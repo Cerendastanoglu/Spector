@@ -1,21 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { useFetcher } from "@remix-run/react";
 import {
   Page,
   Layout,
   Text,
   Card,
-  Button,
   BlockStack,
-  Box,
-  InlineStack,
 } from "@shopify/polaris";
-import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { AppHeader } from "../components/AppHeader";
 import { Dashboard } from "../components/Dashboard";
-import { OutOfStockProducts } from "../components/OutOfStockProducts";
+import { Notifications } from "../components/Notifications";
+import { WelcomePage } from "../components/WelcomePage";
+import { OptimizedComponents, useComponentPreloader } from "../utils/lazyLoader";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -65,10 +62,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Index() {
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [outOfStockCount, setOutOfStockCount] = useState(0);
-  const fetcher = useFetcher<typeof action>();
-  const shopify = useAppBridge();
+  const [activeTab, setActiveTab] = useState("welcome");
+  const [outOfStockCount] = useState(0);
+  const { preloadComponent } = useComponentPreloader();
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -76,6 +72,8 @@ export default function Index() {
 
   const renderActiveTabContent = () => {
     switch (activeTab) {
+      case "welcome":
+        return <WelcomePage onNavigate={handleTabChange} />;
       case "dashboard":
         return (
           <Dashboard
@@ -85,7 +83,9 @@ export default function Index() {
           />
         );
       case "out-of-stock":
-        return <OutOfStockProducts isVisible={true} />;
+        return <OptimizedComponents.ProductManagement isVisible={true} />;
+      case "notifications":
+        return <Notifications isVisible={true} />;
       default:
         return (
           <Card>
@@ -107,6 +107,11 @@ export default function Index() {
           onTabChange={handleTabChange}
           activeTab={activeTab}
           outOfStockCount={outOfStockCount}
+          onPreloadComponent={(componentName) => {
+            if (componentName === 'ProductManagement' || componentName === 'Dashboard') {
+              preloadComponent(componentName as keyof typeof OptimizedComponents);
+            }
+          }}
         />
         
         <Layout>

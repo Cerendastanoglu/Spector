@@ -13,6 +13,77 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const actionType = formData.get("action");
 
+  if (actionType === "get-all-products") {
+    try {
+      const response = await admin.graphql(
+        `#graphql
+          query getAllProducts($first: Int!) {
+            products(first: $first) {
+              edges {
+                node {
+                  id
+                  title
+                  handle
+                  status
+                  totalInventory
+                  featuredMedia {
+                    preview {
+                      image {
+                        url
+                        altText
+                      }
+                    }
+                  }
+                  variants(first: 10) {
+                    edges {
+                      node {
+                        id
+                        title
+                        inventoryQuantity
+                        price
+                        sku
+                        inventoryItem {
+                          id
+                          tracked
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+            }
+          }`,
+        {
+          variables: {
+            first: 100,
+          },
+        }
+      );
+
+      const responseJson: any = await response.json();
+      
+      if (responseJson.errors) {
+        console.error("GraphQL Errors:", responseJson.errors);
+        return json({ error: "Failed to fetch products" }, { status: 500 });
+      }
+
+      const products = responseJson.data?.products?.edges?.map((edge: any) => edge.node) || [];
+      const hasNextPage = responseJson.data?.products?.pageInfo?.hasNextPage || false;
+
+      return json({
+        products,
+        hasNextPage,
+      });
+    } catch (error) {
+      console.error("Error fetching all products:", error);
+      return json({ error: "Internal server error" }, { status: 500 });
+    }
+  }
+
   if (actionType === "fetch-out-of-stock") {
     try {
       const response = await admin.graphql(

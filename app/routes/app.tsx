@@ -4,8 +4,11 @@ import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
 import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
+import { useEffect } from "react";
 
 import { authenticate } from "../shopify.server";
+import { ThemeProvider } from "../contexts/ThemeContext";
+import { ShopifyAppPerformance, useAppBridgePerformance } from "../utils/appBridgePerformance";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
@@ -17,16 +20,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();
+  
+  // Initialize performance optimizations
+  const { markPerformanceMilestone } = useAppBridgePerformance({
+    enableMetrics: true,
+    preloadResources: ['/app/products', '/app/notifications'],
+    loadingStrategy: 'auto'
+  });
+
+  useEffect(() => {
+    // Initialize Shopify app performance optimizations
+    ShopifyAppPerformance.initialize();
+    markPerformanceMilestone('app-initialized');
+  }, [markPerformanceMilestone]);
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
-      <NavMenu>
-        <Link to="/app" rel="home">
-          Home
-        </Link>
-        <Link to="/app/additional">Additional page</Link>
-      </NavMenu>
-      <Outlet />
+      <ThemeProvider>
+        <NavMenu>
+          <Link to="/app" rel="home">
+            Home
+          </Link>
+        </NavMenu>
+        <Outlet />
+      </ThemeProvider>
     </AppProvider>
   );
 }

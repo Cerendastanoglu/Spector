@@ -10,10 +10,10 @@ import {
 } from "@shopify/polaris";
 import {
   ProductIcon,
-  ChartVerticalIcon,
   ExportIcon,
   AlertCircleIcon,
 } from "@shopify/polaris-icons";
+import { PerformanceDashboard } from "./PerformanceDashboard";
 
 interface DashboardProps {
   isVisible: boolean;
@@ -167,6 +167,8 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
           </BlockStack>
         </BlockStack>
       </Card>
+
+      <PerformanceDashboard />
     </BlockStack>
   );
 }

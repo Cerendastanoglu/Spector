@@ -22,9 +22,9 @@ export default function App() {
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>A short heading about [your app]</h1>
+        <h1 className={styles.heading}>Welcome to Spector</h1>
         <p className={styles.text}>
-          A tagline about [your app] that describes your value proposition.
+          Intelligent inventory management for your Shopify store. Track, manage, and optimize your product inventory with advanced analytics and automation.
         </p>
         {showForm && (
           <Form className={styles.form} method="post" action="/auth/login">
@@ -40,16 +40,13 @@ export default function App() {
         )}
         <ul className={styles.list}>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Smart Inventory Tracking</strong>. Real-time monitoring of stock levels with intelligent alerts when products run low.
           </li>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Bulk Product Management</strong>. Edit prices, collections, and inventory for multiple products simultaneously to save time.
           </li>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Advanced Analytics</strong>. Get insights into your inventory performance with detailed reports and forecasting.
           </li>
         </ul>
       </div>
