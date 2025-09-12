@@ -111,7 +111,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
         e.currentTarget.style.transform = 'scale(1)';
       }}>
         <img 
-          src="/assets/Logo.svg" 
+          src="/assets/logo.png" 
           alt="Spector Logo" 
           style={{ 
             width: '80px', 
