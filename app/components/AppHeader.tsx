@@ -47,8 +47,8 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
       background: activeTab === "settings" ? 'white' : 'transparent',
       borderRadius: '12px',
       padding: '2px',
-      border: activeTab === "settings" ? '2px solid #ffd700' : '1px solid transparent',
-      boxShadow: activeTab === "settings" ? '0 2px 8px rgba(255, 215, 0, 0.3)' : 'none',
+      border: activeTab === "settings" ? '2px solid #FF204E' : '1px solid transparent',
+      boxShadow: activeTab === "settings" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
     }}>
       <Tooltip content="App Configuration">
@@ -68,8 +68,8 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
       background: activeTab === "settings" ? 'white' : 'transparent',
       borderRadius: '12px',
       padding: '2px',
-      border: activeTab === "settings" ? '2px solid #ffd700' : '1px solid transparent',
-      boxShadow: activeTab === "settings" ? '0 2px 8px rgba(255, 215, 0, 0.3)' : 'none',
+      border: activeTab === "settings" ? '2px solid #FF204E' : '1px solid transparent',
+      boxShadow: activeTab === "settings" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
     }}>
       <Button 
@@ -111,7 +111,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
         e.currentTarget.style.transform = 'scale(1)';
       }}>
         <img 
-          src="/assets/logo.svg" 
+          src="/assets/Logo.svg" 
           alt="Spector Logo" 
           style={{ 
             width: '80px', 
@@ -132,7 +132,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
         <div style={{
           width: '80px',
           height: '80px',
-          background: 'linear-gradient(135deg, #f31900, #fe5800)',
+          background: 'linear-gradient(135deg, #FF204E, #A0153E)',
           borderRadius: '12px',
           display: 'none',
           alignItems: 'center',
@@ -141,7 +141,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
           fontSize: '32px',
           fontWeight: 'bold',
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: '0 4px 12px rgba(243, 25, 0, 0.3)'
+          boxShadow: '0 4px 12px rgba(255, 32, 78, 0.3)'
         }}>
           S
         </div>
@@ -162,7 +162,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
           </span>
           <span style={{
             marginLeft: '6px',
-            color: '#ffd700',
+            color: '#FF204E',
             fontSize: '0.6em',
             fontWeight: 'normal',
             verticalAlign: 'super'
@@ -190,8 +190,8 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
         background: activeTab === "dashboard" ? 'white' : 'transparent',
         borderRadius: '12px',
         padding: '2px',
-        border: activeTab === "dashboard" ? '2px solid #ffd700' : '1px solid transparent',
-        boxShadow: activeTab === "dashboard" ? '0 2px 8px rgba(255, 215, 0, 0.3)' : 'none'
+        border: activeTab === "dashboard" ? '2px solid #FF204E' : '1px solid transparent',
+        boxShadow: activeTab === "dashboard" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none'
       }}>
         <Button
           onClick={() => onTabChange("dashboard")}
@@ -209,8 +209,8 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
           background: activeTab === "out-of-stock" ? 'white' : 'transparent',
           borderRadius: '12px',
           padding: '2px',
-          border: activeTab === "out-of-stock" ? '2px solid #ffd700' : '1px solid transparent',
-          boxShadow: activeTab === "out-of-stock" ? '0 2px 8px rgba(255, 215, 0, 0.3)' : 'none'
+          border: activeTab === "out-of-stock" ? '2px solid #FF204E' : '1px solid transparent',
+          boxShadow: activeTab === "out-of-stock" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none'
         }}>
           <Button
             onClick={() => onTabChange("out-of-stock")}
@@ -222,23 +222,23 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
           </Button>
         </div>
         
-        {/* Simple gold badge */}
+        {/* Brand color badge */}
         {outOfStockCount > 0 && (
           <div style={{
-            background: 'linear-gradient(135deg, #ffd700, #ffb300)',
+            background: 'linear-gradient(135deg, #FF204E, #A0153E)',
             borderRadius: '12px',
             padding: '4px 8px',
             minWidth: '24px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(255, 215, 0, 0.4)',
+            boxShadow: '0 2px 8px rgba(255, 32, 78, 0.4)',
             border: '1px solid rgba(255, 255, 255, 0.8)'
           }}>
             <Text as="span" variant="bodySm" fontWeight="bold">
               <span style={{ 
-                color: '#8b4513',
-                textShadow: '0 1px 1px rgba(255, 255, 255, 0.8)'
+                color: 'white',
+                textShadow: '0 1px 1px rgba(0, 0, 0, 0.2)'
               }}>
                 {outOfStockCount}
               </span>
@@ -252,8 +252,8 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
         background: activeTab === "notifications" ? 'white' : 'transparent',
         borderRadius: '12px',
         padding: '2px',
-        border: activeTab === "notifications" ? '2px solid #ffd700' : '1px solid transparent',
-        boxShadow: activeTab === "notifications" ? '0 2px 8px rgba(255, 215, 0, 0.3)' : 'none',
+        border: activeTab === "notifications" ? '2px solid #FF204E' : '1px solid transparent',
+        boxShadow: activeTab === "notifications" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none',
         position: 'relative'
       }}>
         <Button
@@ -278,18 +278,18 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
             background: transparent !important;
             border: none !important;
             box-shadow: none !important;
-            color: #8b4513 !important;
+            color: #A0153E !important;
             font-weight: bold !important;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
           }
           
           .nav-button-active button span {
-            color: #8b4513 !important;
+            color: #A0153E !important;
             font-weight: bold !important;
           }
           
           .nav-button-active button svg {
-            fill: #8b4513 !important;
+            fill: #A0153E !important;
           }
           
           .nav-button-inactive button {
@@ -312,16 +312,16 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
           }
           
           .nav-button-inactive button:hover {
-            background: rgba(255, 215, 0, 0.1) !important;
+            background: rgba(255, 32, 78, 0.1) !important;
             transform: translateY(-1px) !important;
           }
           
           .nav-button-inactive button:hover svg {
-            fill: #8b4513 !important;
+            fill: #A0153E !important;
           }
           
           .nav-button-active button:hover {
-            background: rgba(255, 215, 0, 0.05) !important;
+            background: rgba(255, 32, 78, 0.05) !important;
             transform: translateY(-1px) !important;
           }
           
@@ -358,10 +358,10 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
       }} />
       
       <div className="app-header" style={{
-        background: 'linear-gradient(135deg, #ffecd6 0%, #fff5e6 50%, #ffecd6 100%)',
+        background: 'linear-gradient(135deg, #fdf2f5 0%, #fef7f9 50%, #fdf2f5 100%)',
         borderBottom: '1px solid #e0e0e0',
         borderRadius: '0 0 24px 24px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(255, 215, 0, 0.1)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(255, 32, 78, 0.1)',
         position: 'sticky',
         top: 0,
         zIndex: 100,
@@ -369,11 +369,11 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
         overflow: 'hidden'
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = '0 6px 30px rgba(0,0,0,0.12), 0 4px 12px rgba(255, 215, 0, 0.15)';
+        e.currentTarget.style.boxShadow = '0 6px 30px rgba(0,0,0,0.12), 0 4px 12px rgba(255, 32, 78, 0.15)';
         e.currentTarget.style.transform = 'translateY(-1px)';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(255, 215, 0, 0.1)';
+        e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(255, 32, 78, 0.1)';
         e.currentTarget.style.transform = 'translateY(0)';
       }}>
         <Box padding="500" position="relative">
@@ -404,8 +404,8 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
                 background: 'rgba(255, 255, 255, 0.8)',
                 borderRadius: '12px',
                 padding: '12px 16px',
-                border: '1px solid rgba(255, 215, 0, 0.2)',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.08), 0 2px 8px rgba(255, 215, 0, 0.1)',
+                border: '1px solid rgba(255, 32, 78, 0.2)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08), 0 2px 8px rgba(255, 32, 78, 0.1)',
                 backdropFilter: 'blur(10px)',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 display: 'flex',
@@ -425,7 +425,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
                   background: 'rgba(255, 255, 255, 0.8)',
                   borderRadius: '8px',
                   padding: '8px 16px',
-                  border: '1px solid rgba(255, 215, 0, 0.2)',
+                  border: '1px solid rgba(255, 32, 78, 0.2)',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                   backdropFilter: 'blur(10px)'
                 }}>
@@ -449,26 +449,26 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
         bottom: '24px',
         right: '24px',
         zIndex: 1000,
-        background: 'linear-gradient(135deg, #ffecd6 0%, #fff5e6 100%)',
+        background: 'linear-gradient(135deg, #fdf2f5 0%, #fef7f9 100%)',
         borderRadius: '50%',
         width: '56px',
         height: '56px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.15), 0 2px 8px rgba(255, 215, 0, 0.2)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.15), 0 2px 8px rgba(255, 32, 78, 0.2)',
         cursor: 'pointer',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        border: '2px solid rgba(255, 215, 0, 0.3)'
+        border: '2px solid rgba(255, 32, 78, 0.3)'
       }}
       onClick={() => onTabChange("help")}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'scale(1.1)';
-        e.currentTarget.style.boxShadow = '0 6px 30px rgba(0,0,0,0.2), 0 4px 12px rgba(255, 215, 0, 0.3)';
+        e.currentTarget.style.boxShadow = '0 6px 30px rgba(0,0,0,0.2), 0 4px 12px rgba(255, 32, 78, 0.3)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'scale(1)';
-        e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.15), 0 2px 8px rgba(255, 215, 0, 0.2)';
+        e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.15), 0 2px 8px rgba(255, 32, 78, 0.2)';
       }}>
         <Icon source={QuestionCircleIcon} tone="base" />
       </div>
