@@ -155,8 +155,8 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
-            fontWeight: 'bold',
-            fontFamily: 'inherit' // Easy to change font family later
+            fontWeight: '700',
+            fontFamily: 'Unbounded, sans-serif'
           }}>
             Spector
           </span>

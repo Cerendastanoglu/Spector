@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Page,
   Card,
@@ -8,12 +9,15 @@ import {
   Box,
   Icon,
   Grid,
+  Collapsible,
 } from "@shopify/polaris";
 import {
   ChartVerticalIcon,
   InventoryIcon,
   OrderIcon,
   MarketsIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from "@shopify/polaris-icons";
 
 interface WelcomePageProps {
@@ -21,7 +25,18 @@ interface WelcomePageProps {
 }
 
 export function WelcomePage({ onNavigate }: WelcomePageProps) {
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
+
   return (
+    <>
+      {/* Add Unbounded font */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700&display=swap');
+        .unbounded-bold {
+          font-family: 'Unbounded', cursive !important;
+          font-weight: 700 !important;
+        }
+      `}</style>
     <Page>
       <BlockStack gap="500">
         {/* Unified Welcome & What's New Section */}
@@ -50,10 +65,14 @@ export function WelcomePage({ onNavigate }: WelcomePageProps) {
             <BlockStack gap="600" align="center">
               <BlockStack gap="400" align="center">
                 <Text as="h1" variant="heading3xl" alignment="center">
-                  Welcome to Spector
+                  <span style={{ fontFamily: 'Unbounded, sans-serif', fontWeight: '700' }}>
+                    Welcome to Spector
+                  </span>
                 </Text>
                 <Text as="p" variant="headingLg" alignment="center" tone="subdued">
-                  Your Intelligent Inventory Management System
+                  <span style={{ fontFamily: 'Unbounded, sans-serif', fontWeight: '600' }}>
+                    Your Intelligent Inventory Management System
+                  </span>
                 </Text>
               </BlockStack>
               
@@ -90,16 +109,59 @@ export function WelcomePage({ onNavigate }: WelcomePageProps) {
               width: '60%'
             }} />
 
-            {/* What's New Section */}
-            <BlockStack gap="600">
-              <BlockStack gap="300" align="center">
-                <Text as="h2" variant="headingXl" alignment="center">
-                  What's New This Month
-                </Text>
-                <Text as="p" variant="bodyLg" alignment="center" tone="subdued">
-                  Latest features and improvements designed to boost your productivity
-                </Text>
-              </BlockStack>
+            {/* What's New Section - Collapsible */}
+            <BlockStack gap="400">
+              {/* Collapsible Header */}
+              <div 
+                style={{ 
+                  cursor: 'pointer',
+                  padding: '20px',
+                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                  borderRadius: '16px',
+                  border: '2px solid rgba(148, 163, 184, 0.1)',
+                  transition: 'all 0.3s ease'
+                }}
+                onClick={() => setShowWhatsNew(!showWhatsNew)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)';
+                  e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)';
+                  e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.1)';
+                }}
+              >
+                <InlineStack align="space-between" blockAlign="center">
+                  <BlockStack gap="100">
+                    <Text as="h2" variant="headingMd">
+                      <span style={{ fontFamily: 'Unbounded, sans-serif', fontWeight: '600' }}>
+                        What's New This Month
+                      </span>
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Latest features and improvements designed to boost your productivity
+                    </Text>
+                  </BlockStack>
+                  <Button
+                    variant="tertiary"
+                    icon={showWhatsNew ? ChevronUpIcon : ChevronDownIcon}
+                    onClick={() => setShowWhatsNew(!showWhatsNew)}
+                  >
+                    {showWhatsNew ? 'Hide' : 'Show'} Updates
+                  </Button>
+                </InlineStack>
+              </div>
+
+              {/* Collapsible Content */}
+              <Collapsible
+                open={showWhatsNew}
+                id="whats-new-content"
+                transition={{
+                  duration: '300ms',
+                  timingFunction: 'ease-in-out'
+                }}
+              >
+                <BlockStack gap="400">
             
             <Grid>
               <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
@@ -246,54 +308,177 @@ export function WelcomePage({ onNavigate }: WelcomePageProps) {
                 </div>
               </Grid.Cell>
             </Grid>
+                </BlockStack>
+              </Collapsible>
             </BlockStack>
           </BlockStack>
         </div>
 
-        {/* Pro Tips for Success */}
-        <Card>
-          <Box padding="600">
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingLg">
-                Pro Tips for Success
+        {/* Pro Tips for Success - Brand Colors */}
+        <div style={{
+          background: 'linear-gradient(135deg, #fef7f9 0%, #fdf2f5 50%, #fef7f9 100%)',
+          borderRadius: '24px',
+          padding: '48px 32px',
+          border: '2px solid rgba(255, 32, 78, 0.1)',
+          boxShadow: '0 12px 40px rgba(255, 32, 78, 0.08)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          {/* Decorative Background Elements */}
+          <div style={{
+            position: 'absolute',
+            top: '-20px',
+            right: '-20px',
+            width: '100px',
+            height: '100px',
+            background: 'radial-gradient(circle, rgba(255, 32, 78, 0.1) 0%, transparent 70%)',
+            borderRadius: '50%'
+          }} />
+          <div style={{
+            position: 'absolute',
+            bottom: '-30px',
+            left: '-30px',
+            width: '120px',
+            height: '120px',
+            background: 'radial-gradient(circle, rgba(160, 21, 62, 0.05) 0%, transparent 70%)',
+            borderRadius: '50%'
+          }} />
+
+          <BlockStack gap="500">
+            {/* Section Header */}
+            <BlockStack gap="200" align="center">
+              <Text as="h2" variant="headingXl" alignment="center">
+                <span style={{ fontFamily: 'Unbounded, sans-serif', fontWeight: '700', color: '#A0153E' }}>
+                  Pro Tips for Success
+                </span>
               </Text>
-              <BlockStack gap="300">
-                <Box padding="400" background="bg-surface-info" borderRadius="200">
-                  <InlineStack gap="300" align="space-between">
-                    <BlockStack gap="100">
-                      <Text as="h3" variant="headingMd">Set Smart Thresholds</Text>
-                      <Text as="p" variant="bodyMd" tone="subdued">
-                        Configure alerts based on your average sales velocity. Fast-moving products need higher thresholds.
-                      </Text>
-                    </BlockStack>
-                    <Button 
-                      variant="secondary"
-                      onClick={() => onNavigate("settings")}
-                    >
-                      Configure
-                    </Button>
-                  </InlineStack>
-                </Box>
-                <Box padding="400" background="bg-surface-success" borderRadius="200">
-                  <InlineStack gap="300" align="space-between">
-                    <BlockStack gap="100">
-                      <Text as="h3" variant="headingMd">Weekly Analytics Review</Text>
-                      <Text as="p" variant="bodyMd" tone="subdued">
-                        Check your dashboard every Monday to identify trends and plan inventory for the week ahead.
-                      </Text>
-                    </BlockStack>
-                    <Button 
-                      variant="secondary"
-                      onClick={() => onNavigate("dashboard")}
-                    >
-                      View Now
-                    </Button>
-                  </InlineStack>
-                </Box>
-              </BlockStack>
+              <Text as="p" variant="bodyLg" alignment="center" tone="subdued">
+                Expert strategies to maximize your inventory management efficiency
+              </Text>
             </BlockStack>
-          </Box>
-        </Card>
+
+            {/* Tips Grid */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+              gap: '24px'
+            }}>
+              {/* Smart Thresholds Tip */}
+              <div style={{
+                background: 'linear-gradient(135deg, #fff7f8 0%, #fef2f2 100%)',
+                borderRadius: '20px',
+                padding: '32px',
+                border: '2px solid rgba(255, 32, 78, 0.15)',
+                boxShadow: '0 8px 32px rgba(255, 32, 78, 0.1)',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-6px)';
+                e.currentTarget.style.boxShadow = '0 16px 48px rgba(255, 32, 78, 0.2)';
+                e.currentTarget.style.borderColor = 'rgba(255, 32, 78, 0.25)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 32px rgba(255, 32, 78, 0.1)';
+                e.currentTarget.style.borderColor = 'rgba(255, 32, 78, 0.15)';
+              }}>
+                {/* Icon Badge */}
+                <div style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '20px',
+                  width: '48px',
+                  height: '48px',
+                  background: 'linear-gradient(135deg, #FF204E 0%, #A0153E 100%)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 16px rgba(255, 32, 78, 0.3)'
+                }}>
+                  <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>⚡</span>
+                </div>
+
+                <BlockStack gap="300">
+                  <BlockStack gap="100">
+                    <Text as="h3" variant="headingMd">
+                      <span style={{ color: '#A0153E', fontWeight: '600' }}>Set Smart Thresholds</span>
+                    </Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      Configure alerts based on your average sales velocity. Fast-moving products need higher thresholds to prevent stockouts.
+                    </Text>
+                  </BlockStack>
+                  <Button 
+                    variant="primary"
+                    onClick={() => onNavigate("settings")}
+                    fullWidth
+                  >
+                    Configure Settings
+                  </Button>
+                </BlockStack>
+              </div>
+
+              {/* Weekly Analytics Tip */}
+              <div style={{
+                background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)',
+                borderRadius: '20px',
+                padding: '32px',
+                border: '2px solid rgba(93, 14, 65, 0.15)',
+                boxShadow: '0 8px 32px rgba(93, 14, 65, 0.1)',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-6px)';
+                e.currentTarget.style.boxShadow = '0 16px 48px rgba(93, 14, 65, 0.2)';
+                e.currentTarget.style.borderColor = 'rgba(93, 14, 65, 0.25)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 32px rgba(93, 14, 65, 0.1)';
+                e.currentTarget.style.borderColor = 'rgba(93, 14, 65, 0.15)';
+              }}>
+                {/* Icon Badge */}
+                <div style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '20px',
+                  width: '48px',
+                  height: '48px',
+                  background: 'linear-gradient(135deg, #5D0E41 0%, #00224D 100%)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 16px rgba(93, 14, 65, 0.3)'
+                }}>
+                  <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>📊</span>
+                </div>
+
+                <BlockStack gap="300">
+                  <BlockStack gap="100">
+                    <Text as="h3" variant="headingMd">
+                      <span style={{ color: '#5D0E41', fontWeight: '600' }}>Weekly Analytics Review</span>
+                    </Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      Check your dashboard every Monday to identify trends, analyze performance, and plan inventory strategy for the week ahead.
+                    </Text>
+                  </BlockStack>
+                  <Button 
+                    variant="secondary"
+                    onClick={() => onNavigate("dashboard")}
+                    fullWidth
+                  >
+                    View Dashboard
+                  </Button>
+                </BlockStack>
+              </div>
+            </div>
+          </BlockStack>
+        </div>
 
         {/* Core Features */}
         <Grid>
@@ -622,110 +807,180 @@ export function WelcomePage({ onNavigate }: WelcomePageProps) {
         </div>
 
         {/* Quick Setup Guide */}
-        <Card>
-          <Box padding="600">
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingLg">
-                🚀 Get the Most Out of Spector
-              </Text>
-              <Grid>
-                <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 4, xl: 4 }}>
-                  <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                    <BlockStack gap="300">
-                      <Text as="h3" variant="headingMd">1. Set Alert Thresholds</Text>
-                      <Text as="p" variant="bodyMd" tone="subdued">
-                        Customize when you want to be notified for each product
-                      </Text>
-                      <Button 
-                        variant="plain" 
-                        onClick={() => onNavigate("settings")}
-                      >
-                        Configure Alerts →
-                      </Button>
-                    </BlockStack>
-                  </Box>
-                </Grid.Cell>
-                <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 4, xl: 4 }}>
-                  <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                    <BlockStack gap="300">
-                      <Text as="h3" variant="headingMd">2. Review Analytics</Text>
-                      <Text as="p" variant="bodyMd" tone="subdued">
-                        Understand your sales patterns and inventory performance
-                      </Text>
-                      <Button 
-                        variant="plain" 
-                        onClick={() => onNavigate("dashboard")}
-                      >
-                        View Analytics →
-                      </Button>
-                    </BlockStack>
-                  </Box>
-                </Grid.Cell>
-                <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 4, xl: 4 }}>
-                  <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                    <BlockStack gap="300">
-                      <Text as="h3" variant="headingMd">3. Check Notifications</Text>
-                      <Text as="p" variant="bodyMd" tone="subdued">
-                        Stay on top of important inventory updates and alerts
-                      </Text>
-                      <Button 
-                        variant="plain" 
-                        onClick={() => onNavigate("notifications")}
-                      >
-                        View Notifications →
-                      </Button>
-                    </BlockStack>
-                  </Box>
-                </Grid.Cell>
-              </Grid>
-            </BlockStack>
-          </Box>
-        </Card>
 
-        {/* Getting Started */}
-        <Grid>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
-            <Card>
-              <Box padding="500">
-                <BlockStack gap="300">
-                  <Text as="h3" variant="headingMd">
+
+        {/* Getting Started - Brand Colors Design */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', 
+          gap: '24px'
+        }}>
+          {/* Need Help Getting Started */}
+          <div style={{
+            background: 'linear-gradient(135deg, #f0f4ff 0%, #e6f1ff 100%)',
+            borderRadius: '24px',
+            padding: '40px',
+            border: '2px solid rgba(0, 34, 77, 0.15)',
+            boxShadow: '0 12px 40px rgba(0, 34, 77, 0.1)',
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-6px)';
+            e.currentTarget.style.boxShadow = '0 20px 60px rgba(0, 34, 77, 0.2)';
+            e.currentTarget.style.borderColor = 'rgba(0, 34, 77, 0.25)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 12px 40px rgba(0, 34, 77, 0.1)';
+            e.currentTarget.style.borderColor = 'rgba(0, 34, 77, 0.15)';
+          }}>
+            {/* Decorative Elements */}
+            <div style={{
+              position: 'absolute',
+              top: '-30px',
+              right: '-30px',
+              width: '100px',
+              height: '100px',
+              background: 'radial-gradient(circle, rgba(0, 34, 77, 0.1) 0%, transparent 70%)',
+              borderRadius: '50%'
+            }} />
+            <div style={{
+              position: 'absolute',
+              bottom: '20px',
+              left: '20px',
+              width: '60px',
+              height: '60px',
+              background: 'rgba(0, 34, 77, 0.05)',
+              borderRadius: '50%'
+            }} />
+
+            {/* Icon Badge */}
+            <div style={{
+              width: '60px',
+              height: '60px',
+              background: 'linear-gradient(135deg, #00224D 0%, #1e40af 100%)',
+              borderRadius: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 6px 20px rgba(0, 34, 77, 0.3)',
+              marginBottom: '24px'
+            }}>
+              <span style={{ color: 'white', fontSize: '28px', fontWeight: 'bold' }}>❓</span>
+            </div>
+
+            <BlockStack gap="400">
+              <BlockStack gap="200">
+                <Text as="h3" variant="headingLg">
+                  <span style={{ 
+                    color: '#00224D', 
+                    fontFamily: 'Unbounded, sans-serif', 
+                    fontWeight: '600' 
+                  }}>
                     Need Help Getting Started?
-                  </Text>
-                  <Text as="p" variant="bodyMd" tone="subdued">
-                    Access our comprehensive guides, video tutorials, and detailed pricing information to make the most of Spector.
-                  </Text>
-                  <Button 
-                    variant="secondary"
-                    onClick={() => onNavigate("help")}
-                  >
-                    Visit Help Center
-                  </Button>
-                </BlockStack>
-              </Box>
-            </Card>
-          </Grid.Cell>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
-            <Card>
-              <Box padding="500">
-                <BlockStack gap="300">
-                  <Text as="h3" variant="headingMd">
+                  </span>
+                </Text>
+                <Text as="p" variant="bodyLg" tone="subdued">
+                  Access our comprehensive guides, video tutorials, and detailed pricing information to make the most of Spector.
+                </Text>
+              </BlockStack>
+              <Button 
+                variant="secondary"
+                onClick={() => onNavigate("help")}
+                size="large"
+                fullWidth
+              >
+                Visit Help Center
+              </Button>
+            </BlockStack>
+          </div>
+
+          {/* Ready to Start Managing Inventory */}
+          <div style={{
+            background: 'linear-gradient(135deg, #fff7f8 0%, #fef2f2 100%)',
+            borderRadius: '24px',
+            padding: '40px',
+            border: '2px solid rgba(255, 32, 78, 0.15)',
+            boxShadow: '0 12px 40px rgba(255, 32, 78, 0.1)',
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-6px)';
+            e.currentTarget.style.boxShadow = '0 20px 60px rgba(255, 32, 78, 0.2)';
+            e.currentTarget.style.borderColor = 'rgba(255, 32, 78, 0.25)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 12px 40px rgba(255, 32, 78, 0.1)';
+            e.currentTarget.style.borderColor = 'rgba(255, 32, 78, 0.15)';
+          }}>
+            {/* Decorative Elements */}
+            <div style={{
+              position: 'absolute',
+              top: '-30px',
+              right: '-30px',
+              width: '100px',
+              height: '100px',
+              background: 'radial-gradient(circle, rgba(255, 32, 78, 0.1) 0%, transparent 70%)',
+              borderRadius: '50%'
+            }} />
+            <div style={{
+              position: 'absolute',
+              bottom: '20px',
+              left: '20px',
+              width: '60px',
+              height: '60px',
+              background: 'rgba(255, 32, 78, 0.05)',
+              borderRadius: '50%'
+            }} />
+
+            {/* Icon Badge */}
+            <div style={{
+              width: '60px',
+              height: '60px',
+              background: 'linear-gradient(135deg, #FF204E 0%, #A0153E 100%)',
+              borderRadius: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 6px 20px rgba(255, 32, 78, 0.3)',
+              marginBottom: '24px'
+            }}>
+              <span style={{ color: 'white', fontSize: '28px', fontWeight: 'bold' }}>🚀</span>
+            </div>
+
+            <BlockStack gap="400">
+              <BlockStack gap="200">
+                <Text as="h3" variant="headingLg">
+                  <span style={{ 
+                    color: '#A0153E', 
+                    fontFamily: 'Unbounded, sans-serif', 
+                    fontWeight: '600' 
+                  }}>
                     Ready to Start Managing Inventory?
-                  </Text>
-                  <Text as="p" variant="bodyMd" tone="subdued">
-                    Jump into your analytics dashboard and discover insights about your products, sales trends, and inventory performance.
-                  </Text>
-                  <Button 
-                    variant="primary"
-                    onClick={() => onNavigate("dashboard")}
-                  >
-                    Open Dashboard
-                  </Button>
-                </BlockStack>
-              </Box>
-            </Card>
-          </Grid.Cell>
-        </Grid>
+                  </span>
+                </Text>
+                <Text as="p" variant="bodyLg" tone="subdued">
+                  Jump into your analytics dashboard and discover insights about your products, sales trends, and inventory performance.
+                </Text>
+              </BlockStack>
+              <Button 
+                variant="primary"
+                onClick={() => onNavigate("dashboard")}
+                size="large"
+                fullWidth
+              >
+                Open Dashboard
+              </Button>
+            </BlockStack>
+          </div>
+        </div>
       </BlockStack>
     </Page>
+    </>
   );
 }
