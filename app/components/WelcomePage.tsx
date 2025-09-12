@@ -14,8 +14,6 @@ import {
   InventoryIcon,
   OrderIcon,
   MarketsIcon,
-  SettingsIcon,
-  StarIcon,
 } from "@shopify/polaris-icons";
 
 interface WelcomePageProps {
@@ -26,77 +24,231 @@ export function WelcomePage({ onNavigate }: WelcomePageProps) {
   return (
     <Page>
       <BlockStack gap="500">
-        {/* Welcome Hero */}
-        <Card>
-          <Box padding="800">
-            <BlockStack gap="500" align="center">
-              <BlockStack gap="300" align="center">
+        {/* Unified Welcome & What's New Section */}
+        <div style={{
+          background: 'linear-gradient(135deg, #fef7f9 0%, #fdf2f5 50%, #fef7f9 100%)',
+          borderRadius: '24px',
+          border: '1px solid rgba(255, 32, 78, 0.1)',
+          padding: '64px 40px',
+          boxShadow: '0 20px 60px rgba(255, 32, 78, 0.08)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          {/* Subtle background pattern */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'radial-gradient(circle at 20% 80%, rgba(255, 32, 78, 0.03) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(160, 21, 62, 0.03) 0%, transparent 50%)',
+            pointerEvents: 'none'
+          }} />
+          
+          <BlockStack gap="800">
+            {/* Welcome Hero Section */}
+            <BlockStack gap="600" align="center">
+              <BlockStack gap="400" align="center">
                 <Text as="h1" variant="heading3xl" alignment="center">
                   Welcome to Spector
                 </Text>
-                <Text as="p" variant="headingMd" alignment="center" tone="subdued">
+                <Text as="p" variant="headingLg" alignment="center" tone="subdued">
                   Your Intelligent Inventory Management System
                 </Text>
               </BlockStack>
-              <Box paddingBlockStart="300" paddingBlockEnd="200">
+              
+              <Box paddingBlockStart="200" paddingBlockEnd="400" maxWidth="600px">
                 <Text as="p" variant="bodyLg" alignment="center" tone="subdued">
                   Transform your inventory management with intelligent alerts, real-time tracking, and actionable insights. 
                   Spector helps you prevent stockouts, optimize product performance, and make data-driven decisions that grow your business.
                 </Text>
               </Box>
-              <Button
-                variant="primary"
-                size="large"
-                onClick={() => onNavigate("dashboard")}
-              >
-                Explore Your Dashboard
-              </Button>
+              
+              <InlineStack gap="400" align="center">
+                <Button
+                  variant="primary"
+                  size="large"
+                  onClick={() => onNavigate("dashboard")}
+                >
+                  Explore Your Dashboard
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="large"
+                  onClick={() => onNavigate("help")}
+                >
+                  Learn More
+                </Button>
+              </InlineStack>
             </BlockStack>
-          </Box>
-        </Card>
 
-        {/* What's New This Month */}
-        <Card>
-          <Box padding="600">
-            <BlockStack gap="500">
-              <Text as="h2" variant="headingXl" alignment="center">
-                What's New in Spector This Month
-              </Text>
-              <Grid>
-                <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
-                  <Box padding="400" background="bg-surface-secondary" borderRadius="300">
-                    <BlockStack gap="300" align="center">
-                      <Text as="h3" variant="headingMd">Enhanced Analytics</Text>
+            {/* Divider with gradient */}
+            <div style={{
+              height: '1px',
+              background: 'linear-gradient(90deg, transparent 0%, rgba(255, 32, 78, 0.2) 50%, transparent 100%)',
+              margin: '0 auto',
+              width: '60%'
+            }} />
+
+            {/* What's New Section */}
+            <BlockStack gap="600">
+              <BlockStack gap="300" align="center">
+                <Text as="h2" variant="headingXl" alignment="center">
+                  What's New This Month
+                </Text>
+                <Text as="p" variant="bodyLg" alignment="center" tone="subdued">
+                  Latest features and improvements designed to boost your productivity
+                </Text>
+              </BlockStack>
+            
+            <Grid>
+              <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #ffffff 0%, #fefcfd 100%)',
+                  padding: '32px 24px',
+                  borderRadius: '16px',
+                  border: '2px solid rgba(255, 32, 78, 0.1)',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(255, 32, 78, 0.15)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 32, 78, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.04)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 32, 78, 0.1)';
+                }}>
+                  <BlockStack gap="400">
+                    <div style={{
+                      width: '56px',
+                      height: '56px',
+                      background: 'linear-gradient(135deg, #FF204E, #A0153E)',
+                      borderRadius: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto'
+                    }}>
+                      <div style={{ color: 'white' }}>
+                        <Icon source={ChartVerticalIcon} />
+                      </div>
+                    </div>
+                    <BlockStack gap="200" align="center">
+                      <Text as="h3" variant="headingMd" alignment="center">Enhanced Analytics</Text>
                       <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
-                        New revenue tracking and profit margin insights to help you understand your most valuable products.
+                        Advanced revenue tracking and profit insights to identify your most valuable products and optimize inventory decisions.
                       </Text>
                     </BlockStack>
-                  </Box>
-                </Grid.Cell>
-                <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
-                  <Box padding="400" background="bg-surface-secondary" borderRadius="300">
-                    <BlockStack gap="300" align="center">
-                      <Text as="h3" variant="headingMd">Smart Forecasting</Text>
+                  </BlockStack>
+                </div>
+              </Grid.Cell>
+              
+              <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #ffffff 0%, #fefcfd 100%)',
+                  padding: '32px 24px',
+                  borderRadius: '16px',
+                  border: '2px solid rgba(160, 21, 62, 0.1)',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(160, 21, 62, 0.15)';
+                  e.currentTarget.style.borderColor = 'rgba(160, 21, 62, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.04)';
+                  e.currentTarget.style.borderColor = 'rgba(160, 21, 62, 0.1)';
+                }}>
+                  <BlockStack gap="400">
+                    <div style={{
+                      width: '56px',
+                      height: '56px',
+                      background: 'linear-gradient(135deg, #A0153E, #5D0E41)',
+                      borderRadius: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto'
+                    }}>
+                      <div style={{ color: 'white' }}>
+                        <Icon source={MarketsIcon} />
+                      </div>
+                    </div>
+                    <BlockStack gap="200" align="center">
+                      <Text as="h3" variant="headingMd" alignment="center">Smart Forecasting</Text>
                       <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
-                        AI-powered predictions for when you'll need to restock based on sales velocity and trends.
+                        AI-powered predictions for optimal restocking times based on sales velocity, seasonality, and market trends.
                       </Text>
                     </BlockStack>
-                  </Box>
-                </Grid.Cell>
-                <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
-                  <Box padding="400" background="bg-surface-secondary" borderRadius="300">
-                    <BlockStack gap="300" align="center">
-                      <Text as="h3" variant="headingMd">Mobile Alerts</Text>
+                  </BlockStack>
+                </div>
+              </Grid.Cell>
+              
+              <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #ffffff 0%, #fefcfd 100%)',
+                  padding: '32px 24px',
+                  borderRadius: '16px',
+                  border: '2px solid rgba(93, 14, 65, 0.1)',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(93, 14, 65, 0.15)';
+                  e.currentTarget.style.borderColor = 'rgba(93, 14, 65, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.04)';
+                  e.currentTarget.style.borderColor = 'rgba(93, 14, 65, 0.1)';
+                }}>
+                  <BlockStack gap="400">
+                    <div style={{
+                      width: '56px',
+                      height: '56px',
+                      background: 'linear-gradient(135deg, #5D0E41, #00224D)',
+                      borderRadius: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto'
+                    }}>
+                      <div style={{ color: 'white' }}>
+                        <Icon source={OrderIcon} />
+                      </div>
+                    </div>
+                    <BlockStack gap="200" align="center">
+                      <Text as="h3" variant="headingMd" alignment="center">Mobile Alerts</Text>
                       <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
-                        Get instant push notifications on your phone when critical inventory events occur.
+                        Real-time push notifications on your mobile device when critical inventory events occur or thresholds are reached.
                       </Text>
                     </BlockStack>
-                  </Box>
-                </Grid.Cell>
-              </Grid>
+                  </BlockStack>
+                </div>
+              </Grid.Cell>
+            </Grid>
             </BlockStack>
-          </Box>
-        </Card>
+          </BlockStack>
+        </div>
 
         {/* Pro Tips for Success */}
         <Card>
@@ -192,109 +344,282 @@ export function WelcomePage({ onNavigate }: WelcomePageProps) {
           </Grid.Cell>
         </Grid>
 
-        {/* Pricing Plans */}
-        <BlockStack gap="400">
-          <Text as="h2" variant="heading2xl" alignment="center">
-            Choose Your Plan
-          </Text>
-          <Text as="p" variant="bodyLg" alignment="center" tone="subdued">
-            Scale your inventory management as you grow
-          </Text>
-          
-          <Grid>
-            <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
-              <Card>
-                <Box padding="600">
-                  <BlockStack gap="500" align="center">
-                    <BlockStack gap="200" align="center">
-                      <Text as="h3" variant="headingXl">Starter</Text>
-                      <InlineStack gap="100" align="center">
-                        <Text as="p" variant="heading3xl">Free</Text>
-                        <Text as="p" variant="bodyLg" tone="subdued">forever</Text>
-                      </InlineStack>
-                    </BlockStack>
-                    
-                    <BlockStack gap="300">
-                      <Text as="p" variant="bodyMd" alignment="center" tone="subdued">
-                        Perfect for small stores getting started with inventory management
-                      </Text>
-                      <BlockStack gap="200">
-                        <InlineStack gap="200">
-                          <Icon source={InventoryIcon} tone="subdued" />
-                          <Text as="p" variant="bodyMd">Track up to 100 products</Text>
-                        </InlineStack>
-                        <InlineStack gap="200">
-                          <Icon source={ChartVerticalIcon} tone="subdued" />
-                          <Text as="p" variant="bodyMd">Basic analytics dashboard</Text>
-                        </InlineStack>
-                        <InlineStack gap="200">
-                          <Icon source={OrderIcon} tone="subdued" />
-                          <Text as="p" variant="bodyMd">Email notifications</Text>
-                        </InlineStack>
-                      </BlockStack>
-                    </BlockStack>
-                    
-                    <Button variant="secondary" fullWidth onClick={() => onNavigate("dashboard")}>
-                      Current Plan
-                    </Button>
-                  </BlockStack>
-                </Box>
-              </Card>
-            </Grid.Cell>
+        {/* Choose Your Plan - Modern Redesign */}
+        <div style={{
+          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #f8fafc 100%)',
+          borderRadius: '24px',
+          padding: '64px 40px',
+          border: '1px solid rgba(148, 163, 184, 0.1)',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.06)'
+        }}>
+          <BlockStack gap="600">
+            {/* Header */}
+            <BlockStack gap="300" align="center">
+              <Text as="h2" variant="heading2xl" alignment="center">
+                Choose Your Plan
+              </Text>
+              <Text as="p" variant="bodyLg" alignment="center" tone="subdued">
+                Scale your inventory management as your business grows
+              </Text>
+            </BlockStack>
             
-            <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
-              <Card>
-                <Box padding="600" background="bg-surface-secondary">
-                  <BlockStack gap="500" align="center">
-                    <BlockStack gap="200" align="center">
-                      <InlineStack gap="200" align="center">
-                        <Text as="h3" variant="headingXl">Pro</Text>
-                        <Box background="bg-surface-success" padding="200" borderRadius="200">
-                          <Text as="p" variant="bodySm" fontWeight="medium">Most Popular</Text>
-                        </Box>
-                      </InlineStack>
-                      <InlineStack gap="100" align="center">
-                        <Text as="p" variant="heading3xl">$19</Text>
+            {/* Pricing Cards */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', 
+              gap: '32px',
+              maxWidth: '800px',
+              margin: '0 auto'
+            }}>
+              {/* Starter Plan */}
+              <div style={{
+                background: 'linear-gradient(135deg, #ffffff 0%, #fefefe 100%)',
+                borderRadius: '20px',
+                padding: '40px 32px',
+                border: '2px solid rgba(148, 163, 184, 0.15)',
+                position: 'relative',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.06)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-8px)';
+                e.currentTarget.style.boxShadow = '0 20px 60px rgba(148, 163, 184, 0.15)';
+                e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.25)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.06)';
+                e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.15)';
+              }}>
+                <BlockStack gap="500">
+                  {/* Plan Header */}
+                  <BlockStack gap="300" align="center">
+                    <div style={{
+                      background: 'linear-gradient(135deg, #64748b, #475569)',
+                      borderRadius: '12px',
+                      padding: '12px 24px',
+                      marginBottom: '8px'
+                    }}>
+                      <Text as="h3" variant="headingMd" alignment="center">
+                        <span style={{ color: 'white', fontWeight: '600' }}>Starter</span>
+                      </Text>
+                    </div>
+                    <BlockStack gap="100" align="center">
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '8px' }}>
+                        <Text as="p" variant="heading2xl">Free</Text>
+                        <Text as="p" variant="bodyLg" tone="subdued">forever</Text>
+                      </div>
+                      <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+                        Perfect for small stores getting started
+                      </Text>
+                    </BlockStack>
+                  </BlockStack>
+                  
+                  {/* Features */}
+                  <BlockStack gap="300">
+                    <div style={{
+                      padding: '24px 0',
+                      borderTop: '1px solid rgba(148, 163, 184, 0.1)',
+                      borderBottom: '1px solid rgba(148, 163, 184, 0.1)'
+                    }}>
+                      <BlockStack gap="200">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{
+                            width: '20px',
+                            height: '20px',
+                            background: 'linear-gradient(135deg, #10b981, #059669)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>
+                          </div>
+                          <Text as="p" variant="bodyMd">Track up to 100 products</Text>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{
+                            width: '20px',
+                            height: '20px',
+                            background: 'linear-gradient(135deg, #10b981, #059669)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>
+                          </div>
+                          <Text as="p" variant="bodyMd">Basic analytics dashboard</Text>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{
+                            width: '20px',
+                            height: '20px',
+                            background: 'linear-gradient(135deg, #10b981, #059669)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>
+                          </div>
+                          <Text as="p" variant="bodyMd">Email notifications</Text>
+                        </div>
+                      </BlockStack>
+                    </div>
+                  </BlockStack>
+                  
+                  <Button variant="secondary" fullWidth onClick={() => onNavigate("dashboard")}>
+                    Current Plan
+                  </Button>
+                </BlockStack>
+              </div>
+
+              {/* Pro Plan */}
+              <div style={{
+                background: 'linear-gradient(135deg, #fef7f9 0%, #fdf2f5 50%, #fef7f9 100%)',
+                borderRadius: '20px',
+                padding: '40px 32px',
+                border: '2px solid #FF204E',
+                position: 'relative',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 20px 60px rgba(255, 32, 78, 0.15)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-8px)';
+                e.currentTarget.style.boxShadow = '0 32px 80px rgba(255, 32, 78, 0.25)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 20px 60px rgba(255, 32, 78, 0.15)';
+              }}>
+                {/* Popular Badge */}
+                <div style={{
+                  position: 'absolute',
+                  top: '-12px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'linear-gradient(135deg, #FF204E, #A0153E)',
+                  borderRadius: '20px',
+                  padding: '8px 20px',
+                  boxShadow: '0 8px 24px rgba(255, 32, 78, 0.3)'
+                }}>
+                  <Text as="p" variant="bodySm" fontWeight="medium">
+                    <span style={{ color: 'white' }}>Most Popular</span>
+                  </Text>
+                </div>
+
+                <BlockStack gap="500">
+                  {/* Plan Header */}
+                  <BlockStack gap="300" align="center">
+                    <div style={{
+                      background: 'linear-gradient(135deg, #FF204E, #A0153E)',
+                      borderRadius: '12px',
+                      padding: '12px 24px',
+                      marginTop: '16px',
+                      marginBottom: '8px'
+                    }}>
+                      <Text as="h3" variant="headingMd" alignment="center">
+                        <span style={{ color: 'white', fontWeight: '600' }}>Pro</span>
+                      </Text>
+                    </div>
+                    <BlockStack gap="100" align="center">
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '8px' }}>
+                        <Text as="p" variant="heading2xl">$19</Text>
                         <Text as="p" variant="bodyLg" tone="subdued">/month</Text>
-                      </InlineStack>
-                      <Text as="p" variant="bodySm" tone="success" alignment="center">
+                      </div>
+                      <Text as="p" variant="bodySm" alignment="center" tone="success">
                         14-day free trial • Cancel anytime
                       </Text>
-                    </BlockStack>
-                    
-                    <BlockStack gap="300">
-                      <Text as="p" variant="bodyMd" alignment="center" tone="subdued">
-                        Advanced features for growing businesses that need complete control
+                      <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+                        Advanced features for growing businesses
                       </Text>
-                      <BlockStack gap="200">
-                        <InlineStack gap="200">
-                          <Icon source={InventoryIcon} tone="success" />
-                          <Text as="p" variant="bodyMd">Unlimited products & locations</Text>
-                        </InlineStack>
-                        <InlineStack gap="200">
-                          <Icon source={ChartVerticalIcon} tone="success" />
-                          <Text as="p" variant="bodyMd">Advanced analytics & forecasting</Text>
-                        </InlineStack>
-                        <InlineStack gap="200">
-                          <Icon source={OrderIcon} tone="success" />
-                          <Text as="p" variant="bodyMd">Custom alerts & automations</Text>
-                        </InlineStack>
-                        <InlineStack gap="200">
-                          <Icon source={SettingsIcon} tone="success" />
-                          <Text as="p" variant="bodyMd">Priority support & API access</Text>
-                        </InlineStack>
-                      </BlockStack>
                     </BlockStack>
-                    
-                    <Button variant="primary" fullWidth onClick={() => onNavigate("help")}>
-                      Upgrade to Pro
-                    </Button>
                   </BlockStack>
-                </Box>
-              </Card>
-            </Grid.Cell>
-          </Grid>
-        </BlockStack>
+                  
+                  {/* Features */}
+                  <BlockStack gap="300">
+                    <div style={{
+                      padding: '24px 0',
+                      borderTop: '1px solid rgba(255, 32, 78, 0.1)',
+                      borderBottom: '1px solid rgba(255, 32, 78, 0.1)'
+                    }}>
+                      <BlockStack gap="200">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{
+                            width: '20px',
+                            height: '20px',
+                            background: 'linear-gradient(135deg, #FF204E, #A0153E)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>
+                          </div>
+                          <Text as="p" variant="bodyMd">Unlimited products & locations</Text>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{
+                            width: '20px',
+                            height: '20px',
+                            background: 'linear-gradient(135deg, #FF204E, #A0153E)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>
+                          </div>
+                          <Text as="p" variant="bodyMd">Advanced analytics & forecasting</Text>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{
+                            width: '20px',
+                            height: '20px',
+                            background: 'linear-gradient(135deg, #FF204E, #A0153E)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>
+                          </div>
+                          <Text as="p" variant="bodyMd">Custom alerts & automations</Text>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{
+                            width: '20px',
+                            height: '20px',
+                            background: 'linear-gradient(135deg, #FF204E, #A0153E)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>
+                          </div>
+                          <Text as="p" variant="bodyMd">Priority support & API access</Text>
+                        </div>
+                      </BlockStack>
+                    </div>
+                  </BlockStack>
+                  
+                  <Button variant="primary" fullWidth onClick={() => onNavigate("help")}>
+                    Start Free Trial
+                  </Button>
+                </BlockStack>
+              </div>
+            </div>
+          </BlockStack>
+        </div>
 
         {/* Quick Setup Guide */}
         <Card>
