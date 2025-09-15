@@ -444,7 +444,9 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
       </div>
       
       {/* Floating Help Guide */}
-      <div style={{
+      <div 
+      data-help-button
+      style={{
         position: 'fixed',
         bottom: '24px',
         right: '24px',

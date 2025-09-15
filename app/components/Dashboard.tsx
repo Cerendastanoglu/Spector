@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useFetcher } from "@remix-run/react";
 import {
   Card,
@@ -9,20 +9,13 @@ import {
   Grid,
   Button,
   Icon,
-  Spinner,
-  Badge,
-  InlineGrid,
-  EmptyState,
 } from "@shopify/polaris";
 import {
-  ProductIcon,
   ExportIcon,
   AlertCircleIcon,
   ChartVerticalIcon,
   CashDollarIcon,
   OrderIcon,
-  RefreshIcon,
-  CheckCircleIcon,
 } from "@shopify/polaris-icons";
 import { PerformanceDashboard } from "./PerformanceDashboard";
 
@@ -57,17 +50,17 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
   
   const fetcher = useFetcher<{ success: boolean; data?: AnalyticsData; error?: string }>();
 
-  const fetchAnalytics = () => {
+  const fetchAnalytics = useCallback(() => {
     setIsLoading(true);
     setError(null);
     fetcher.load("/app/api/analytics");
-  };
+  }, [fetcher]);
 
   useEffect(() => {
     if (isVisible) {
       fetchAnalytics();
     }
-  }, [isVisible]);
+  }, [isVisible, fetchAnalytics]);
 
   useEffect(() => {
     if (fetcher.data) {
@@ -273,7 +266,7 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
                 </Box>
               ) : analyticsData?.recentOrders && analyticsData.recentOrders.length > 0 ? (
                 <BlockStack gap="200">
-                  {analyticsData.recentOrders.slice(0, 5).map((order, index) => (
+                  {analyticsData.recentOrders.slice(0, 5).map((order, _index) => (
                     <Box 
                       key={order.id} 
                       paddingBlock="200" 

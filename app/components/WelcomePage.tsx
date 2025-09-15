@@ -8,16 +8,14 @@ import {
   InlineStack,
   Box,
   Icon,
-  Grid,
-  Collapsible,
+  Modal,
 } from "@shopify/polaris";
 import {
-  ChartVerticalIcon,
-  InventoryIcon,
-  OrderIcon,
-  MarketsIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
+  ClockIcon,
+  CalendarIcon,
+  StarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from "@shopify/polaris-icons";
 
 interface WelcomePageProps {
@@ -25,962 +23,710 @@ interface WelcomePageProps {
 }
 
 export function WelcomePage({ onNavigate }: WelcomePageProps) {
-  const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [showRoadmap, setShowRoadmap] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  const timelineData = [
+    {
+      date: "December 2025",
+      title: "AI & Automation",
+      items: [
+        { feature: "AI-powered forecasting", status: "research" },
+        { feature: "Automated reordering", status: "research" },
+        { feature: "Smart recommendations", status: "research" }
+      ],
+      status: "future",
+      color: "#f59e0b"
+    },
+    {
+      date: "November 2025",
+      title: "Enterprise Integration",
+      items: [
+        { feature: "API integrations", status: "planned" },
+        { feature: "Multi-store management", status: "planned" },
+        { feature: "Advanced filters", status: "planned" }
+      ],
+      status: "upcoming", 
+      color: "#8b5cf6"
+    },
+    {
+      date: "October 2025",
+      title: "Advanced Operations", 
+      items: [
+        { feature: "Advanced reporting features", status: "planned" },
+        { feature: "Bulk operations support", status: "planned" },
+        { feature: "Custom notification rules", status: "planned" }
+      ],
+      status: "upcoming",
+      color: "#3b82f6"
+    },
+    {
+      date: "September 2025",
+      title: "Q3 Performance Boost",
+      items: [
+        { feature: "Enhanced dashboard analytics", status: "completed" },
+        { feature: "Mobile app improvements", status: "completed" },
+        { feature: "Performance optimizations", status: "in-progress" }
+      ],
+      status: "current",
+      color: "#10b981"
+    }
+  ];
+
+  const nextSlide = () => {
+    setCurrentSlide((prev) => (prev + 1) % Math.ceil(timelineData.length / 3));
+  };
+
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + Math.ceil(timelineData.length / 3)) % Math.ceil(timelineData.length / 3));
+  };
 
   return (
     <>
-      {/* Add Unbounded font */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700&display=swap');
-        .unbounded-bold {
-          font-family: 'Unbounded', cursive !important;
-          font-weight: 700 !important;
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&display=swap');
+        
+        .hero-glow {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(20px);
+          position: relative;
+          overflow: hidden;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .hero-glow::before {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: radial-gradient(circle, rgba(255, 32, 78, 0.05) 0%, transparent 70%);
+          animation: pulse 4s ease-in-out infinite;
+        }
+        
+        .hero-glow::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: linear-gradient(45deg, transparent 0%, rgba(160, 21, 62, 0.03) 25%, transparent 50%, rgba(255, 32, 78, 0.03) 75%, transparent 100%);
+          animation: shift 6s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.8; }
+        }
+        
+        @keyframes shift {
+          0%, 100% { transform: translateX(-2px) translateY(-2px); }
+          50% { transform: translateX(2px) translateY(2px); }
+        }
+        
+        .timeline-item {
+          position: relative;
+          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .timeline-item:hover {
+          transform: translateY(-4px);
+        }
+        
+        .futuristic-card {
+          background: rgba(255, 255, 255, 0.02);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          transition: all 0.3s ease;
+        }
+        
+        .futuristic-card:hover {
+          background: rgba(255, 255, 255, 0.05);
+          border-color: rgba(255, 32, 78, 0.3);
+          box-shadow: 0 20px 40px rgba(255, 32, 78, 0.1);
+        }
+        
+        .collapsible-roadmap {
+          background: transparent;
+          backdrop-filter: none;
+          border: none;
+          border-radius: 20px;
+          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
+        }
+        
+        .collapsible-roadmap::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: linear-gradient(45deg, 
+            rgba(255, 32, 78, 0.03) 0%, 
+            transparent 25%, 
+            rgba(160, 21, 62, 0.03) 50%, 
+            transparent 75%, 
+            rgba(93, 14, 65, 0.03) 100%);
+          border-radius: 20px;
+          animation: shimmer 3s ease-in-out infinite;
+          z-index: 0;
+        }
+        
+        .collapsible-roadmap:hover {
+          transform: translateY(-2px);
+        }
+        
+        .collapsible-roadmap:hover::before {
+          background: linear-gradient(45deg, 
+            rgba(255, 32, 78, 0.08) 0%, 
+            transparent 25%, 
+            rgba(160, 21, 62, 0.08) 50%, 
+            transparent 75%, 
+            rgba(93, 14, 65, 0.08) 100%);
+        }
+        
+        @keyframes shimmer {
+          0%, 100% { 
+            background-position: -200% 0;
+            opacity: 0.3;
+          }
+          50% { 
+            background-position: 200% 0;
+            opacity: 0.8;
+          }
+        }
+        
+        @keyframes helpHighlight {
+          0%, 100% { 
+            transform: scale(1);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15), 0 2px 8px rgba(255, 32, 78, 0.2);
+          }
+          25% { 
+            transform: scale(1.3);
+            box-shadow: 0 8px 40px rgba(255, 32, 78, 0.4), 0 4px 16px rgba(255, 32, 78, 0.6);
+          }
+          50% { 
+            transform: scale(1.2);
+            box-shadow: 0 6px 30px rgba(255, 32, 78, 0.5), 0 3px 12px rgba(255, 32, 78, 0.7);
+          }
+          75% { 
+            transform: scale(1.15);
+            box-shadow: 0 6px 25px rgba(255, 32, 78, 0.3), 0 3px 10px rgba(255, 32, 78, 0.5);
+          }
+        }
+
+        .timeline-slider {
+          overflow: hidden;
+          position: relative;
+        }
+
+        .timeline-slides {
+          display: flex;
+          transition: transform 0.5s ease-in-out;
+        }
+
+        .timeline-slide {
+          min-width: 100%;
+          display: flex;
+          gap: 24px;
+          justify-content: center;
+          align-items: stretch;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-20px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-    <Page>
-      <BlockStack gap="500">
-        {/* Unified Welcome & What's New Section */}
-        <div style={{
-          background: 'linear-gradient(135deg, #fef7f9 0%, #fdf2f5 50%, #fef7f9 100%)',
-          borderRadius: '24px',
-          border: '1px solid rgba(255, 32, 78, 0.1)',
-          padding: '64px 40px',
-          boxShadow: '0 20px 60px rgba(255, 32, 78, 0.08)',
-          position: 'relative',
-          overflow: 'hidden'
-        }}>
-          {/* Subtle background pattern */}
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'radial-gradient(circle at 20% 80%, rgba(255, 32, 78, 0.03) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(160, 21, 62, 0.03) 0%, transparent 50%)',
-            pointerEvents: 'none'
-          }} />
-          
-          <BlockStack gap="800">
-            {/* Welcome Hero Section */}
-            <BlockStack gap="600" align="center">
-              <BlockStack gap="400" align="center">
-                <Text as="h1" variant="heading3xl" alignment="center">
-                  <span style={{ fontFamily: 'Unbounded, sans-serif', fontWeight: '700' }}>
-                    Welcome to Spector
-                  </span>
-                </Text>
-                <Text as="p" variant="headingLg" alignment="center" tone="subdued">
-                  <span style={{ fontFamily: 'Unbounded, sans-serif', fontWeight: '600' }}>
-                    Your Intelligent Inventory Management System
-                  </span>
-                </Text>
-              </BlockStack>
-              
-              <Box paddingBlockStart="200" paddingBlockEnd="400" maxWidth="600px">
-                <Text as="p" variant="bodyLg" alignment="center" tone="subdued">
-                  Transform your inventory management with intelligent alerts, real-time tracking, and actionable insights. 
-                  Spector helps you prevent stockouts, optimize product performance, and make data-driven decisions that grow your business.
-                </Text>
-              </Box>
-              
-              <InlineStack gap="400" align="center">
-                <Button
-                  variant="primary"
-                  size="large"
-                  onClick={() => onNavigate("dashboard")}
-                >
-                  Explore Your Dashboard
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="large"
-                  onClick={() => onNavigate("help")}
-                >
-                  Learn More
-                </Button>
-              </InlineStack>
-            </BlockStack>
-
-            {/* Divider with gradient */}
-            <div style={{
-              height: '1px',
-              background: 'linear-gradient(90deg, transparent 0%, rgba(255, 32, 78, 0.2) 50%, transparent 100%)',
-              margin: '0 auto',
-              width: '60%'
-            }} />
-
-            {/* What's New Section - Collapsible */}
-            <BlockStack gap="400">
-              {/* Collapsible Header */}
-              <div 
-                style={{ 
-                  cursor: 'pointer',
-                  padding: '20px',
-                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                  borderRadius: '16px',
-                  border: '2px solid rgba(148, 163, 184, 0.1)',
-                  transition: 'all 0.3s ease'
-                }}
-                onClick={() => setShowWhatsNew(!showWhatsNew)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)';
-                  e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.2)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)';
-                  e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.1)';
-                }}
-              >
-                <InlineStack align="space-between" blockAlign="center">
-                  <BlockStack gap="100">
-                    <Text as="h2" variant="headingMd">
-                      <span style={{ fontFamily: 'Unbounded, sans-serif', fontWeight: '600' }}>
-                        What's New This Month
+      
+      <Page>
+        <div style={{ background: 'transparent', minHeight: '100vh' }}>
+          <BlockStack gap="0">
+            {/* Hero Welcome Section - Futuristic */}
+            <div className="hero-glow" style={{
+              padding: '100px 40px',
+              position: 'relative',
+              zIndex: 1,
+              margin: '40px',
+              borderRadius: '24px'
+            }}>
+              <div style={{ position: 'relative', zIndex: 2 }}>
+                <BlockStack gap="800" align="center">
+                  <BlockStack gap="400" align="center">
+                    <Text as="h1" variant="heading2xl" alignment="center">
+                      <span style={{ 
+                        fontFamily: 'Orbitron, monospace', 
+                        fontWeight: '900',
+                        background: 'linear-gradient(135deg, #FF204E, #A0153E, #5D0E41)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        fontSize: '3.5rem',
+                        letterSpacing: '2px'
+                      }}>
+                        Welcome To SPECTOR
                       </span>
                     </Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Latest features and improvements designed to boost your productivity
+                    <Text as="p" variant="headingLg" alignment="center">
+                      <span style={{ 
+                        color: '#64748b',
+                        fontFamily: 'Inter, sans-serif',
+                        fontWeight: '300',
+                        letterSpacing: '1px'
+                      }}>
+                        Next-Generation Inventory Intelligence
+                      </span>
                     </Text>
                   </BlockStack>
-                  <Button
-                    variant="tertiary"
-                    icon={showWhatsNew ? ChevronUpIcon : ChevronDownIcon}
-                    onClick={() => setShowWhatsNew(!showWhatsNew)}
-                  >
-                    {showWhatsNew ? 'Hide' : 'Show'} Updates
-                  </Button>
-                </InlineStack>
-              </div>
-
-              {/* Collapsible Content */}
-              <Collapsible
-                open={showWhatsNew}
-                id="whats-new-content"
-                transition={{
-                  duration: '300ms',
-                  timingFunction: 'ease-in-out'
-                }}
-              >
-                <BlockStack gap="400">
-            
-            <Grid>
-              <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
-                <div style={{
-                  background: 'linear-gradient(135deg, #ffffff 0%, #fefcfd 100%)',
-                  padding: '32px 24px',
-                  borderRadius: '16px',
-                  border: '2px solid rgba(255, 32, 78, 0.1)',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(255, 32, 78, 0.15)';
-                  e.currentTarget.style.borderColor = 'rgba(255, 32, 78, 0.2)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.04)';
-                  e.currentTarget.style.borderColor = 'rgba(255, 32, 78, 0.1)';
-                }}>
-                  <BlockStack gap="400">
-                    <div style={{
-                      width: '56px',
-                      height: '56px',
-                      background: 'linear-gradient(135deg, #FF204E, #A0153E)',
-                      borderRadius: '14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: '0 auto'
-                    }}>
-                      <div style={{ color: 'white' }}>
-                        <Icon source={ChartVerticalIcon} />
-                      </div>
-                    </div>
-                    <BlockStack gap="200" align="center">
-                      <Text as="h3" variant="headingMd" alignment="center">Enhanced Analytics</Text>
-                      <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
-                        Advanced revenue tracking and profit insights to identify your most valuable products and optimize inventory decisions.
-                      </Text>
-                    </BlockStack>
-                  </BlockStack>
-                </div>
-              </Grid.Cell>
-              
-              <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
-                <div style={{
-                  background: 'linear-gradient(135deg, #ffffff 0%, #fefcfd 100%)',
-                  padding: '32px 24px',
-                  borderRadius: '16px',
-                  border: '2px solid rgba(160, 21, 62, 0.1)',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(160, 21, 62, 0.15)';
-                  e.currentTarget.style.borderColor = 'rgba(160, 21, 62, 0.2)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.04)';
-                  e.currentTarget.style.borderColor = 'rgba(160, 21, 62, 0.1)';
-                }}>
-                  <BlockStack gap="400">
-                    <div style={{
-                      width: '56px',
-                      height: '56px',
-                      background: 'linear-gradient(135deg, #A0153E, #5D0E41)',
-                      borderRadius: '14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: '0 auto'
-                    }}>
-                      <div style={{ color: 'white' }}>
-                        <Icon source={MarketsIcon} />
-                      </div>
-                    </div>
-                    <BlockStack gap="200" align="center">
-                      <Text as="h3" variant="headingMd" alignment="center">Smart Forecasting</Text>
-                      <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
-                        AI-powered predictions for optimal restocking times based on sales velocity, seasonality, and market trends.
-                      </Text>
-                    </BlockStack>
-                  </BlockStack>
-                </div>
-              </Grid.Cell>
-              
-              <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
-                <div style={{
-                  background: 'linear-gradient(135deg, #ffffff 0%, #fefcfd 100%)',
-                  padding: '32px 24px',
-                  borderRadius: '16px',
-                  border: '2px solid rgba(93, 14, 65, 0.1)',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(93, 14, 65, 0.15)';
-                  e.currentTarget.style.borderColor = 'rgba(93, 14, 65, 0.2)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.04)';
-                  e.currentTarget.style.borderColor = 'rgba(93, 14, 65, 0.1)';
-                }}>
-                  <BlockStack gap="400">
-                    <div style={{
-                      width: '56px',
-                      height: '56px',
-                      background: 'linear-gradient(135deg, #5D0E41, #00224D)',
-                      borderRadius: '14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: '0 auto'
-                    }}>
-                      <div style={{ color: 'white' }}>
-                        <Icon source={OrderIcon} />
-                      </div>
-                    </div>
-                    <BlockStack gap="200" align="center">
-                      <Text as="h3" variant="headingMd" alignment="center">Mobile Alerts</Text>
-                      <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
-                        Real-time push notifications on your mobile device when critical inventory events occur or thresholds are reached.
-                      </Text>
-                    </BlockStack>
-                  </BlockStack>
-                </div>
-              </Grid.Cell>
-            </Grid>
-                </BlockStack>
-              </Collapsible>
-            </BlockStack>
-          </BlockStack>
-        </div>
-
-        {/* Pro Tips for Success - Brand Colors */}
-        <div style={{
-          background: 'linear-gradient(135deg, #fef7f9 0%, #fdf2f5 50%, #fef7f9 100%)',
-          borderRadius: '24px',
-          padding: '48px 32px',
-          border: '2px solid rgba(255, 32, 78, 0.1)',
-          boxShadow: '0 12px 40px rgba(255, 32, 78, 0.08)',
-          position: 'relative',
-          overflow: 'hidden'
-        }}>
-          {/* Decorative Background Elements */}
-          <div style={{
-            position: 'absolute',
-            top: '-20px',
-            right: '-20px',
-            width: '100px',
-            height: '100px',
-            background: 'radial-gradient(circle, rgba(255, 32, 78, 0.1) 0%, transparent 70%)',
-            borderRadius: '50%'
-          }} />
-          <div style={{
-            position: 'absolute',
-            bottom: '-30px',
-            left: '-30px',
-            width: '120px',
-            height: '120px',
-            background: 'radial-gradient(circle, rgba(160, 21, 62, 0.05) 0%, transparent 70%)',
-            borderRadius: '50%'
-          }} />
-
-          <BlockStack gap="500">
-            {/* Section Header */}
-            <BlockStack gap="200" align="center">
-              <Text as="h2" variant="headingXl" alignment="center">
-                <span style={{ fontFamily: 'Unbounded, sans-serif', fontWeight: '700', color: '#A0153E' }}>
-                  Pro Tips for Success
-                </span>
-              </Text>
-              <Text as="p" variant="bodyLg" alignment="center" tone="subdued">
-                Expert strategies to maximize your inventory management efficiency
-              </Text>
-            </BlockStack>
-
-            {/* Tips Grid */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-              gap: '24px'
-            }}>
-              {/* Smart Thresholds Tip */}
-              <div style={{
-                background: 'linear-gradient(135deg, #fff7f8 0%, #fef2f2 100%)',
-                borderRadius: '20px',
-                padding: '32px',
-                border: '2px solid rgba(255, 32, 78, 0.15)',
-                boxShadow: '0 8px 32px rgba(255, 32, 78, 0.1)',
-                transition: 'all 0.3s ease',
-                position: 'relative',
-                overflow: 'hidden'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-6px)';
-                e.currentTarget.style.boxShadow = '0 16px 48px rgba(255, 32, 78, 0.2)';
-                e.currentTarget.style.borderColor = 'rgba(255, 32, 78, 0.25)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 8px 32px rgba(255, 32, 78, 0.1)';
-                e.currentTarget.style.borderColor = 'rgba(255, 32, 78, 0.15)';
-              }}>
-                {/* Icon Badge */}
-                <div style={{
-                  position: 'absolute',
-                  top: '20px',
-                  right: '20px',
-                  width: '48px',
-                  height: '48px',
-                  background: 'linear-gradient(135deg, #FF204E 0%, #A0153E 100%)',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 16px rgba(255, 32, 78, 0.3)'
-                }}>
-                  <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>⚡</span>
-                </div>
-
-                <BlockStack gap="300">
-                  <BlockStack gap="100">
-                    <Text as="h3" variant="headingMd">
-                      <span style={{ color: '#A0153E', fontWeight: '600' }}>Set Smart Thresholds</span>
+                  
+                  <Box maxWidth="700px">
+                    <Text as="p" variant="bodyLg" alignment="center">
+                      <span style={{ 
+                        color: '#475569',
+                        lineHeight: '1.8',
+                        fontFamily: 'Inter, sans-serif',
+                        fontWeight: '400'
+                      }}>
+                        Harness the power of AI-driven analytics and real-time intelligence to transform your inventory management into a competitive advantage.
+                      </span>
                     </Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      Configure alerts based on your average sales velocity. Fast-moving products need higher thresholds to prevent stockouts.
-                    </Text>
-                  </BlockStack>
-                  <Button 
-                    variant="primary"
-                    onClick={() => onNavigate("settings")}
-                    fullWidth
-                  >
-                    Configure Settings
-                  </Button>
-                </BlockStack>
-              </div>
-
-              {/* Weekly Analytics Tip */}
-              <div style={{
-                background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)',
-                borderRadius: '20px',
-                padding: '32px',
-                border: '2px solid rgba(93, 14, 65, 0.15)',
-                boxShadow: '0 8px 32px rgba(93, 14, 65, 0.1)',
-                transition: 'all 0.3s ease',
-                position: 'relative',
-                overflow: 'hidden'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-6px)';
-                e.currentTarget.style.boxShadow = '0 16px 48px rgba(93, 14, 65, 0.2)';
-                e.currentTarget.style.borderColor = 'rgba(93, 14, 65, 0.25)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 8px 32px rgba(93, 14, 65, 0.1)';
-                e.currentTarget.style.borderColor = 'rgba(93, 14, 65, 0.15)';
-              }}>
-                {/* Icon Badge */}
-                <div style={{
-                  position: 'absolute',
-                  top: '20px',
-                  right: '20px',
-                  width: '48px',
-                  height: '48px',
-                  background: 'linear-gradient(135deg, #5D0E41 0%, #00224D 100%)',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 16px rgba(93, 14, 65, 0.3)'
-                }}>
-                  <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>📊</span>
-                </div>
-
-                <BlockStack gap="300">
-                  <BlockStack gap="100">
-                    <Text as="h3" variant="headingMd">
-                      <span style={{ color: '#5D0E41', fontWeight: '600' }}>Weekly Analytics Review</span>
-                    </Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      Check your dashboard every Monday to identify trends, analyze performance, and plan inventory strategy for the week ahead.
-                    </Text>
-                  </BlockStack>
-                  <Button 
-                    variant="secondary"
-                    onClick={() => onNavigate("dashboard")}
-                    fullWidth
-                  >
-                    View Dashboard
-                  </Button>
+                  </Box>
+                  
+                  <InlineStack gap="400" align="center">
+                    <Button
+                      variant="primary"
+                      size="large"
+                      onClick={() => onNavigate("dashboard")}
+                    >
+                      Launch Dashboard
+                    </Button>
+                  </InlineStack>
                 </BlockStack>
               </div>
             </div>
-          </BlockStack>
-        </div>
 
-        {/* Core Features */}
-        <Grid>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
-            <Card>
-              <Box padding="500">
-                <BlockStack gap="300">
-                  <Box background="bg-surface-success" padding="300" borderRadius="200">
-                    <Icon source={InventoryIcon} tone="success" />
-                  </Box>
-                  <Text as="h3" variant="headingMd">Smart Alerts</Text>
-                  <Text as="p" variant="bodyMd" tone="subdued">
-                    Get notified before you run out. Set custom thresholds for each product.
-                  </Text>
-                </BlockStack>
-              </Box>
-            </Card>
-          </Grid.Cell>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
-            <Card>
-              <Box padding="500">
-                <BlockStack gap="300">
-                  <Box background="bg-surface-info" padding="300" borderRadius="200">
-                    <Icon source={ChartVerticalIcon} tone="info" />
-                  </Box>
-                  <Text as="h3" variant="headingMd">Real-Time Sync</Text>
-                  <Text as="p" variant="bodyMd" tone="subdued">
-                    Inventory updates instantly across all sales channels. Never oversell again.
-                  </Text>
-                </BlockStack>
-              </Box>
-            </Card>
-          </Grid.Cell>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
-            <Card>
-              <Box padding="500">
-                <BlockStack gap="300">
-                  <Box background="bg-surface-warning" padding="300" borderRadius="200">
-                    <Icon source={OrderIcon} tone="warning" />
-                  </Box>
-                  <Text as="h3" variant="headingMd">Sales Analytics</Text>
-                  <Text as="p" variant="bodyMd" tone="subdued">
-                    Identify your best-sellers and optimize your inventory strategy.
-                  </Text>
-                </BlockStack>
-              </Box>
-            </Card>
-          </Grid.Cell>
-        </Grid>
-
-        {/* Choose Your Plan - Modern Redesign */}
-        <div style={{
-          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #f8fafc 100%)',
-          borderRadius: '24px',
-          padding: '64px 40px',
-          border: '1px solid rgba(148, 163, 184, 0.1)',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.06)'
-        }}>
-          <BlockStack gap="600">
-            {/* Header */}
-            <BlockStack gap="300" align="center">
-              <Text as="h2" variant="heading2xl" alignment="center">
-                Choose Your Plan
-              </Text>
-              <Text as="p" variant="bodyLg" alignment="center" tone="subdued">
-                Scale your inventory management as your business grows
-              </Text>
-            </BlockStack>
-            
-            {/* Pricing Cards */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', 
-              gap: '32px',
-              maxWidth: '800px',
-              margin: '0 auto'
-            }}>
-              {/* Starter Plan */}
-              <div style={{
-                background: 'linear-gradient(135deg, #ffffff 0%, #fefefe 100%)',
-                borderRadius: '20px',
-                padding: '40px 32px',
-                border: '2px solid rgba(148, 163, 184, 0.15)',
-                position: 'relative',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.06)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-8px)';
-                e.currentTarget.style.boxShadow = '0 20px 60px rgba(148, 163, 184, 0.15)';
-                e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.25)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.06)';
-                e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.15)';
-              }}>
-                <BlockStack gap="500">
-                  {/* Plan Header */}
-                  <BlockStack gap="300" align="center">
-                    <div style={{
-                      background: 'linear-gradient(135deg, #64748b, #475569)',
-                      borderRadius: '12px',
-                      padding: '12px 24px',
-                      marginBottom: '8px'
-                    }}>
-                      <Text as="h3" variant="headingMd" alignment="center">
-                        <span style={{ color: 'white', fontWeight: '600' }}>Starter</span>
-                      </Text>
-                    </div>
-                    <BlockStack gap="100" align="center">
-                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '8px' }}>
-                        <Text as="p" variant="heading2xl">Free</Text>
-                        <Text as="p" variant="bodyLg" tone="subdued">forever</Text>
-                      </div>
-                      <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-                        Perfect for small stores getting started
-                      </Text>
-                    </BlockStack>
-                  </BlockStack>
-                  
-                  {/* Features */}
-                  <BlockStack gap="300">
-                    <div style={{
-                      padding: '24px 0',
-                      borderTop: '1px solid rgba(148, 163, 184, 0.1)',
-                      borderBottom: '1px solid rgba(148, 163, 184, 0.1)'
-                    }}>
-                      <BlockStack gap="200">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{
-                            width: '20px',
-                            height: '20px',
-                            background: 'linear-gradient(135deg, #10b981, #059669)',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>
-                          </div>
-                          <Text as="p" variant="bodyMd">Track up to 100 products</Text>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{
-                            width: '20px',
-                            height: '20px',
-                            background: 'linear-gradient(135deg, #10b981, #059669)',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>
-                          </div>
-                          <Text as="p" variant="bodyMd">Basic analytics dashboard</Text>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{
-                            width: '20px',
-                            height: '20px',
-                            background: 'linear-gradient(135deg, #10b981, #059669)',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>
-                          </div>
-                          <Text as="p" variant="bodyMd">Email notifications</Text>
-                        </div>
-                      </BlockStack>
-                    </div>
-                  </BlockStack>
-                  
-                  <Button variant="secondary" fullWidth onClick={() => onNavigate("dashboard")}>
-                    Current Plan
-                  </Button>
-                </BlockStack>
-              </div>
-
-              {/* Pro Plan */}
-              <div style={{
-                background: 'linear-gradient(135deg, #fef7f9 0%, #fdf2f5 50%, #fef7f9 100%)',
-                borderRadius: '20px',
-                padding: '40px 32px',
-                border: '2px solid #FF204E',
-                position: 'relative',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: '0 20px 60px rgba(255, 32, 78, 0.15)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-8px)';
-                e.currentTarget.style.boxShadow = '0 32px 80px rgba(255, 32, 78, 0.25)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 20px 60px rgba(255, 32, 78, 0.15)';
-              }}>
-                {/* Popular Badge */}
+            {/* Futuristic Collapsible Roadmap */}
+            <div style={{ padding: '40px' }}>
+              <div 
+                className="collapsible-roadmap"
+                style={{
+                  padding: '40px',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+                onClick={() => setShowRoadmap(!showRoadmap)}
+              >
+                {/* Ambient glow effect */}
                 <div style={{
                   position: 'absolute',
-                  top: '-12px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  background: 'linear-gradient(135deg, #FF204E, #A0153E)',
+                  top: '-50%',
+                  left: '-50%',
+                  width: '200%',
+                  height: '200%',
+                  background: 'radial-gradient(circle, rgba(255, 32, 78, 0.05) 0%, transparent 70%)',
+                  animation: 'pulse 4s ease-in-out infinite',
+                  pointerEvents: 'none'
+                }} />
+                
+                <div style={{ position: 'relative', zIndex: 1 }}>
+                  <InlineStack align="space-between" blockAlign="center">
+                    <BlockStack gap="300">
+                      <Text as="h2" variant="headingXl">
+                        <span style={{
+                          fontFamily: 'Orbitron, monospace',
+                          fontWeight: '700',
+                          background: 'linear-gradient(135deg, #FF204E, #A0153E)',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          letterSpacing: '1px'
+                        }}>
+                          Development Roadmap
+                        </span>
+                      </Text>
+                      <Text as="p" variant="bodyLg" tone="subdued">
+                        <span style={{ fontFamily: 'Inter, sans-serif' }}>
+                          Track our journey of continuous innovation and upcoming features
+                        </span>
+                      </Text>
+                    </BlockStack>
+                    
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px 24px',
+                      background: 'rgba(255, 32, 78, 0.1)',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(255, 32, 78, 0.2)',
+                      transition: 'all 0.3s ease'
+                    }}>
+                      <Icon source={CalendarIcon} tone="base" />
+                      <Text as="span" variant="bodyMd">
+                        <span style={{ 
+                          color: '#A0153E',
+                          fontFamily: 'Inter, sans-serif',
+                          fontWeight: '500'
+                        }}>
+                          {showRoadmap ? 'Hide Timeline' : 'View Timeline'}
+                        </span>
+                      </Text>
+                      <div style={{
+                        transform: showRoadmap ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.3s ease',
+                        color: '#A0153E'
+                      }}>
+                        ▼
+                      </div>
+                    </div>
+                  </InlineStack>
+                </div>
+              </div>
+              
+              {/* Collapsible Timeline Content with Slider */}
+              {showRoadmap && (
+                <div style={{
+                  margin: '24px 0',
+                  padding: '40px',
+                  background: 'rgba(255, 255, 255, 0.98)',
+                  backdropFilter: 'blur(20px)',
                   borderRadius: '20px',
-                  padding: '8px 20px',
-                  boxShadow: '0 8px 24px rgba(255, 32, 78, 0.3)'
+                  border: '1px solid rgba(255, 32, 78, 0.1)',
+                  position: 'relative',
+                  animation: 'fadeIn 0.4s ease-out'
                 }}>
-                  <Text as="p" variant="bodySm" fontWeight="medium">
-                    <span style={{ color: 'white' }}>Most Popular</span>
-                  </Text>
-                </div>
-
-                <BlockStack gap="500">
-                  {/* Plan Header */}
-                  <BlockStack gap="300" align="center">
-                    <div style={{
-                      background: 'linear-gradient(135deg, #FF204E, #A0153E)',
-                      borderRadius: '12px',
-                      padding: '12px 24px',
-                      marginTop: '16px',
-                      marginBottom: '8px'
+                  {/* Timeline Slider Controls */}
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    marginBottom: '30px'
+                  }}>
+                    <Button
+                      onClick={prevSlide}
+                      variant="tertiary"
+                      size="large"
+                      disabled={currentSlide === 0}
+                      icon={ChevronLeftIcon}
+                    />
+                    
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '8px',
+                      alignItems: 'center'
                     }}>
-                      <Text as="h3" variant="headingMd" alignment="center">
-                        <span style={{ color: 'white', fontWeight: '600' }}>Pro</span>
-                      </Text>
+                      {Array.from({ length: Math.ceil(timelineData.length / 3) }).map((_, index) => (
+                        <div
+                          key={index}
+                          style={{
+                            width: '12px',
+                            height: '12px',
+                            borderRadius: '50%',
+                            background: index === currentSlide ? '#FF204E' : 'rgba(255, 32, 78, 0.3)',
+                            transition: 'all 0.3s ease',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => setCurrentSlide(index)}
+                        />
+                      ))}
                     </div>
-                    <BlockStack gap="100" align="center">
-                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '8px' }}>
-                        <Text as="p" variant="heading2xl">$19</Text>
-                        <Text as="p" variant="bodyLg" tone="subdued">/month</Text>
-                      </div>
-                      <Text as="p" variant="bodySm" alignment="center" tone="success">
-                        14-day free trial • Cancel anytime
-                      </Text>
-                      <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-                        Advanced features for growing businesses
-                      </Text>
-                    </BlockStack>
-                  </BlockStack>
-                  
-                  {/* Features */}
-                  <BlockStack gap="300">
+                    
+                    <Button
+                      onClick={nextSlide}
+                      variant="tertiary"
+                      size="large"
+                      disabled={currentSlide === Math.ceil(timelineData.length / 3) - 1}
+                      icon={ChevronRightIcon}
+                    />
+                  </div>
+
+                  {/* Timeline Slider */}
+                  <div className="timeline-slider">
+                    <div 
+                      className="timeline-slides"
+                      style={{
+                        transform: `translateX(-${currentSlide * 100}%)`
+                      }}
+                    >
+                      {Array.from({ length: Math.ceil(timelineData.length / 3) }).map((_, slideIndex) => (
+                        <div key={slideIndex} className="timeline-slide">
+                          {timelineData
+                            .slice(slideIndex * 3, slideIndex * 3 + 3)
+                            .map((period, index) => (
+                              <div 
+                                key={index} 
+                                className="timeline-item" 
+                                style={{
+                                  flex: '1',
+                                  maxWidth: '320px',
+                                  position: 'relative'
+                                }}
+                              >
+                                <div style={{
+                                  background: period.status === 'current' ? 'rgba(16, 185, 129, 0.05)' :
+                                            period.status === 'upcoming' ? 'rgba(107, 114, 128, 0.08)' :
+                                            'rgba(107, 114, 128, 0.15)',
+                                  backdropFilter: 'blur(10px)',
+                                  borderRadius: '16px',
+                                  border: period.status === 'current' ? '2px solid rgba(16, 185, 129, 0.3)' :
+                                         period.status === 'upcoming' ? '2px solid rgba(107, 114, 128, 0.2)' :
+                                         '2px solid rgba(107, 114, 128, 0.15)',
+                                  position: 'relative',
+                                  overflow: 'hidden',
+                                  transition: 'all 0.3s ease',
+                                  height: '100%'
+                                }}>
+                                  {/* Status overlay effect */}
+                                  {period.status === 'current' && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: 0,
+                                      left: 0,
+                                      right: 0,
+                                      height: '4px',
+                                      background: 'linear-gradient(90deg, #10b981, #059669)',
+                                      animation: 'pulse 2s ease-in-out infinite'
+                                    }} />
+                                  )}
+                                  
+                                  <Box padding="500">
+                                    <BlockStack gap="400">
+                                      <BlockStack gap="300">
+                                        <div style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '12px',
+                                          flexWrap: 'wrap'
+                                        }}>
+                                          <div style={{
+                                            display: 'inline-block',
+                                            padding: '6px 14px',
+                                            background: period.status === 'current' ? 'rgba(16, 185, 129, 0.15)' :
+                                                      period.status === 'upcoming' ? 'rgba(107, 114, 128, 0.15)' :
+                                                      'rgba(107, 114, 128, 0.25)',
+                                            borderRadius: '20px',
+                                            border: period.status === 'current' ? '1px solid rgba(16, 185, 129, 0.3)' :
+                                                   period.status === 'upcoming' ? '1px solid rgba(107, 114, 128, 0.3)' :
+                                                   '1px solid rgba(107, 114, 128, 0.2)'
+                                          }}>
+                                            <Text as="span" variant="bodySm">
+                                              <span style={{ 
+                                                color: period.status === 'current' ? '#059669' :
+                                                      period.status === 'upcoming' ? '#4b5563' :
+                                                      '#6b7280',
+                                                fontWeight: '600',
+                                                fontSize: '12px'
+                                              }}>
+                                                {period.date}
+                                              </span>
+                                            </Text>
+                                          </div>
+                                          
+                                          {/* Status badge */}
+                                          <div style={{
+                                            padding: '4px 10px',
+                                            borderRadius: '12px',
+                                            background: period.status === 'current' ? '#10b981' :
+                                                      period.status === 'upcoming' ? '#6b7280' :
+                                                      '#9ca3af',
+                                            fontSize: '10px',
+                                            color: 'white',
+                                            fontWeight: 'bold',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.5px'
+                                          }}>
+                                            {period.status === 'current' ? '✓ RELEASED' :
+                                             period.status === 'upcoming' ? '⏳ PLANNED' :
+                                             '🔬 FUTURE'}
+                                          </div>
+                                        </div>
+                                        
+                                        <Text as="h3" variant="headingMd">
+                                          <span style={{
+                                            fontFamily: 'Orbitron, monospace',
+                                            fontWeight: '600',
+                                            color: period.status === 'current' ? '#0f172a' :
+                                                  period.status === 'upcoming' ? '#374151' :
+                                                  '#6b7280'
+                                          }}>
+                                            {period.title}
+                                          </span>
+                                        </Text>
+                                      </BlockStack>
+
+                                      <BlockStack gap="300">
+                                        {period.items.map((item, itemIndex) => (
+                                          <div key={itemIndex} style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '16px',
+                                            padding: '12px 16px',
+                                            background: item.status === 'completed' ? 'rgba(16, 185, 129, 0.08)' : 
+                                                      item.status === 'in-progress' ? 'rgba(245, 158, 11, 0.08)' :
+                                                      item.status === 'planned' ? 'rgba(107, 114, 128, 0.08)' :
+                                                      'rgba(107, 114, 128, 0.05)',
+                                            borderRadius: '12px',
+                                            border: item.status === 'completed' ? '1px solid rgba(16, 185, 129, 0.2)' :
+                                                  item.status === 'in-progress' ? '1px solid rgba(245, 158, 11, 0.2)' :
+                                                  item.status === 'planned' ? '1px solid rgba(107, 114, 128, 0.15)' :
+                                                  '1px solid rgba(107, 114, 128, 0.1)',
+                                            transition: 'all 0.2s ease'
+                                          }}>
+                                            <div style={{
+                                              width: '12px',
+                                              height: '12px',
+                                              borderRadius: '3px',
+                                              background: item.status === 'completed' ? '#10b981' : 
+                                                        item.status === 'in-progress' ? '#f59e0b' :
+                                                        item.status === 'planned' ? '#6b7280' : '#9ca3af',
+                                              flexShrink: 0,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              fontSize: '8px',
+                                              color: 'white',
+                                              fontWeight: 'bold'
+                                            }}>
+                                              {item.status === 'completed' ? '✓' :
+                                               item.status === 'in-progress' ? '◐' :
+                                               item.status === 'planned' ? '○' : '◯'}
+                                            </div>
+                                            <Text as="p" variant="bodyMd">
+                                              <span style={{
+                                                color: item.status === 'completed' ? '#059669' : 
+                                                      item.status === 'in-progress' ? '#d97706' :
+                                                      item.status === 'planned' ? '#4b5563' : '#6b7280',
+                                                fontWeight: item.status === 'completed' ? '600' : '400'
+                                              }}>
+                                                {item.feature}
+                                              </span>
+                                            </Text>
+                                          </div>
+                                        ))}
+                                      </BlockStack>
+                                    </BlockStack>
+                                  </Box>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Help Sections - Modern Futuristic Design */}
+            <div style={{ padding: '40px 40px 80px 40px' }}>
+              <BlockStack gap="600">
+                <Text as="h2" variant="heading2xl" alignment="center">
+                  <span style={{ 
+                    fontFamily: 'Orbitron, monospace',
+                    fontWeight: '700',
+                    background: 'linear-gradient(135deg, #FF204E, #A0153E, #5D0E41)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    letterSpacing: '1px'
+                  }}>
+                    Get Started
+                  </span>
+                </Text>
+
+                <div style={{
+                  display: 'flex',
+                  gap: '32px',
+                  maxWidth: '500px',
+                  margin: '0 auto',
+                  justifyContent: 'center'
+                }}>
+                  {/* Need Help Card */}
+                  <div className="futuristic-card" style={{
+                    flex: '1',
+                    borderRadius: '20px',
+                    padding: '40px',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}>
+                    {/* Ambient glow effect */}
                     <div style={{
-                      padding: '24px 0',
-                      borderTop: '1px solid rgba(255, 32, 78, 0.1)',
-                      borderBottom: '1px solid rgba(255, 32, 78, 0.1)'
-                    }}>
-                      <BlockStack gap="200">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{
-                            width: '20px',
-                            height: '20px',
-                            background: 'linear-gradient(135deg, #FF204E, #A0153E)',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>
-                          </div>
-                          <Text as="p" variant="bodyMd">Unlimited products & locations</Text>
+                      position: 'absolute',
+                      top: '-50%',
+                      left: '-50%',
+                      width: '200%',
+                      height: '200%',
+                      background: 'radial-gradient(circle, rgba(255, 32, 78, 0.08) 0%, transparent 70%)',
+                      animation: 'pulse 3s ease-in-out infinite',
+                      pointerEvents: 'none'
+                    }} />
+                    
+                    <div style={{ position: 'relative', zIndex: 1 }}>
+                      <BlockStack gap="500">
+                        <div style={{
+                          width: '80px',
+                          height: '80px',
+                          background: 'linear-gradient(135deg, #FF204E, #A0153E)',
+                          borderRadius: '20px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 20px 40px rgba(255, 32, 78, 0.3)',
+                          margin: '0 auto'
+                        }}>
+                          <Icon source={ClockIcon} tone="base" />
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{
-                            width: '20px',
-                            height: '20px',
-                            background: 'linear-gradient(135deg, #FF204E, #A0153E)',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>
-                          </div>
-                          <Text as="p" variant="bodyMd">Advanced analytics & forecasting</Text>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{
-                            width: '20px',
-                            height: '20px',
-                            background: 'linear-gradient(135deg, #FF204E, #A0153E)',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>
-                          </div>
-                          <Text as="p" variant="bodyMd">Custom alerts & automations</Text>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{
-                            width: '20px',
-                            height: '20px',
-                            background: 'linear-gradient(135deg, #FF204E, #A0153E)',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>
-                          </div>
-                          <Text as="p" variant="bodyMd">Priority support & API access</Text>
-                        </div>
+                        
+                        <BlockStack gap="300" align="center">
+                          <Text as="h3" variant="headingLg" alignment="center">
+                            <span style={{
+                              fontFamily: 'Orbitron, monospace',
+                              fontWeight: '600',
+                              background: 'linear-gradient(135deg, #FF204E, #A0153E)',
+                              WebkitBackgroundClip: 'text',
+                              WebkitTextFillColor: 'transparent'
+                            }}>
+                              Need Guidance?
+                            </span>
+                          </Text>
+                          <Text as="p" variant="bodyLg" alignment="center" tone="subdued">
+                            <span style={{ 
+                              fontFamily: 'Inter, sans-serif',
+                              lineHeight: '1.7'
+                            }}>
+                              Access comprehensive guides, interactive tutorials, and expert best practices to master inventory management.
+                            </span>
+                          </Text>
+                        </BlockStack>
+                        
+                        <Button 
+                          variant="primary"
+                          size="large"
+                          fullWidth
+                          onClick={() => {
+                            // Highlight the floating help button without navigation
+                            const helpButton = document.querySelector('[data-help-button]') as HTMLElement;
+                            if (helpButton) {
+                              helpButton.style.animation = 'helpHighlight 2s ease-in-out';
+                              setTimeout(() => {
+                                helpButton.style.animation = '';
+                              }, 2000);
+                            }
+                          }}
+                        >
+                          Start Learning
+                        </Button>
                       </BlockStack>
                     </div>
-                  </BlockStack>
-                  
-                  <Button variant="primary" fullWidth onClick={() => onNavigate("help")}>
-                    Start Free Trial
-                  </Button>
-                </BlockStack>
-              </div>
+                  </div>
+                </div>
+              </BlockStack>
             </div>
           </BlockStack>
         </div>
-
-        {/* Quick Setup Guide */}
-
-
-        {/* Getting Started - Brand Colors Design */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', 
-          gap: '24px'
-        }}>
-          {/* Need Help Getting Started */}
-          <div style={{
-            background: 'linear-gradient(135deg, #f0f4ff 0%, #e6f1ff 100%)',
-            borderRadius: '24px',
-            padding: '40px',
-            border: '2px solid rgba(0, 34, 77, 0.15)',
-            boxShadow: '0 12px 40px rgba(0, 34, 77, 0.1)',
-            transition: 'all 0.3s ease',
-            position: 'relative',
-            overflow: 'hidden'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-6px)';
-            e.currentTarget.style.boxShadow = '0 20px 60px rgba(0, 34, 77, 0.2)';
-            e.currentTarget.style.borderColor = 'rgba(0, 34, 77, 0.25)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 12px 40px rgba(0, 34, 77, 0.1)';
-            e.currentTarget.style.borderColor = 'rgba(0, 34, 77, 0.15)';
-          }}>
-            {/* Decorative Elements */}
-            <div style={{
-              position: 'absolute',
-              top: '-30px',
-              right: '-30px',
-              width: '100px',
-              height: '100px',
-              background: 'radial-gradient(circle, rgba(0, 34, 77, 0.1) 0%, transparent 70%)',
-              borderRadius: '50%'
-            }} />
-            <div style={{
-              position: 'absolute',
-              bottom: '20px',
-              left: '20px',
-              width: '60px',
-              height: '60px',
-              background: 'rgba(0, 34, 77, 0.05)',
-              borderRadius: '50%'
-            }} />
-
-            {/* Icon Badge */}
-            <div style={{
-              width: '60px',
-              height: '60px',
-              background: 'linear-gradient(135deg, #00224D 0%, #1e40af 100%)',
-              borderRadius: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 6px 20px rgba(0, 34, 77, 0.3)',
-              marginBottom: '24px'
-            }}>
-              <span style={{ color: 'white', fontSize: '28px', fontWeight: 'bold' }}>❓</span>
-            </div>
-
-            <BlockStack gap="400">
-              <BlockStack gap="200">
-                <Text as="h3" variant="headingLg">
-                  <span style={{ 
-                    color: '#00224D', 
-                    fontFamily: 'Unbounded, sans-serif', 
-                    fontWeight: '600' 
-                  }}>
-                    Need Help Getting Started?
-                  </span>
-                </Text>
-                <Text as="p" variant="bodyLg" tone="subdued">
-                  Access our comprehensive guides, video tutorials, and detailed pricing information to make the most of Spector.
-                </Text>
-              </BlockStack>
-              <Button 
-                variant="secondary"
-                onClick={() => onNavigate("help")}
-                size="large"
-                fullWidth
-              >
-                Visit Help Center
-              </Button>
-            </BlockStack>
-          </div>
-
-          {/* Ready to Start Managing Inventory */}
-          <div style={{
-            background: 'linear-gradient(135deg, #fff7f8 0%, #fef2f2 100%)',
-            borderRadius: '24px',
-            padding: '40px',
-            border: '2px solid rgba(255, 32, 78, 0.15)',
-            boxShadow: '0 12px 40px rgba(255, 32, 78, 0.1)',
-            transition: 'all 0.3s ease',
-            position: 'relative',
-            overflow: 'hidden'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-6px)';
-            e.currentTarget.style.boxShadow = '0 20px 60px rgba(255, 32, 78, 0.2)';
-            e.currentTarget.style.borderColor = 'rgba(255, 32, 78, 0.25)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 12px 40px rgba(255, 32, 78, 0.1)';
-            e.currentTarget.style.borderColor = 'rgba(255, 32, 78, 0.15)';
-          }}>
-            {/* Decorative Elements */}
-            <div style={{
-              position: 'absolute',
-              top: '-30px',
-              right: '-30px',
-              width: '100px',
-              height: '100px',
-              background: 'radial-gradient(circle, rgba(255, 32, 78, 0.1) 0%, transparent 70%)',
-              borderRadius: '50%'
-            }} />
-            <div style={{
-              position: 'absolute',
-              bottom: '20px',
-              left: '20px',
-              width: '60px',
-              height: '60px',
-              background: 'rgba(255, 32, 78, 0.05)',
-              borderRadius: '50%'
-            }} />
-
-            {/* Icon Badge */}
-            <div style={{
-              width: '60px',
-              height: '60px',
-              background: 'linear-gradient(135deg, #FF204E 0%, #A0153E 100%)',
-              borderRadius: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 6px 20px rgba(255, 32, 78, 0.3)',
-              marginBottom: '24px'
-            }}>
-              <span style={{ color: 'white', fontSize: '28px', fontWeight: 'bold' }}>🚀</span>
-            </div>
-
-            <BlockStack gap="400">
-              <BlockStack gap="200">
-                <Text as="h3" variant="headingLg">
-                  <span style={{ 
-                    color: '#A0153E', 
-                    fontFamily: 'Unbounded, sans-serif', 
-                    fontWeight: '600' 
-                  }}>
-                    Ready to Start Managing Inventory?
-                  </span>
-                </Text>
-                <Text as="p" variant="bodyLg" tone="subdued">
-                  Jump into your analytics dashboard and discover insights about your products, sales trends, and inventory performance.
-                </Text>
-              </BlockStack>
-              <Button 
-                variant="primary"
-                onClick={() => onNavigate("dashboard")}
-                size="large"
-                fullWidth
-              >
-                Open Dashboard
-              </Button>
-            </BlockStack>
-          </div>
-        </div>
-      </BlockStack>
-    </Page>
+      </Page>
     </>
   );
 }
