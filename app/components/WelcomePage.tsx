@@ -241,383 +241,307 @@ export function WelcomePage({ onNavigate }: WelcomePageProps) {
           from { opacity: 0; transform: translateY(-20px); }
           to { opacity: 1; transform: translateY(0); }
         }
+
+        @keyframes timelinePulse {
+          0% { top: 0%; opacity: 1; }
+          25% { opacity: 0.7; }
+          50% { top: 50%; opacity: 1; }
+          75% { opacity: 0.7; }
+          100% { top: 100%; opacity: 0; }
+        }
+
+        .timeline-card:hover {
+          transform: translateY(-8px) !important;
+          box-shadow: 0 30px 60px rgba(255, 32, 78, 0.15) !important;
+        }
       `}</style>
       
       <Page>
         <div style={{ background: 'transparent', minHeight: '100vh' }}>
           <BlockStack gap="0">
-            {/* Hero Welcome Section - Futuristic */}
-            <div className="hero-glow" style={{
-              padding: '100px 40px',
+            {/* Hero Welcome Section - Clean & Minimal */}
+            <div style={{
+              padding: '60px 40px',
               position: 'relative',
               zIndex: 1,
-              margin: '40px',
-              borderRadius: '24px'
+              margin: '20px 40px 40px 40px',
+              borderRadius: '16px',
+              background: 'rgba(255, 255, 255, 0.8)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.3)'
             }}>
-              <div style={{ position: 'relative', zIndex: 2 }}>
-                <BlockStack gap="800" align="center">
-                  <BlockStack gap="400" align="center">
-                    <Text as="h1" variant="heading2xl" alignment="center">
-                      <span style={{ 
-                        fontFamily: 'Orbitron, monospace', 
-                        fontWeight: '900',
-                        background: 'linear-gradient(135deg, #FF204E, #A0153E, #5D0E41)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        fontSize: '3.5rem',
-                        letterSpacing: '2px'
-                      }}>
-                        Welcome To SPECTOR
-                      </span>
-                    </Text>
-                    <Text as="p" variant="headingLg" alignment="center">
-                      <span style={{ 
-                        color: '#64748b',
-                        fontFamily: 'Inter, sans-serif',
-                        fontWeight: '300',
-                        letterSpacing: '1px'
-                      }}>
-                        Next-Generation Inventory Intelligence
-                      </span>
-                    </Text>
-                  </BlockStack>
-                  
-                  <Box maxWidth="700px">
-                    <Text as="p" variant="bodyLg" alignment="center">
-                      <span style={{ 
-                        color: '#475569',
-                        lineHeight: '1.8',
-                        fontFamily: 'Inter, sans-serif',
-                        fontWeight: '400'
-                      }}>
-                        Harness the power of AI-driven analytics and real-time intelligence to transform your inventory management into a competitive advantage.
-                      </span>
-                    </Text>
-                  </Box>
-                  
-                  <InlineStack gap="400" align="center">
-                    <Button
-                      variant="primary"
-                      size="large"
-                      onClick={() => onNavigate("dashboard")}
-                    >
-                      Launch Dashboard
-                    </Button>
-                  </InlineStack>
+              <BlockStack gap="500" align="center">
+                <BlockStack gap="300" align="center">
+                  <Text as="h1" variant="headingXl" alignment="center">
+                    <span style={{ 
+                      fontFamily: 'Orbitron, monospace', 
+                      fontWeight: '700',
+                      background: 'linear-gradient(135deg, #FF204E, #A0153E)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      fontSize: '2.5rem',
+                      letterSpacing: '1px'
+                    }}>
+                      Welcome To SPECTOR
+                    </span>
+                  </Text>
+                  <Text as="p" variant="bodyLg" alignment="center">
+                    <span style={{ 
+                      color: '#64748b',
+                      fontFamily: 'Inter, sans-serif',
+                      fontWeight: '400',
+                      fontSize: '1.1rem'
+                    }}>
+                      Next-Generation Inventory Intelligence
+                    </span>
+                  </Text>
                 </BlockStack>
-              </div>
+                
+                <Button
+                  variant="primary"
+                  size="large"
+                  onClick={() => onNavigate("dashboard")}
+                >
+                  Launch Dashboard
+                </Button>
+              </BlockStack>
             </div>
 
-            {/* Futuristic Collapsible Roadmap */}
-            <div style={{ padding: '40px' }}>
-              <div 
-                className="collapsible-roadmap"
-                style={{
-                  padding: '40px',
-                  cursor: 'pointer',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-                onClick={() => setShowRoadmap(!showRoadmap)}
-              >
-                {/* Ambient glow effect */}
-                <div style={{
-                  position: 'absolute',
-                  top: '-50%',
-                  left: '-50%',
-                  width: '200%',
-                  height: '200%',
-                  background: 'radial-gradient(circle, rgba(255, 32, 78, 0.05) 0%, transparent 70%)',
-                  animation: 'pulse 4s ease-in-out infinite',
-                  pointerEvents: 'none'
-                }} />
-                
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                  <InlineStack align="space-between" blockAlign="center">
-                    <BlockStack gap="300">
-                      <Text as="h2" variant="headingXl">
-                        <span style={{
-                          fontFamily: 'Orbitron, monospace',
-                          fontWeight: '700',
-                          background: 'linear-gradient(135deg, #FF204E, #A0153E)',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          letterSpacing: '1px'
-                        }}>
-                          Development Roadmap
-                        </span>
-                      </Text>
-                      <Text as="p" variant="bodyLg" tone="subdued">
-                        <span style={{ fontFamily: 'Inter, sans-serif' }}>
-                          Track our journey of continuous innovation and upcoming features
-                        </span>
-                      </Text>
-                    </BlockStack>
-                    
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '12px 24px',
-                      background: 'rgba(255, 32, 78, 0.1)',
-                      borderRadius: '12px',
-                      border: '1px solid rgba(255, 32, 78, 0.2)',
-                      transition: 'all 0.3s ease'
-                    }}>
-                      <Icon source={CalendarIcon} tone="base" />
-                      <Text as="span" variant="bodyMd">
-                        <span style={{ 
-                          color: '#A0153E',
-                          fontFamily: 'Inter, sans-serif',
-                          fontWeight: '500'
-                        }}>
-                          {showRoadmap ? 'Hide Timeline' : 'View Timeline'}
-                        </span>
-                      </Text>
-                      <div style={{
-                        transform: showRoadmap ? 'rotate(180deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.3s ease',
-                        color: '#A0153E'
-                      }}>
-                        ▼
-                      </div>
-                    </div>
-                  </InlineStack>
-                </div>
+            {/* Vertical Timeline Roadmap */}
+            <div style={{ padding: '40px', position: 'relative' }}>
+              <div style={{ 
+                textAlign: 'center', 
+                marginBottom: '60px' 
+              }}>
+                <Text as="h2" variant="headingXl">
+                  <span style={{
+                    fontFamily: 'Orbitron, monospace',
+                    fontWeight: '700',
+                    background: 'linear-gradient(135deg, #FF204E, #A0153E)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    letterSpacing: '1px'
+                  }}>
+                    Development Roadmap
+                  </span>
+                </Text>
+                <Text as="p" variant="bodyLg" tone="subdued">
+                  <span style={{ fontFamily: 'Inter, sans-serif' }}>
+                    Track our journey of continuous innovation
+                  </span>
+                </Text>
               </div>
               
-              {/* Collapsible Timeline Content with Slider */}
-              {showRoadmap && (
+              {/* Vertical Timeline */}
+              <div style={{ 
+                position: 'relative',
+                maxWidth: '800px',
+                margin: '0 auto'
+              }}>
+                {/* Central Timeline Line */}
                 <div style={{
-                  margin: '24px 0',
-                  padding: '40px',
-                  background: 'rgba(255, 255, 255, 0.98)',
-                  backdropFilter: 'blur(20px)',
-                  borderRadius: '20px',
-                  border: '1px solid rgba(255, 32, 78, 0.1)',
-                  position: 'relative',
-                  animation: 'fadeIn 0.4s ease-out'
-                }}>
-                  {/* Timeline Slider Controls */}
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    marginBottom: '30px'
-                  }}>
-                    <Button
-                      onClick={prevSlide}
-                      variant="tertiary"
-                      size="large"
-                      disabled={currentSlide === 0}
-                      icon={ChevronLeftIcon}
-                    />
-                    
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: '8px',
-                      alignItems: 'center'
+                  position: 'absolute',
+                  left: '50%',
+                  top: '0',
+                  bottom: '0',
+                  width: '4px',
+                  background: 'linear-gradient(180deg, #FF204E 0%, #A0153E 50%, #5D0E41 100%)',
+                  transform: 'translateX(-50%)',
+                  borderRadius: '2px',
+                  boxShadow: '0 0 20px rgba(255, 32, 78, 0.3)'
+                }} />
+                
+                {/* Animated Pulse Moving Along Timeline */}
+                <div style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '0',
+                  width: '12px',
+                  height: '12px',
+                  background: 'radial-gradient(circle, #FF204E, #A0153E)',
+                  borderRadius: '50%',
+                  transform: 'translateX(-50%)',
+                  animation: 'timelinePulse 8s ease-in-out infinite',
+                  boxShadow: '0 0 30px rgba(255, 32, 78, 0.6)',
+                  zIndex: 10
+                }} />
+                
+                {/* Timeline Items */}
+                {timelineData.map((period, index) => (
+                  <div 
+                    key={index}
+                    style={{
+                      position: 'relative',
+                      marginBottom: '80px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      minHeight: '120px'
+                    }}
+                  >
+                    {/* Timeline Node */}
+                    <div style={{
+                      position: 'absolute',
+                      left: '50%',
+                      top: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      width: '24px',
+                      height: '24px',
+                      background: period.status === 'current' ? 'linear-gradient(45deg, #10b981, #059669)' :
+                                period.status === 'upcoming' ? 'linear-gradient(45deg, #6366f1, #4f46e5)' :
+                                'linear-gradient(45deg, #64748b, #475569)',
+                      borderRadius: '50%',
+                      border: '4px solid white',
+                      boxShadow: period.status === 'current' ? '0 0 25px rgba(16, 185, 129, 0.5)' :
+                               period.status === 'upcoming' ? '0 0 25px rgba(99, 102, 241, 0.5)' :
+                               '0 0 25px rgba(100, 116, 139, 0.3)',
+                      zIndex: 5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '12px',
+                      color: 'white',
+                      fontWeight: 'bold'
                     }}>
-                      {Array.from({ length: Math.ceil(timelineData.length / 3) }).map((_, index) => (
-                        <div
-                          key={index}
-                          style={{
-                            width: '12px',
-                            height: '12px',
-                            borderRadius: '50%',
-                            background: index === currentSlide ? '#FF204E' : 'rgba(255, 32, 78, 0.3)',
-                            transition: 'all 0.3s ease',
-                            cursor: 'pointer'
-                          }}
-                          onClick={() => setCurrentSlide(index)}
-                        />
-                      ))}
+                      {period.status === 'current' ? '✓' :
+                       period.status === 'upcoming' ? '○' : '◯'}
                     </div>
                     
-                    <Button
-                      onClick={nextSlide}
-                      variant="tertiary"
-                      size="large"
-                      disabled={currentSlide === Math.ceil(timelineData.length / 3) - 1}
-                      icon={ChevronRightIcon}
-                    />
-                  </div>
-
-                  {/* Timeline Slider */}
-                  <div className="timeline-slider">
-                    <div 
-                      className="timeline-slides"
-                      style={{
-                        transform: `translateX(-${currentSlide * 100}%)`
+                    {/* Content Card - Alternating Left/Right */}
+                    <div style={{
+                      width: '45%',
+                      [index % 2 === 0 ? 'marginRight' : 'marginLeft']: 'auto',
+                      [index % 2 === 0 ? 'marginLeft' : 'marginRight']: '55%'
+                    }}>
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        backdropFilter: 'blur(15px)',
+                        borderRadius: '20px',
+                        padding: '32px',
+                        border: period.status === 'current' ? '2px solid rgba(16, 185, 129, 0.3)' :
+                               period.status === 'upcoming' ? '2px solid rgba(99, 102, 241, 0.3)' :
+                               '2px solid rgba(100, 116, 139, 0.2)',
+                        boxShadow: period.status === 'current' ? '0 20px 40px rgba(16, 185, 129, 0.1)' :
+                                 period.status === 'upcoming' ? '0 20px 40px rgba(99, 102, 241, 0.1)' :
+                                 '0 20px 40px rgba(100, 116, 139, 0.08)',
+                        position: 'relative',
+                        transform: 'translateY(0)',
+                        transition: 'all 0.3s ease'
                       }}
-                    >
-                      {Array.from({ length: Math.ceil(timelineData.length / 3) }).map((_, slideIndex) => (
-                        <div key={slideIndex} className="timeline-slide">
-                          {timelineData
-                            .slice(slideIndex * 3, slideIndex * 3 + 3)
-                            .map((period, index) => (
-                              <div 
-                                key={index} 
-                                className="timeline-item" 
-                                style={{
-                                  flex: '1',
-                                  maxWidth: '320px',
-                                  position: 'relative'
-                                }}
-                              >
-                                <div style={{
-                                  background: period.status === 'current' ? 'rgba(16, 185, 129, 0.05)' :
-                                            period.status === 'upcoming' ? 'rgba(107, 114, 128, 0.08)' :
-                                            'rgba(107, 114, 128, 0.15)',
-                                  backdropFilter: 'blur(10px)',
-                                  borderRadius: '16px',
-                                  border: period.status === 'current' ? '2px solid rgba(16, 185, 129, 0.3)' :
-                                         period.status === 'upcoming' ? '2px solid rgba(107, 114, 128, 0.2)' :
-                                         '2px solid rgba(107, 114, 128, 0.15)',
-                                  position: 'relative',
-                                  overflow: 'hidden',
-                                  transition: 'all 0.3s ease',
-                                  height: '100%'
+                      className="timeline-card"
+                      >
+                        {/* Connection Line to Timeline */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          [index % 2 === 0 ? 'right' : 'left']: '-32px',
+                          width: '32px',
+                          height: '2px',
+                          background: period.status === 'current' ? 'linear-gradient(90deg, #10b981, #059669)' :
+                                    period.status === 'upcoming' ? 'linear-gradient(90deg, #6366f1, #4f46e5)' :
+                                    'linear-gradient(90deg, #64748b, #475569)',
+                          transform: 'translateY(-50%)'
+                        }} />
+                        
+                        <BlockStack gap="400">
+                          {/* Date & Status */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            flexWrap: 'wrap'
+                          }}>
+                            <div style={{
+                              padding: '8px 16px',
+                              background: period.status === 'current' ? 'rgba(16, 185, 129, 0.1)' :
+                                        period.status === 'upcoming' ? 'rgba(99, 102, 241, 0.1)' :
+                                        'rgba(100, 116, 139, 0.1)',
+                              borderRadius: '20px',
+                              border: period.status === 'current' ? '1px solid rgba(16, 185, 129, 0.3)' :
+                                     period.status === 'upcoming' ? '1px solid rgba(99, 102, 241, 0.3)' :
+                                     '1px solid rgba(100, 116, 139, 0.2)'
+                            }}>
+                              <Text as="span" variant="bodyMd">
+                                <span style={{ 
+                                  color: period.status === 'current' ? '#059669' :
+                                        period.status === 'upcoming' ? '#4338ca' :
+                                        '#475569',
+                                  fontWeight: '600',
+                                  fontFamily: 'Inter, sans-serif'
                                 }}>
-                                  {/* Status overlay effect */}
-                                  {period.status === 'current' && (
-                                    <div style={{
-                                      position: 'absolute',
-                                      top: 0,
-                                      left: 0,
-                                      right: 0,
-                                      height: '4px',
-                                      background: 'linear-gradient(90deg, #10b981, #059669)',
-                                      animation: 'pulse 2s ease-in-out infinite'
-                                    }} />
-                                  )}
-                                  
-                                  <Box padding="500">
-                                    <BlockStack gap="400">
-                                      <BlockStack gap="300">
-                                        <div style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '12px',
-                                          flexWrap: 'wrap'
-                                        }}>
-                                          <div style={{
-                                            display: 'inline-block',
-                                            padding: '6px 14px',
-                                            background: period.status === 'current' ? 'rgba(16, 185, 129, 0.15)' :
-                                                      period.status === 'upcoming' ? 'rgba(107, 114, 128, 0.15)' :
-                                                      'rgba(107, 114, 128, 0.25)',
-                                            borderRadius: '20px',
-                                            border: period.status === 'current' ? '1px solid rgba(16, 185, 129, 0.3)' :
-                                                   period.status === 'upcoming' ? '1px solid rgba(107, 114, 128, 0.3)' :
-                                                   '1px solid rgba(107, 114, 128, 0.2)'
-                                          }}>
-                                            <Text as="span" variant="bodySm">
-                                              <span style={{ 
-                                                color: period.status === 'current' ? '#059669' :
-                                                      period.status === 'upcoming' ? '#4b5563' :
-                                                      '#6b7280',
-                                                fontWeight: '600',
-                                                fontSize: '12px'
-                                              }}>
-                                                {period.date}
-                                              </span>
-                                            </Text>
-                                          </div>
-                                          
-                                          {/* Status badge */}
-                                          <div style={{
-                                            padding: '4px 10px',
-                                            borderRadius: '12px',
-                                            background: period.status === 'current' ? '#10b981' :
-                                                      period.status === 'upcoming' ? '#6b7280' :
-                                                      '#9ca3af',
-                                            fontSize: '10px',
-                                            color: 'white',
-                                            fontWeight: 'bold',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.5px'
-                                          }}>
-                                            {period.status === 'current' ? '✓ RELEASED' :
-                                             period.status === 'upcoming' ? '⏳ PLANNED' :
-                                             '🔬 FUTURE'}
-                                          </div>
-                                        </div>
-                                        
-                                        <Text as="h3" variant="headingMd">
-                                          <span style={{
-                                            fontFamily: 'Orbitron, monospace',
-                                            fontWeight: '600',
-                                            color: period.status === 'current' ? '#0f172a' :
-                                                  period.status === 'upcoming' ? '#374151' :
-                                                  '#6b7280'
-                                          }}>
-                                            {period.title}
-                                          </span>
-                                        </Text>
-                                      </BlockStack>
-
-                                      <BlockStack gap="300">
-                                        {period.items.map((item, itemIndex) => (
-                                          <div key={itemIndex} style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '16px',
-                                            padding: '12px 16px',
-                                            background: item.status === 'completed' ? 'rgba(16, 185, 129, 0.08)' : 
-                                                      item.status === 'in-progress' ? 'rgba(245, 158, 11, 0.08)' :
-                                                      item.status === 'planned' ? 'rgba(107, 114, 128, 0.08)' :
-                                                      'rgba(107, 114, 128, 0.05)',
-                                            borderRadius: '12px',
-                                            border: item.status === 'completed' ? '1px solid rgba(16, 185, 129, 0.2)' :
-                                                  item.status === 'in-progress' ? '1px solid rgba(245, 158, 11, 0.2)' :
-                                                  item.status === 'planned' ? '1px solid rgba(107, 114, 128, 0.15)' :
-                                                  '1px solid rgba(107, 114, 128, 0.1)',
-                                            transition: 'all 0.2s ease'
-                                          }}>
-                                            <div style={{
-                                              width: '12px',
-                                              height: '12px',
-                                              borderRadius: '3px',
-                                              background: item.status === 'completed' ? '#10b981' : 
-                                                        item.status === 'in-progress' ? '#f59e0b' :
-                                                        item.status === 'planned' ? '#6b7280' : '#9ca3af',
-                                              flexShrink: 0,
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              fontSize: '8px',
-                                              color: 'white',
-                                              fontWeight: 'bold'
-                                            }}>
-                                              {item.status === 'completed' ? '✓' :
-                                               item.status === 'in-progress' ? '◐' :
-                                               item.status === 'planned' ? '○' : '◯'}
-                                            </div>
-                                            <Text as="p" variant="bodyMd">
-                                              <span style={{
-                                                color: item.status === 'completed' ? '#059669' : 
-                                                      item.status === 'in-progress' ? '#d97706' :
-                                                      item.status === 'planned' ? '#4b5563' : '#6b7280',
-                                                fontWeight: item.status === 'completed' ? '600' : '400'
-                                              }}>
-                                                {item.feature}
-                                              </span>
-                                            </Text>
-                                          </div>
-                                        ))}
-                                      </BlockStack>
-                                    </BlockStack>
-                                  </Box>
-                                </div>
+                                  {period.date}
+                                </span>
+                              </Text>
+                            </div>
+                            
+                            <div style={{
+                              padding: '6px 12px',
+                              borderRadius: '12px',
+                              background: period.status === 'current' ? '#10b981' :
+                                        period.status === 'upcoming' ? '#6366f1' :
+                                        '#64748b',
+                              fontSize: '11px',
+                              color: 'white',
+                              fontWeight: 'bold',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px'
+                            }}>
+                              {period.status === 'current' ? '✓ RELEASED' :
+                               period.status === 'upcoming' ? '⏳ PLANNED' :
+                               '🔬 FUTURE'}
+                            </div>
+                          </div>
+                          
+                          {/* Title */}
+                          <Text as="h3" variant="headingLg">
+                            <span style={{
+                              fontFamily: 'Orbitron, monospace',
+                              fontWeight: '600',
+                              color: period.status === 'current' ? '#0f172a' :
+                                    period.status === 'upcoming' ? '#1e1b4b' :
+                                    '#475569'
+                            }}>
+                              {period.title}
+                            </span>
+                          </Text>
+                          
+                          {/* Features */}
+                          <BlockStack gap="200">
+                            {period.items.map((item, itemIndex) => (
+                              <div key={itemIndex} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                padding: '8px 0'
+                              }}>
+                                <div style={{
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  background: item.status === 'completed' ? '#10b981' : 
+                                            item.status === 'in-progress' ? '#f59e0b' :
+                                            item.status === 'planned' ? '#6366f1' : '#64748b',
+                                  flexShrink: 0
+                                }} />
+                                <Text as="p" variant="bodyMd">
+                                  <span style={{
+                                    color: item.status === 'completed' ? '#059669' : 
+                                          item.status === 'in-progress' ? '#d97706' :
+                                          item.status === 'planned' ? '#4338ca' : '#475569',
+                                    fontWeight: item.status === 'completed' ? '500' : '400',
+                                    fontFamily: 'Inter, sans-serif'
+                                  }}>
+                                    {item.feature}
+                                  </span>
+                                </Text>
                               </div>
                             ))}
-                        </div>
-                      ))}
+                          </BlockStack>
+                        </BlockStack>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
 
             {/* Help Sections - Modern Futuristic Design */}
