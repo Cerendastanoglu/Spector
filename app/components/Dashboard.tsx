@@ -25,6 +25,10 @@ import {
   AlertCircleIcon,
   InfoIcon,
   ClockIcon,
+  PackageIcon,
+  CheckIcon,
+  AlertTriangleIcon,
+  XIcon,
 } from "@shopify/polaris-icons";
 
 interface DashboardProps {
@@ -33,27 +37,33 @@ interface DashboardProps {
   onNavigate: (tab: string) => void;
 }
 
-interface RevenueData {
-  totalRevenue: number;
-  totalOrders: number;
-  avgOrderValue: number;
-  revenueGrowth: number;
-  topRevenueProducts: Array<{
+interface ProductAnalyticsData {
+  totalProducts: number;
+  activeProducts: number;
+  totalCatalogValue: number;
+  avgProductPrice: number;
+  catalogHealth: number;
+  topProducts: Array<{
     id: string;
     name: string;
-    revenue: number;
-    quantity: number;
-    growthRate: number;
+    value: number;
+    variants: number;
+    inventoryStatus: string;
+    priceRange: string;
   }>;
-  salesTrends: Array<{
-    date: string;
-    revenue: number;
-    orders: number;
-  }>;
-  customerMetrics: {
-    newCustomers: number;
-    returningCustomers: number;
-    avgCustomerValue: number;
+  inventoryDistribution: {
+    wellStocked: number;
+    lowStock: number;
+    outOfStock: number;
+  };
+  priceAnalysis: {
+    avgPrice: number;
+    minPrice: number;
+    maxPrice: number;
+    priceDistribution: Array<{
+      range: string;
+      count: number;
+    }>;
   };
 }
 
@@ -81,7 +91,7 @@ interface InventoryData {
 export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardProps) {
   const [activeTab, setActiveTab] = useState(0);
   const [timePeriod, setTimePeriod] = useState('30');
-  const [revenueData, setRevenueData] = useState<RevenueData | null>(null);
+  const [productAnalyticsData, setProductAnalyticsData] = useState<ProductAnalyticsData | null>(null);
   const [inventoryData, setInventoryData] = useState<InventoryData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,18 +104,18 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
   const [filterRisk, setFilterRisk] = useState('all');
   const [searchProduct, setSearchProduct] = useState('');
   
-  const revenueFetcher = useFetcher<{ success: boolean; data?: RevenueData; error?: string }>();
+  const productAnalyticsFetcher = useFetcher<{ success: boolean; data?: ProductAnalyticsData; error?: string }>();
   const inventoryFetcher = useFetcher<{ success: boolean; data?: InventoryData; error?: string }>();
   
   // Refs to hold current values to prevent useEffect dependencies
   const timePeriodRef = useRef(timePeriod);
-  const revenueFetcherRef = useRef(revenueFetcher);
+  const productAnalyticsFetcherRef = useRef(productAnalyticsFetcher);
   const inventoryFetcherRef = useRef(inventoryFetcher);
   
   // Update refs when values change
   useEffect(() => {
     timePeriodRef.current = timePeriod;
-    revenueFetcherRef.current = revenueFetcher;
+    productAnalyticsFetcherRef.current = productAnalyticsFetcher;
     inventoryFetcherRef.current = inventoryFetcher;
   });
 
@@ -113,11 +123,10 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
   const getCacheKey = (type: 'revenue' | 'inventory', period: string) => 
     `spector_${type}_data_${period}`;
 
-  // Check if data needs refresh (weekly refresh or manual)
+  // Check if data needs refresh (manual only)
   const needsRefresh = useCallback((lastUpdate: Date | null): boolean => {
-    if (!lastUpdate) return true;
-    const oneWeek = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-    return Date.now() - lastUpdate.getTime() > oneWeek;
+    // Only refresh manually - no automatic refresh
+    return false;
   }, []);
 
   // Load data from cache (only in browser)
@@ -135,12 +144,12 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
         if (!needsRefresh(lastUpdate)) {
           const data = JSON.parse(cached);
           if (type === 'revenue') {
-            setRevenueData(data);
+            setProductAnalyticsData(data);
           } else {
             setInventoryData(data);
           }
           setLastDataUpdate(lastUpdate);
-          console.log(`Dashboard: Loaded ${type} data from cache (${data?.totalOrders || 0} orders)`);
+          console.log(`Dashboard: Loaded ${type} data from cache (${data?.totalProducts || 0} products)`);
           return true;
         }
       }
@@ -186,19 +195,30 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
     setIsManualRefresh(force);
     
     const currentPeriod = timePeriodRef.current;
-    const currentRevenueFetcher = revenueFetcherRef.current;
+    const currentProductAnalyticsFetcher = productAnalyticsFetcherRef.current;
     const currentInventoryFetcher = inventoryFetcherRef.current;
     
+    console.log("Dashboard: fetchFreshData called with type:", type, "force:", force);
     if (type === 'revenue') {
-      currentRevenueFetcher.load(`/app/api/revenue?period=${currentPeriod}`);
+      console.log("Dashboard: Calling product-analytics API...");
+      currentProductAnalyticsFetcher.load(`/app/api/product-analytics`);
     } else {
+      console.log("Dashboard: Calling inventory API...", currentPeriod);
       currentInventoryFetcher.load(`/app/api/inventory?period=${currentPeriod}`);
     }
   }, []); // No dependencies to prevent recreation
 
   const handleRefresh = useCallback(() => {
     setLastRefresh(new Date());
+    
+    // Skip refresh for Inventory Forecasting (tab 1) and Order Analysis (tab 2) - they're in development
+    if (activeTab === 1 || activeTab === 2) {
+      console.log("Dashboard: Skipping refresh for development tab:", activeTab);
+      return;
+    }
+    
     const type = activeTab === 0 ? 'revenue' : 'inventory';
+    console.log("Dashboard: Refresh triggered, activeTab:", activeTab, "type:", type);
     fetchFreshData(type, true);
   }, [activeTab, fetchFreshData]);
 
@@ -207,12 +227,23 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
     setHasLoadedInitialData(false);
   }, [activeTab, timePeriod]);
 
+
+
   // Smart data loading: check cache first, then fetch if needed
   useEffect(() => {
+    console.log("Dashboard: useEffect triggered - isVisible:", isVisible, "activeTab:", activeTab, "hasLoadedInitialData:", hasLoadedInitialData);
+    
     if (!isVisible) return;
+
+    // Skip data loading for Inventory Forecasting (tab 1) and Order Analysis (tab 2) - they're in development
+    if (activeTab === 1 || activeTab === 2) {
+      setHasLoadedInitialData(true);
+      return;
+    }
 
     const type = activeTab === 0 ? 'revenue' : 'inventory';
     const cacheKey = `${type}_${activeTab}_${timePeriod}`;
+    console.log("Dashboard: Loading data for activeTab:", activeTab, "type:", type, "timePeriod:", timePeriod);
     
     // Skip if we've already loaded data for this combination
     if (hasLoadedInitialData) return;
@@ -232,29 +263,29 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
 
   // Handle revenue data response
   useEffect(() => {
-    if (revenueFetcher.data) {
-      console.log("Dashboard: Revenue data received", revenueFetcher.data);
-      if (revenueFetcher.data.success && revenueFetcher.data.data) {
-        setRevenueData(revenueFetcher.data.data);
-        saveCachedData('revenue', timePeriod, revenueFetcher.data.data);
-        setError((revenueFetcher.data as any).warning || null); // Show warning if present
+    if (productAnalyticsFetcher.data) {
+      console.log("Dashboard: Product analytics data received", productAnalyticsFetcher.data);
+      if (productAnalyticsFetcher.data.success && productAnalyticsFetcher.data.data) {
+        setProductAnalyticsData(productAnalyticsFetcher.data.data);
+        saveCachedData('revenue', timePeriod, productAnalyticsFetcher.data.data);
+        setError((productAnalyticsFetcher.data as any).warning || null); // Show warning if present
       } else {
-        setError(revenueFetcher.data.error || 'Failed to load revenue data');
-        setRevenueData(null);
+        setError(productAnalyticsFetcher.data.error || 'Failed to load product analytics data');
+        setProductAnalyticsData(null);
       }
       setIsLoading(false);
       setIsManualRefresh(false);
     }
-  }, [revenueFetcher.data, timePeriod, saveCachedData]);
+  }, [productAnalyticsFetcher.data, timePeriod, saveCachedData]);
 
-  // Handle revenue fetcher state changes
+  // Handle product analytics fetcher state changes
   useEffect(() => {
-    if (revenueFetcher.state === 'idle' && revenueFetcher.data) {
+    if (productAnalyticsFetcher.state === 'idle' && productAnalyticsFetcher.data) {
       setIsLoading(false);
-    } else if (revenueFetcher.state === 'loading') {
+    } else if (productAnalyticsFetcher.state === 'loading') {
       setIsLoading(true);
     }
-  }, [revenueFetcher.state, revenueFetcher.data]);
+  }, [productAnalyticsFetcher.state, productAnalyticsFetcher.data]);
 
   // Handle inventory data response
   useEffect(() => {
@@ -282,6 +313,15 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
     }).format(amount);
   };
 
+  const formatCompactCurrency = (amount: number) => {
+    if (amount >= 1000000) {
+      return `$${(amount / 1000000).toFixed(1)}M`;
+    } else if (amount >= 1000) {
+      return `$${(amount / 1000).toFixed(1)}K`;
+    }
+    return formatCurrency(amount);
+  };
+
   const formatPercentage = (value: number) => {
     return `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
   };
@@ -289,8 +329,8 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
   const tabs = [
     {
       id: 'revenue',
-      content: 'Revenue Analytics',
-      accessibilityLabel: 'Revenue Analytics',
+      content: 'Product Performance',
+      accessibilityLabel: 'Product Performance',
       panelID: 'revenue-panel',
     },
     {
@@ -299,21 +339,27 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
       accessibilityLabel: 'Inventory Forecasting',
       panelID: 'inventory-panel',
     },
+    {
+      id: 'orders',
+      content: 'Order Analysis',
+      accessibilityLabel: 'Order Analysis',
+      panelID: 'orders-panel',
+    },
   ];
 
-  const renderRevenueTab = () => {
+  const renderProductPerformanceTab = () => {
     // Handle loading state
     if (isLoading) {
       return (
         <Card>
           <BlockStack align="center" gap="400">
-            <Spinner accessibilityLabel="Loading revenue data" size="large" />
+            <Spinner accessibilityLabel="Loading product analytics" size="large" />
             <BlockStack align="center" gap="200">
               <Text as="h3">
-                {isManualRefresh ? 'Fetching latest revenue data...' : 'Loading revenue analytics...'}
+                {isManualRefresh ? 'Analyzing product performance...' : 'Loading product analytics...'}
               </Text>
               <Text as="p" variant="bodyMd" tone="subdued">
-                {isManualRefresh ? 'Getting the most up-to-date information from Shopify' : 'Preparing your analytics dashboard'}
+                {isManualRefresh ? 'Getting the most up-to-date product data from your store' : 'Preparing your product performance dashboard'}
               </Text>
             </BlockStack>
           </BlockStack>
@@ -333,8 +379,8 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
       );
     }
 
-    // Handle empty data state (no orders)
-    if (!revenueData || revenueData.totalOrders === 0) {
+    // Handle empty data state (no products)
+    if (!productAnalyticsData || productAnalyticsData.totalProducts === 0) {
       return (
         <Card>
           <BlockStack align="center" gap="400">
@@ -345,22 +391,22 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
                   padding="400" 
                   borderRadius="100"
                 >
-                  <Icon source={CashDollarIcon} tone="info" />
+                  <Icon source={ChartVerticalIcon} tone="info" />
                 </Box>
                 <BlockStack align="center" gap="200">
-                  <Text as="h3" variant="headingMd">No Sales Data Yet</Text>
+                  <Text as="h3" variant="headingMd">No Products Found</Text>
                   <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
-                    Your store hasn't made any sales yet. Once you start making sales, 
-                    analytics will be automatically updated weekly with growth trends and insights.
+                    Your store doesn't have any products yet. Add some products to see detailed 
+                    performance analytics, pricing insights, and inventory management recommendations.
                   </Text>
                 </BlockStack>
                 <BlockStack align="center" gap="300">
                   <Text as="p" variant="bodyMd" fontWeight="semibold">Get started:</Text>
                   <BlockStack gap="200">
-                    <Text as="p" variant="bodySm" tone="subdued">• Add products to your store</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">• Set up your payment gateway</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">• Start marketing your products</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">• Use 'Refresh Now' for instant updates</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">• Add your first product</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">• Set competitive pricing</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">• Manage inventory levels</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">• Track performance metrics</Text>
                   </BlockStack>
                 </BlockStack>
               </BlockStack>
@@ -371,114 +417,273 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
     }
 
     return (
-    <BlockStack gap="500">
-      {/* Revenue Overview Cards */}
-      <Grid>
-        <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack align="space-between" blockAlign="start">
-                <InlineStack gap="200" blockAlign="center">
-                  <Box 
-                    background="bg-fill-success-secondary" 
-                    padding="200" 
-                    borderRadius="100"
-                  >
-                    <Icon source={CashDollarIcon} tone="success" />
-                  </Box>
-                  <Text as="p" variant="bodyMd" tone="subdued">
-                    Total Revenue
-                  </Text>
-                </InlineStack>
-                <Badge tone={revenueData?.revenueGrowth && revenueData.revenueGrowth > 0 ? 'success' : 'critical'}>
-                  {revenueData ? formatPercentage(revenueData.revenueGrowth) : '0%'}
-                </Badge>
-              </InlineStack>
-              <Text as="p" variant="headingXl">
-                {revenueData ? formatCurrency(revenueData.totalRevenue) : '$0.00'}
-              </Text>
-            </BlockStack>
-          </Card>
-        </Grid.Cell>
-        
-        <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="200" blockAlign="center">
-                <Box 
-                  background="bg-fill-info-secondary" 
-                  padding="200" 
-                  borderRadius="100"
-                >
-                  <Icon source={OrderIcon} tone="info" />
-                </Box>
-                <Text as="p" variant="bodyMd" tone="subdued">
-                  Total Orders
-                </Text>
-              </InlineStack>
-              <Text as="p" variant="headingXl">
-                {revenueData?.totalOrders || 0}
-              </Text>
-            </BlockStack>
-          </Card>
-        </Grid.Cell>
-
-        <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="200" blockAlign="center">
-                <Box 
-                  background="bg-fill-warning-secondary" 
-                  padding="200" 
-                  borderRadius="100"
-                >
-                  <Icon source={ChartVerticalIcon} tone="warning" />
-                </Box>
-                <Text as="p" variant="bodyMd" tone="subdued">
-                  Avg Order Value
-                </Text>
-              </InlineStack>
-              <Text as="p" variant="headingXl">
-                {revenueData ? formatCurrency(revenueData.avgOrderValue) : '$0.00'}
-              </Text>
-            </BlockStack>
-          </Card>
-        </Grid.Cell>
-
-        <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="200" blockAlign="center">
-                <Box 
-                  background="bg-fill-success-secondary" 
-                  padding="200" 
-                  borderRadius="100"
-                >
-                  <Icon source={CashDollarIcon} tone="success" />
-                </Box>
-                <Text as="p" variant="bodyMd" tone="subdued">
-                  Avg Customer Value
-                </Text>
-              </InlineStack>
-              <Text as="p" variant="headingXl">
-                {revenueData ? formatCurrency(revenueData.customerMetrics.avgCustomerValue) : '$0.00'}
-              </Text>
-            </BlockStack>
-          </Card>
-        </Grid.Cell>
-      </Grid>
-
-      {/* Top Revenue Products */}
+    <BlockStack gap="400">
+      {/* Key Metrics - Compact Line Layout */}
       <Card>
-        <BlockStack gap="400">
+        <InlineStack gap="600" align="space-between" wrap={false}>
+          <InlineStack gap="300" blockAlign="center">
+            <Box 
+              background="bg-surface-info" 
+              padding="200" 
+              borderRadius="100"
+            >
+              <Icon source={ChartVerticalIcon} tone="info" />
+            </Box>
+            <BlockStack gap="050">
+              <Text as="p" variant="bodySm" tone="subdued">Total Products</Text>
+              <Text as="span" variant="headingLg" fontWeight="bold">
+                {productAnalyticsData?.totalProducts || 0}
+              </Text>
+              <Text as="p" variant="bodyXs" tone="subdued">
+                {productAnalyticsData?.activeProducts || 0} active in catalog
+              </Text>
+            </BlockStack>
+          </InlineStack>
+
+          <Box background="bg-surface" width="1px" minHeight="60px" />
+
+          <InlineStack gap="300" blockAlign="center">
+            <Box 
+              background="bg-surface-success" 
+              padding="200" 
+              borderRadius="100"
+            >
+              <Icon source={CashDollarIcon} tone="success" />
+            </Box>
+            <BlockStack gap="050">
+              <Text as="p" variant="bodySm" tone="subdued">Catalog Value</Text>
+              <Text as="span" variant="headingLg" fontWeight="bold">
+                {formatCompactCurrency(productAnalyticsData?.totalCatalogValue || 0)}
+              </Text>
+              <Text as="p" variant="bodyXs" tone="subdued">
+                Total inventory value
+              </Text>
+            </BlockStack>
+          </InlineStack>
+
+          <Box background="bg-surface" width="1px" minHeight="60px" />
+
+          <InlineStack gap="300" blockAlign="center">
+            <Box 
+              background="bg-surface-warning" 
+              padding="200" 
+              borderRadius="100"
+            >
+              <Icon source={ChartVerticalIcon} tone="warning" />
+            </Box>
+            <BlockStack gap="050">
+              <Text as="p" variant="bodySm" tone="subdued">Average Price</Text>
+              <Text as="span" variant="headingLg" fontWeight="bold">
+                {formatCompactCurrency(productAnalyticsData?.avgProductPrice || 0)}
+              </Text>
+              <Text as="p" variant="bodyXs" tone="subdued">
+                Per product pricing
+              </Text>
+            </BlockStack>
+          </InlineStack>
+
+          <Box background="bg-surface" width="1px" minHeight="60px" />
+
+          <InlineStack gap="300" blockAlign="center">
+            <Box 
+              background="bg-surface-critical" 
+              padding="200" 
+              borderRadius="100"
+            >
+              <Icon source={ChartVerticalIcon} tone="critical" />
+            </Box>
+            <BlockStack gap="050">
+              <Text as="p" variant="bodySm" tone="subdued">Catalog Health</Text>
+              <Text as="span" variant="headingLg" fontWeight="bold">
+                {formatPercentage(productAnalyticsData?.catalogHealth || 0)}
+              </Text>
+              <Text as="p" variant="bodyXs" tone="subdued">
+                Stock adequacy score
+              </Text>
+            </BlockStack>
+          </InlineStack>
+        </InlineStack>
+      </Card>
+
+      {/* Analytics Deep Dive - Full Width Horizontal Layout */}
+      <BlockStack gap="400">
+        {/* Stock Status - Full Width Horizontal */}
+        <Card>
+          <BlockStack gap="400">
+            <Text as="h3" variant="headingMd" fontWeight="semibold">
+              Stock Status Overview
+            </Text>
+            
+            {productAnalyticsData?.inventoryDistribution ? (
+              <InlineStack gap="400" align="space-between" wrap={true}>
+                <Box 
+                  padding="400" 
+                  background="bg-surface" 
+                  borderRadius="200" 
+                  borderWidth="025" 
+                  borderColor="border-success"
+                  minWidth="280px"
+                >
+                  <InlineStack align="space-between" blockAlign="center">
+                    <InlineStack gap="300" blockAlign="center">
+                      <Box 
+                        background="bg-surface-success" 
+                        padding="200" 
+                        borderRadius="100"
+                      >
+                        <Icon source={CheckIcon} tone="success" />
+                      </Box>
+                      <BlockStack gap="100">
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">Well Stocked</Text>
+                        <Text as="p" variant="bodyXs" tone="subdued">Products in good supply</Text>
+                      </BlockStack>
+                    </InlineStack>
+                    <Text as="p" variant="heading2xl" fontWeight="bold" tone="success">
+                      {productAnalyticsData.inventoryDistribution.wellStocked}
+                    </Text>
+                  </InlineStack>
+                </Box>
+                
+                <Box 
+                  padding="400" 
+                  background="bg-surface" 
+                  borderRadius="200" 
+                  borderWidth="025" 
+                  borderColor="border-warning"
+                  minWidth="280px"
+                >
+                  <InlineStack align="space-between" blockAlign="center">
+                    <InlineStack gap="300" blockAlign="center">
+                      <Box 
+                        background="bg-surface-warning" 
+                        padding="200" 
+                        borderRadius="100"
+                      >
+                        <Icon source={AlertTriangleIcon} tone="warning" />
+                      </Box>
+                      <BlockStack gap="100">
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">Low Stock</Text>
+                        <Text as="p" variant="bodyXs" tone="subdued">Needs replenishment</Text>
+                      </BlockStack>
+                    </InlineStack>
+                    <Text as="p" variant="heading2xl" fontWeight="bold">
+                      {productAnalyticsData.inventoryDistribution.lowStock}
+                    </Text>
+                  </InlineStack>
+                </Box>
+                
+                <Box 
+                  padding="400" 
+                  background="bg-surface" 
+                  borderRadius="200" 
+                  borderWidth="025" 
+                  borderColor="border-critical"
+                  minWidth="280px"
+                >
+                  <InlineStack align="space-between" blockAlign="center">
+                    <InlineStack gap="300" blockAlign="center">
+                      <Box 
+                        background="bg-surface-critical" 
+                        padding="200" 
+                        borderRadius="100"
+                      >
+                        <Icon source={XIcon} tone="critical" />
+                      </Box>
+                      <BlockStack gap="100">
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">Out of Stock</Text>
+                        <Text as="p" variant="bodyXs" tone="subdued">Immediate action needed</Text>
+                      </BlockStack>
+                    </InlineStack>
+                    <Text as="p" variant="heading2xl" fontWeight="bold" tone="critical">
+                      {productAnalyticsData.inventoryDistribution.outOfStock}
+                    </Text>
+                  </InlineStack>
+                </Box>
+              </InlineStack>
+            ) : (
+              <Box padding="600" background="bg-surface-secondary" borderRadius="300">
+                <BlockStack align="center" gap="300">
+                  <Spinner size="small" />
+                  <Text as="p" variant="bodyMd" tone="subdued">Loading stock data...</Text>
+                </BlockStack>
+              </Box>
+            )}
+          </BlockStack>
+        </Card>
+
+        {/* Price Distribution - Better Horizontal Layout */}
+        <Card>
+          <BlockStack gap="400">
+            <Text as="h3" variant="headingMd" fontWeight="semibold">
+              Price Distribution Analysis
+            </Text>
+            
+            {productAnalyticsData?.priceAnalysis?.priceDistribution ? (
+              <BlockStack gap="300">
+                {productAnalyticsData.priceAnalysis.priceDistribution.map((range, index) => (
+                  <Box 
+                    key={index} 
+                    padding="400" 
+                    background="bg-surface" 
+                    borderRadius="200" 
+                    borderWidth="025" 
+                    borderColor="border"
+                  >
+                    <InlineStack align="space-between" blockAlign="center">
+                      <InlineStack gap="400" blockAlign="center">
+                        <Box 
+                          background="bg-surface-info" 
+                          padding="200" 
+                          borderRadius="100"
+                          minWidth="40px"
+                        >
+                          <Text as="span" variant="bodyXs" fontWeight="bold" alignment="center">
+                            ${index + 1}
+                          </Text>
+                        </Box>
+                        <BlockStack gap="100">
+                          <Text as="p" variant="bodyMd" fontWeight="semibold">
+                            {range.range}
+                          </Text>
+                          <Text as="p" variant="bodyXs" tone="subdued">
+                            Price range category
+                          </Text>
+                        </BlockStack>
+                      </InlineStack>
+                      
+                      <InlineStack gap="200" blockAlign="center">
+                        <Text as="p" variant="headingLg" fontWeight="bold">
+                          {range.count}
+                        </Text>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {range.count === 1 ? 'product' : 'products'}
+                        </Text>
+                      </InlineStack>
+                    </InlineStack>
+                  </Box>
+                ))}
+              </BlockStack>
+            ) : (
+              <Box padding="600" background="bg-surface-secondary" borderRadius="300">
+                <BlockStack align="center" gap="300">
+                  <Spinner size="small" />
+                  <Text as="p" variant="bodyMd" tone="subdued">Loading price analysis...</Text>
+                </BlockStack>
+              </Box>
+            )}
+          </BlockStack>
+        </Card>
+      </BlockStack>      {/* Top Products by Value - Horizontal Slider */}
+      <Card>
+        <BlockStack gap="500">
           <Text as="h3" variant="headingMd">
-            Top Revenue Generating Products
+            Top Products by Catalog Value
           </Text>
           {isLoading ? (
             <Box padding="400" background="bg-surface-secondary" borderRadius="200">
               <InlineStack align="center" gap="200">
                 <Spinner size="small" />
-                <Text as="p" variant="bodyMd">Loading revenue data...</Text>
+                <Text as="p" variant="bodyMd">Analyzing product performance...</Text>
               </InlineStack>
             </Box>
           ) : error ? (
@@ -487,42 +692,61 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
                 {error}
               </Text>
             </Box>
-          ) : revenueData?.topRevenueProducts && revenueData.topRevenueProducts.length > 0 ? (
-            <BlockStack gap="300">
-              {revenueData.topRevenueProducts.map((product, index) => (
-                <Box 
-                  key={product.id} 
-                  paddingBlock="400" 
-                  paddingInline="400" 
-                  background="bg-surface-secondary" 
-                  borderRadius="200"
-                >
-                  <InlineStack align="space-between">
-                    <BlockStack gap="200">
-                      <InlineStack gap="300" align="start">
-                        <Badge tone="info">{`#${index + 1}`}</Badge>
+          ) : productAnalyticsData?.topProducts && productAnalyticsData.topProducts.length > 0 ? (
+            <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
+              <div style={{ display: 'flex', gap: '1rem', minWidth: 'max-content' }}>
+                {productAnalyticsData.topProducts.map((product, index) => (
+                  <Box 
+                    key={product.id}
+                    minWidth="280px"
+                    padding="400"
+                    background="bg-surface" 
+                    borderRadius="300"
+                    borderWidth="025" 
+                    borderColor="border"
+                  >
+                    <BlockStack gap="300">
+                      <InlineStack align="space-between" blockAlign="start">
+                        <InlineStack gap="200" blockAlign="center">
+                          <Box 
+                            background="bg-surface-info" 
+                            padding="150" 
+                            borderRadius="100"
+                          >
+                            <Text as="span" variant="bodyXs" fontWeight="bold">#{index + 1}</Text>
+                          </Box>
+                          <Badge 
+                            size="small"
+                            tone={
+                              product.inventoryStatus === 'Well Stocked' ? 'success' : 
+                              product.inventoryStatus === 'Low Stock' ? 'warning' : 'critical'
+                            }
+                          >
+                            {product.inventoryStatus}
+                          </Badge>
+                        </InlineStack>
+                        <Text as="p" variant="headingMd" fontWeight="bold" tone="success">
+                          {formatCompactCurrency(product.value)}
+                        </Text>
+                      </InlineStack>
+                      
+                      <BlockStack gap="200">
                         <Text as="p" variant="bodyMd" fontWeight="semibold">
                           {product.name}
                         </Text>
-                        <Badge tone={product.growthRate > 0 ? 'success' : 'critical'}>
-                          {formatPercentage(product.growthRate)}
-                        </Badge>
-                      </InlineStack>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Sold: {product.quantity} units
-                      </Text>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {product.variants} variant{product.variants !== 1 ? 's' : ''} • {product.priceRange}
+                        </Text>
+                      </BlockStack>
                     </BlockStack>
-                    <Text as="p" variant="headingMd" fontWeight="semibold">
-                      {formatCurrency(product.revenue)}
-                    </Text>
-                  </InlineStack>
-                </Box>
-              ))}
-            </BlockStack>
+                  </Box>
+                ))}
+              </div>
+            </div>
           ) : (
             <Box padding="400" background="bg-surface-secondary" borderRadius="200">
               <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
-                No revenue data available for selected period
+                No product data available
               </Text>
             </Box>
           )}
@@ -533,220 +757,114 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
   };
 
   const renderInventoryTab = () => {
-    // Mock data for demonstration - in real app, this would come from API
-    const mockInventoryData = [
-      {
-        id: '1',
-        name: 'Wireless Headphones Pro',
-        currentStock: 15,
-        dailySalesRate: 2.3,
-        daysRemaining: 7,
-        riskLevel: 'high' as const,
-        suggestedReorder: 50,
-      },
-      {
-        id: '2', 
-        name: 'Bluetooth Speaker',
-        currentStock: 45,
-        dailySalesRate: 1.8,
-        daysRemaining: 25,
-        riskLevel: 'medium' as const,
-        suggestedReorder: 30,
-      },
-      {
-        id: '3',
-        name: 'Phone Case Clear',
-        currentStock: 8,
-        dailySalesRate: 3.1,
-        daysRemaining: 3,
-        riskLevel: 'high' as const,
-        suggestedReorder: 100,
-      },
-      {
-        id: '4',
-        name: 'USB-C Cable',
-        currentStock: 120,
-        dailySalesRate: 4.2,
-        daysRemaining: 29,
-        riskLevel: 'low' as const,
-        suggestedReorder: 150,
-      },
-      {
-        id: '5',
-        name: 'Laptop Stand',
-        currentStock: 25,
-        dailySalesRate: 1.1,
-        daysRemaining: 23,
-        riskLevel: 'medium' as const,
-        suggestedReorder: 40,
-      },
-    ];
-
-    const riskFilterOptions = [
-      { label: 'All Products', value: 'all' },
-      { label: 'High Risk (< 7 days)', value: 'high' },
-      { label: 'Medium Risk (7-21 days)', value: 'medium' },
-      { label: 'Low Risk (> 21 days)', value: 'low' },
-    ];
-
-    const filteredProducts = mockInventoryData.filter(product => {
-      const matchesRisk = filterRisk === 'all' || product.riskLevel === filterRisk;
-      const matchesSearch = product.name.toLowerCase().includes(searchProduct.toLowerCase());
-      return matchesRisk && matchesSearch;
-    });
-
-    const getRiskBadgeTone = (riskLevel: string) => {
-      switch (riskLevel) {
-        case 'high': return 'critical';
-        case 'medium': return 'warning';
-        case 'low': return 'success';
-        default: return 'info';
-      }
-    };
-
-    const getRiskIcon = (riskLevel: string) => {
-      switch (riskLevel) {
-        case 'high': return AlertCircleIcon;
-        case 'medium': return ClockIcon;
-        case 'low': return ChartVerticalIcon;
-        default: return InfoIcon;
-      }
-    };
-
     return (
-      <BlockStack gap="500">
-        {/* Filters Section */}
-        <Card>
-          <BlockStack gap="400">
-            <Text as="h3" variant="headingMd">
-              Stock-Out Predictions & Forecasting
-            </Text>
-            
-            <InlineStack gap="400" align="start">
-              <Box minWidth="200px">
-                <Select
-                  label="Filter by Risk Level"
-                  options={riskFilterOptions}
-                  value={filterRisk}
-                  onChange={setFilterRisk}
-                />
+      <Card>
+        <BlockStack gap="600" align="center">
+          <Box padding="800">
+            <BlockStack gap="500" align="center">
+              <Box 
+                background="bg-fill-warning" 
+                padding="600" 
+                borderRadius="200"
+              >
+                <Icon source={AlertTriangleIcon} tone="base" />
               </Box>
               
-              <Box minWidth="250px">
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="text"
-                    placeholder="Search products..."
-                    value={searchProduct}
-                    onChange={(e) => setSearchProduct(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                    }}
-                  />
-                </div>
-              </Box>
-            </InlineStack>
-          </BlockStack>
-        </Card>
-
-        {/* Inventory Forecasting Results */}
-        <Card>
-          <BlockStack gap="400">
-            <InlineStack align="space-between">
-              <Text as="h3" variant="headingMd">
-                Inventory Forecast ({filteredProducts.length} products)
-              </Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Based on sales velocity and current stock levels
-              </Text>
-            </InlineStack>
-
-            {filteredProducts.length === 0 ? (
-              <Box padding="600" background="bg-surface-secondary" borderRadius="200">
-                <BlockStack align="center" gap="200">
-                  <Icon source={InfoIcon} tone="subdued" />
-                  <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
-                    No products match your current filters
-                  </Text>
-                </BlockStack>
-              </Box>
-            ) : (
-              <BlockStack gap="300">
-                {filteredProducts.map((product) => (
-                  <Box 
-                    key={product.id}
-                    padding="400"
-                    background="bg-surface-secondary"
-                    borderRadius="200"
-                  >
-                    <InlineStack align="space-between" blockAlign="start">
-                      <BlockStack gap="200">
-                        <InlineStack gap="300" align="start">
-                          <Box 
-                            background={`bg-fill-${getRiskBadgeTone(product.riskLevel)}-secondary`}
-                            padding="100" 
-                            borderRadius="100"
-                          >
-                            <Icon source={getRiskIcon(product.riskLevel)} tone={getRiskBadgeTone(product.riskLevel) as any} />
-                          </Box>
-                          <BlockStack gap="100">
-                            <Text as="p" variant="bodyMd" fontWeight="semibold">
-                              {product.name}
-                            </Text>
-                            <InlineStack gap="400">
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                Current Stock: {product.currentStock} units
-                              </Text>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                Daily Sales: {product.dailySalesRate}/day
-                              </Text>
-                            </InlineStack>
-                          </BlockStack>
-                        </InlineStack>
-                      </BlockStack>
-
-                      <BlockStack gap="200" align="end">
-                        <Badge tone={getRiskBadgeTone(product.riskLevel) as any}>
-                          {product.daysRemaining < 1 ? 'Out of Stock' : 
-                           product.daysRemaining === 1 ? '1 day left' :
-                           `${Math.floor(product.daysRemaining)} days left`}
-                        </Badge>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Reorder: {product.suggestedReorder} units
-                        </Text>
-                      </BlockStack>
-                    </InlineStack>
-
-                    {/* Progress Bar for Days Remaining */}
-                    <Box paddingBlockStart="300">
-                      <div style={{ 
-                        width: '100%', 
-                        height: '4px', 
-                        backgroundColor: '#f3f4f6', 
-                        borderRadius: '2px',
-                        overflow: 'hidden'
-                      }}>
-                        <div style={{
-                          width: `${Math.max(0, Math.min(100, (product.daysRemaining / 30) * 100))}%`,
-                          height: '100%',
-                          backgroundColor: 
-                            product.riskLevel === 'high' ? '#ef4444' :
-                            product.riskLevel === 'medium' ? '#f59e0b' : '#10b981',
-                          transition: 'width 0.3s ease'
-                        }} />
-                      </div>
-                    </Box>
-                  </Box>
-                ))}
+              <BlockStack gap="300" align="center">
+                <Text as="h2" variant="headingLg" fontWeight="bold">
+                  Inventory Forecasting
+                </Text>
+                <Text as="p" variant="bodyLg" tone="subdued" alignment="center">
+                  In Development
+                </Text>
               </BlockStack>
-            )}
-          </BlockStack>
-        </Card>
-      </BlockStack>
+              
+              <BlockStack gap="400" align="center">
+                <Text as="p" variant="bodyMd" alignment="center" tone="subdued">
+                  Advanced inventory forecasting requires order history data to predict stock-outs, 
+                  calculate reorder points, and optimize inventory levels. This feature is currently 
+                  being developed and will be available soon.
+                </Text>
+                
+                <Box padding="400" background="bg-surface-secondary" borderRadius="300">
+                  <BlockStack gap="300">
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">
+                      🚀 Coming Soon:
+                    </Text>
+                    <BlockStack gap="200">
+                      <Text as="p" variant="bodySm" tone="subdued">• AI-powered stock-out predictions</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">• Automated reorder point calculations</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">• Seasonal demand forecasting</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">• Smart inventory optimization</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">• Low stock alerts & notifications</Text>
+                    </BlockStack>
+                  </BlockStack>
+                </Box>
+                
+                <Box padding="300" background="bg-surface-info" borderRadius="200">
+                  <InlineStack gap="200" blockAlign="center">
+                    <Icon source={InfoIcon} tone="info" />
+                    <Text as="p" variant="bodySm">
+                      Order data integration required for accurate forecasting
+                    </Text>
+                  </InlineStack>
+                </Box>
+              </BlockStack>
+            </BlockStack>
+          </Box>
+        </BlockStack>
+      </Card>
+    );
+  };
+
+  const renderOrderAnalysisTab = () => {
+    return (
+      <Card>
+        <BlockStack gap="600" align="center">
+          <Box padding="800">
+            <BlockStack gap="500" align="center">
+              <Box 
+                background="bg-fill-info" 
+                padding="600" 
+                borderRadius="200"
+              >
+                <Icon source={OrderIcon} tone="base" />
+              </Box>
+              
+              <BlockStack gap="300" align="center">
+                <Text as="h2" variant="headingLg" fontWeight="bold">
+                  Order Analysis
+                </Text>
+                <Text as="p" variant="bodyLg" tone="subdued" alignment="center">
+                  Coming Soon
+                </Text>
+              </BlockStack>
+              
+              <BlockStack gap="400" align="center">
+                <Text as="p" variant="bodyMd" alignment="center" tone="subdued">
+                  Advanced order analytics including sales trends, customer behavior patterns, 
+                  revenue forecasting, and performance insights are currently in development.
+                </Text>
+                
+                <Box padding="400" background="bg-surface-secondary" borderRadius="300">
+                  <BlockStack gap="300">
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">
+                      📊 Planned Features:
+                    </Text>
+                    <BlockStack gap="200">
+                      <Text as="p" variant="bodySm" tone="subdued">• Sales trend analysis and forecasting</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">• Customer purchase behavior insights</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">• Revenue growth tracking</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">• Order fulfillment analytics</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">• Peak sales time identification</Text>
+                    </BlockStack>
+                  </BlockStack>
+                </Box>
+              </BlockStack>
+            </BlockStack>
+          </Box>
+        </BlockStack>
+      </Card>
     );
   };
 
@@ -763,72 +881,64 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
                   Analytics Dashboard
                 </Text>
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Smart insights with weekly auto-refresh and on-demand updates
+                  Smart insights and comprehensive analytics for your store
                 </Text>
               </BlockStack>
               
-              <InlineStack gap="300" align="end">
-                <Box minWidth="200px">
-                  <Select
-                    label="Time Period"
-                    labelHidden
-                    options={timePeriodOptions}
-                    value={timePeriod}
-                    onChange={setTimePeriod}
-                  />
-                </Box>
+              <BlockStack gap="200" align="end">
                 <Button
                   icon={RefreshIcon}
                   onClick={handleRefresh}
                   loading={isLoading}
                   tone={isManualRefresh ? 'success' : undefined}
-                  accessibilityLabel="Refresh data now"
+                  accessibilityLabel="Refresh analytics data"
                 >
-                  {isLoading ? 'Refreshing...' : 'Refresh Now'}
+                  {isLoading ? 'Refreshing...' : 'Refresh Analytics'}
                 </Button>
-              </InlineStack>
+                
+                {/* Data Update Information - Only for Inventory & Order Analysis */}
+                {(activeTab === 1 || activeTab === 2) && (
+                  <InlineStack gap="400" wrap={false} align="end">
+                    <InlineStack gap="200" blockAlign="center">
+                      <Icon source={ClockIcon} tone="subdued" />
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Real-time data
+                      </Text>
+                    </InlineStack>
+                    
+                    {lastDataUpdate && (
+                      <InlineStack gap="200" blockAlign="center">
+                        <Icon source={CalendarIcon} tone="subdued" />
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Last updated: {lastDataUpdate.toLocaleDateString()} at {lastDataUpdate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                      </InlineStack>
+                    )}
+
+                    <Tooltip content="Analytics data updates in real-time. Click 'Refresh Now' for the latest information.">
+                      <Icon source={InfoIcon} tone="subdued" />
+                    </Tooltip>
+                  </InlineStack>
+                )}
+              </BlockStack>
             </InlineStack>
 
             <Divider />
 
-            {/* Tabs and Data Update Information on Same Line */}
-            <InlineStack align="space-between" blockAlign="center">
-              {/* Tabs on the Left */}
-              <Tabs
-                tabs={tabs}
-                selected={activeTab}
-                onSelect={setActiveTab}
-                fitted={false}
-              />
-
-              {/* Data Update Information on the Right */}
-              <InlineStack gap="400" wrap={false}>
-                <InlineStack gap="200" blockAlign="center">
-                  <Icon source={ClockIcon} tone="subdued" />
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Auto-refreshes weekly
-                  </Text>
-                </InlineStack>
-                
-                {lastDataUpdate && (
-                  <InlineStack gap="200" blockAlign="center">
-                    <Icon source={CalendarIcon} tone="subdued" />
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Last updated: {lastDataUpdate.toLocaleDateString()} at {lastDataUpdate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  </InlineStack>
-                )}
-
-                <Tooltip content="Data is automatically refreshed weekly to ensure performance. Click 'Refresh Now' for the latest information.">
-                  <Icon source={InfoIcon} tone="subdued" />
-                </Tooltip>
-              </InlineStack>
-            </InlineStack>
+            {/* Tabs Section */}
+            <Tabs
+              tabs={tabs}
+              selected={activeTab}
+              onSelect={setActiveTab}
+              fitted={false}
+            />
           </BlockStack>
 
           {/* Tab Content */}
           <Box paddingBlockStart="400">
-            {activeTab === 0 ? renderRevenueTab() : renderInventoryTab()}
+            {activeTab === 0 && renderProductPerformanceTab()}
+            {activeTab === 1 && renderInventoryTab()}
+            {activeTab === 2 && renderOrderAnalysisTab()}
           </Box>
         </BlockStack>
       </Card>
