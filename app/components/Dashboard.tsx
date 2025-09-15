@@ -90,6 +90,10 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
   const [isManualRefresh, setIsManualRefresh] = useState(false);
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   
+  // Inventory filtering state
+  const [filterRisk, setFilterRisk] = useState('all');
+  const [searchProduct, setSearchProduct] = useState('');
+  
   const revenueFetcher = useFetcher<{ success: boolean; data?: RevenueData; error?: string }>();
   const inventoryFetcher = useFetcher<{ success: boolean; data?: InventoryData; error?: string }>();
   
@@ -528,99 +532,306 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
     );
   };
 
-  const renderInventoryTab = () => (
-    <BlockStack gap="500">
-      <Text as="h3" variant="headingMd">
-        Inventory Forecasting & Analytics
-      </Text>
-      <Card>
-        <Box padding="600" background="bg-surface-secondary" borderRadius="200">
-          <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
-            Inventory analytics coming soon...
-          </Text>
-        </Box>
-      </Card>
-    </BlockStack>
-  );
+  const renderInventoryTab = () => {
+    // Mock data for demonstration - in real app, this would come from API
+    const mockInventoryData = [
+      {
+        id: '1',
+        name: 'Wireless Headphones Pro',
+        currentStock: 15,
+        dailySalesRate: 2.3,
+        daysRemaining: 7,
+        riskLevel: 'high' as const,
+        suggestedReorder: 50,
+      },
+      {
+        id: '2', 
+        name: 'Bluetooth Speaker',
+        currentStock: 45,
+        dailySalesRate: 1.8,
+        daysRemaining: 25,
+        riskLevel: 'medium' as const,
+        suggestedReorder: 30,
+      },
+      {
+        id: '3',
+        name: 'Phone Case Clear',
+        currentStock: 8,
+        dailySalesRate: 3.1,
+        daysRemaining: 3,
+        riskLevel: 'high' as const,
+        suggestedReorder: 100,
+      },
+      {
+        id: '4',
+        name: 'USB-C Cable',
+        currentStock: 120,
+        dailySalesRate: 4.2,
+        daysRemaining: 29,
+        riskLevel: 'low' as const,
+        suggestedReorder: 150,
+      },
+      {
+        id: '5',
+        name: 'Laptop Stand',
+        currentStock: 25,
+        dailySalesRate: 1.1,
+        daysRemaining: 23,
+        riskLevel: 'medium' as const,
+        suggestedReorder: 40,
+      },
+    ];
+
+    const riskFilterOptions = [
+      { label: 'All Products', value: 'all' },
+      { label: 'High Risk (< 7 days)', value: 'high' },
+      { label: 'Medium Risk (7-21 days)', value: 'medium' },
+      { label: 'Low Risk (> 21 days)', value: 'low' },
+    ];
+
+    const filteredProducts = mockInventoryData.filter(product => {
+      const matchesRisk = filterRisk === 'all' || product.riskLevel === filterRisk;
+      const matchesSearch = product.name.toLowerCase().includes(searchProduct.toLowerCase());
+      return matchesRisk && matchesSearch;
+    });
+
+    const getRiskBadgeTone = (riskLevel: string) => {
+      switch (riskLevel) {
+        case 'high': return 'critical';
+        case 'medium': return 'warning';
+        case 'low': return 'success';
+        default: return 'info';
+      }
+    };
+
+    const getRiskIcon = (riskLevel: string) => {
+      switch (riskLevel) {
+        case 'high': return AlertCircleIcon;
+        case 'medium': return ClockIcon;
+        case 'low': return ChartVerticalIcon;
+        default: return InfoIcon;
+      }
+    };
+
+    return (
+      <BlockStack gap="500">
+        {/* Filters Section */}
+        <Card>
+          <BlockStack gap="400">
+            <Text as="h3" variant="headingMd">
+              Stock-Out Predictions & Forecasting
+            </Text>
+            
+            <InlineStack gap="400" align="start">
+              <Box minWidth="200px">
+                <Select
+                  label="Filter by Risk Level"
+                  options={riskFilterOptions}
+                  value={filterRisk}
+                  onChange={setFilterRisk}
+                />
+              </Box>
+              
+              <Box minWidth="250px">
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    value={searchProduct}
+                    onChange={(e) => setSearchProduct(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                    }}
+                  />
+                </div>
+              </Box>
+            </InlineStack>
+          </BlockStack>
+        </Card>
+
+        {/* Inventory Forecasting Results */}
+        <Card>
+          <BlockStack gap="400">
+            <InlineStack align="space-between">
+              <Text as="h3" variant="headingMd">
+                Inventory Forecast ({filteredProducts.length} products)
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Based on sales velocity and current stock levels
+              </Text>
+            </InlineStack>
+
+            {filteredProducts.length === 0 ? (
+              <Box padding="600" background="bg-surface-secondary" borderRadius="200">
+                <BlockStack align="center" gap="200">
+                  <Icon source={InfoIcon} tone="subdued" />
+                  <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
+                    No products match your current filters
+                  </Text>
+                </BlockStack>
+              </Box>
+            ) : (
+              <BlockStack gap="300">
+                {filteredProducts.map((product) => (
+                  <Box 
+                    key={product.id}
+                    padding="400"
+                    background="bg-surface-secondary"
+                    borderRadius="200"
+                  >
+                    <InlineStack align="space-between" blockAlign="start">
+                      <BlockStack gap="200">
+                        <InlineStack gap="300" align="start">
+                          <Box 
+                            background={`bg-fill-${getRiskBadgeTone(product.riskLevel)}-secondary`}
+                            padding="100" 
+                            borderRadius="100"
+                          >
+                            <Icon source={getRiskIcon(product.riskLevel)} tone={getRiskBadgeTone(product.riskLevel) as any} />
+                          </Box>
+                          <BlockStack gap="100">
+                            <Text as="p" variant="bodyMd" fontWeight="semibold">
+                              {product.name}
+                            </Text>
+                            <InlineStack gap="400">
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                Current Stock: {product.currentStock} units
+                              </Text>
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                Daily Sales: {product.dailySalesRate}/day
+                              </Text>
+                            </InlineStack>
+                          </BlockStack>
+                        </InlineStack>
+                      </BlockStack>
+
+                      <BlockStack gap="200" align="end">
+                        <Badge tone={getRiskBadgeTone(product.riskLevel) as any}>
+                          {product.daysRemaining < 1 ? 'Out of Stock' : 
+                           product.daysRemaining === 1 ? '1 day left' :
+                           `${Math.floor(product.daysRemaining)} days left`}
+                        </Badge>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Reorder: {product.suggestedReorder} units
+                        </Text>
+                      </BlockStack>
+                    </InlineStack>
+
+                    {/* Progress Bar for Days Remaining */}
+                    <Box paddingBlockStart="300">
+                      <div style={{ 
+                        width: '100%', 
+                        height: '4px', 
+                        backgroundColor: '#f3f4f6', 
+                        borderRadius: '2px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          width: `${Math.max(0, Math.min(100, (product.daysRemaining / 30) * 100))}%`,
+                          height: '100%',
+                          backgroundColor: 
+                            product.riskLevel === 'high' ? '#ef4444' :
+                            product.riskLevel === 'medium' ? '#f59e0b' : '#10b981',
+                          transition: 'width 0.3s ease'
+                        }} />
+                      </div>
+                    </Box>
+                  </Box>
+                ))}
+              </BlockStack>
+            )}
+          </BlockStack>
+        </Card>
+      </BlockStack>
+    );
+  };
 
   return (
     <BlockStack gap="500">
-      {/* Enhanced Header with Data Strategy Info */}
+      {/* Unified Dashboard Header and Content */}
       <Card>
-        <BlockStack gap="400">
-          <InlineStack align="space-between" blockAlign="start">
-            <BlockStack gap="200">
-              <Text as="h1" variant="headingLg">
-                Analytics Dashboard
-              </Text>
-              <Text as="p" variant="bodyMd" tone="subdued">
-                Smart insights with weekly auto-refresh and on-demand updates
-              </Text>
-            </BlockStack>
-            
-            <InlineStack gap="300" align="end">
-              <Box minWidth="200px">
-                <Select
-                  label="Time Period"
-                  labelHidden
-                  options={timePeriodOptions}
-                  value={timePeriod}
-                  onChange={setTimePeriod}
-                />
-              </Box>
-              <Button
-                icon={RefreshIcon}
-                onClick={handleRefresh}
-                loading={isLoading}
-                tone={isManualRefresh ? 'success' : undefined}
-                accessibilityLabel="Refresh data now"
-              >
-                {isLoading ? 'Refreshing...' : 'Refresh Now'}
-              </Button>
-            </InlineStack>
-          </InlineStack>
-
-          <Divider />
-
-          {/* Data Update Information */}
-          <InlineStack align="space-between" blockAlign="center">
-            <InlineStack gap="400" wrap={false}>
-              <InlineStack gap="200" blockAlign="center">
-                <Icon source={ClockIcon} tone="subdued" />
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Auto-refreshes weekly
+        <BlockStack gap="500">
+          {/* Header Section */}
+          <BlockStack gap="400">
+            <InlineStack align="space-between" blockAlign="start">
+              <BlockStack gap="200">
+                <Text as="h1" variant="headingLg">
+                  Analytics Dashboard
                 </Text>
-              </InlineStack>
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  Smart insights with weekly auto-refresh and on-demand updates
+                </Text>
+              </BlockStack>
               
-              {lastDataUpdate && (
+              <InlineStack gap="300" align="end">
+                <Box minWidth="200px">
+                  <Select
+                    label="Time Period"
+                    labelHidden
+                    options={timePeriodOptions}
+                    value={timePeriod}
+                    onChange={setTimePeriod}
+                  />
+                </Box>
+                <Button
+                  icon={RefreshIcon}
+                  onClick={handleRefresh}
+                  loading={isLoading}
+                  tone={isManualRefresh ? 'success' : undefined}
+                  accessibilityLabel="Refresh data now"
+                >
+                  {isLoading ? 'Refreshing...' : 'Refresh Now'}
+                </Button>
+              </InlineStack>
+            </InlineStack>
+
+            <Divider />
+
+            {/* Tabs and Data Update Information on Same Line */}
+            <InlineStack align="space-between" blockAlign="center">
+              {/* Tabs on the Left */}
+              <Tabs
+                tabs={tabs}
+                selected={activeTab}
+                onSelect={setActiveTab}
+                fitted={false}
+              />
+
+              {/* Data Update Information on the Right */}
+              <InlineStack gap="400" wrap={false}>
                 <InlineStack gap="200" blockAlign="center">
-                  <Icon source={CalendarIcon} tone="subdued" />
+                  <Icon source={ClockIcon} tone="subdued" />
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Last updated: {lastDataUpdate.toLocaleDateString()} at {lastDataUpdate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    Auto-refreshes weekly
                   </Text>
                 </InlineStack>
-              )}
+                
+                {lastDataUpdate && (
+                  <InlineStack gap="200" blockAlign="center">
+                    <Icon source={CalendarIcon} tone="subdued" />
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Last updated: {lastDataUpdate.toLocaleDateString()} at {lastDataUpdate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </InlineStack>
+                )}
+
+                <Tooltip content="Data is automatically refreshed weekly to ensure performance. Click 'Refresh Now' for the latest information.">
+                  <Icon source={InfoIcon} tone="subdued" />
+                </Tooltip>
+              </InlineStack>
             </InlineStack>
+          </BlockStack>
 
-            <Tooltip content="Data is automatically refreshed weekly to ensure performance. Click 'Refresh Now' for the latest information.">
-              <Icon source={InfoIcon} tone="subdued" />
-            </Tooltip>
-          </InlineStack>
-        </BlockStack>
-      </Card>
-
-      {/* Tabs */}
-      <Tabs
-        tabs={tabs}
-        selected={activeTab}
-        onSelect={setActiveTab}
-      >
-        <Card>
-          <Box padding="400">
+          {/* Tab Content */}
+          <Box paddingBlockStart="400">
             {activeTab === 0 ? renderRevenueTab() : renderInventoryTab()}
           </Box>
-        </Card>
-      </Tabs>
+        </BlockStack>
+      </Card>
     </BlockStack>
   );
 }
