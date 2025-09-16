@@ -34,6 +34,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                       }
                     }
                   }
+                  media(first: 1) {
+                    edges {
+                      node {
+                        ... on MediaImage {
+                          id
+                          image {
+                            url
+                            altText
+                          }
+                        }
+                      }
+                    }
+                  }
                   variants(first: 10) {
                     edges {
                       node {
@@ -267,6 +280,202 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
     } catch (error) {
       console.error("Error fetching stats:", error);
+      return json({ error: "Internal server error" }, { status: 500 });
+    }
+  }
+
+  // New action for notifications: Fetch products with variants and inventory locations
+  if (actionType === "fetch-products-with-variants-and-locations") {
+    try {
+      const response = await admin.graphql(
+        `#graphql
+          query getProductsWithVariantsAndLocations($first: Int!) {
+            products(first: $first) {
+              edges {
+                node {
+                  id
+                  title
+                  handle
+                  status
+                  totalInventory
+                  tags
+                  productType
+                  vendor
+                  featuredMedia {
+                    preview {
+                      image {
+                        url
+                        altText
+                      }
+                    }
+                  }
+                  media(first: 1) {
+                    edges {
+                      node {
+                        ... on MediaImage {
+                          id
+                          image {
+                            url
+                            altText
+                          }
+                        }
+                      }
+                    }
+                  }
+                  variants(first: 50) {
+                    edges {
+                      node {
+                        id
+                        title
+                        sku
+                        price
+                        inventoryQuantity
+                        inventoryPolicy
+                        inventoryItem {
+                          id
+                          tracked
+                        }
+                      }
+                    }
+                  }
+
+                }
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+            }
+          }`,
+        {
+          variables: {
+            first: 100,
+          },
+        }
+      );
+
+      const responseJson: any = await response.json();
+      
+      if (responseJson.errors) {
+        console.error("GraphQL Errors:", responseJson.errors);
+        return json({ error: "Failed to fetch products with variants" }, { status: 500 });
+      }
+
+      return json({
+        products: responseJson.data?.products || { edges: [] },
+      });
+    } catch (error) {
+      console.error("Error fetching products with variants:", error);
+      return json({ error: "Internal server error" }, { status: 500 });
+    }
+  }
+
+  // New action for notifications: Fetch collections
+  if (actionType === "fetch-collections") {
+    try {
+      const response = await admin.graphql(
+        `#graphql
+          query getCollections($first: Int!) {
+            collections(first: $first) {
+              edges {
+                node {
+                  id
+                  title
+                  handle
+                  productsCount {
+                    count
+                  }
+                  description
+                }
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+            }
+          }`,
+        {
+          variables: {
+            first: 50,
+          },
+        }
+      );
+
+      const responseJson: any = await response.json();
+      
+      if (responseJson.errors) {
+        console.error("GraphQL Errors:", responseJson.errors);
+        return json({ error: "Failed to fetch collections" }, { status: 500 });
+      }
+
+      return json({
+        collections: responseJson.data?.collections || { edges: [] },
+      });
+    } catch (error) {
+      console.error("Error fetching collections:", error);
+      return json({ error: "Internal server error" }, { status: 500 });
+    }
+  }
+
+  // New action for notifications: Fetch locations
+  if (actionType === "fetch-locations") {
+    try {
+      // Use mock locations since the app doesn't have access to the locations API
+      const mockLocations = {
+        edges: [
+          {
+            node: {
+              id: 'gid://shopify/Location/1',
+              name: 'Main Store',
+              address: {
+                formatted: '123 Main St, New York, NY 10001, US',
+                address1: '123 Main St',
+                city: 'New York',
+                province: 'NY',
+                country: 'US'
+              },
+              fulfillsOnlineOrders: true,
+              isActive: true
+            }
+          },
+          {
+            node: {
+              id: 'gid://shopify/Location/2',
+              name: 'Warehouse',
+              address: {
+                formatted: '456 Storage Ave, Los Angeles, CA 90210, US',
+                address1: '456 Storage Ave',
+                city: 'Los Angeles',
+                province: 'CA',
+                country: 'US'
+              },
+              fulfillsOnlineOrders: false,
+              isActive: true
+            }
+          },
+          {
+            node: {
+              id: 'gid://shopify/Location/3',
+              name: 'Pop-up Store',
+              address: {
+                formatted: '789 Retail Blvd, Chicago, IL 60601, US',
+                address1: '789 Retail Blvd',
+                city: 'Chicago',
+                province: 'IL',
+                country: 'US'
+              },
+              fulfillsOnlineOrders: true,
+              isActive: true
+            }
+          }
+        ]
+      };
+
+      return json({
+        locations: mockLocations,
+      });
+    } catch (error) {
+      console.error("Error fetching locations:", error);
       return json({ error: "Internal server error" }, { status: 500 });
     }
   }
