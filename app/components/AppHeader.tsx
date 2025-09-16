@@ -101,7 +101,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         cursor: 'pointer'
       }}
-      onClick={() => onTabChange("welcome")}
+      onClick={() => onTabChange("dashboard")}
       onMouseEnter={(e) => {
         e.currentTarget.style.animation = 'logoHover 0.6s ease-in-out';
         e.currentTarget.style.transform = 'scale(1.05)';
