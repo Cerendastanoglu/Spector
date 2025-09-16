@@ -15,6 +15,8 @@ import {
   Badge,
   Tooltip,
   Divider,
+  Modal,
+  Banner,
 } from "@shopify/polaris";
 import {
   RefreshIcon,
@@ -98,6 +100,7 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [lastDataUpdate, setLastDataUpdate] = useState<Date | null>(null);
   const [isManualRefresh, setIsManualRefresh] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   
   // Inventory filtering state
@@ -335,14 +338,14 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
     },
     {
       id: 'inventory',
-      content: 'Inventory Forecasting',
-      accessibilityLabel: 'Inventory Forecasting',
+      content: '🔒 Inventory Forecasting',
+      accessibilityLabel: 'Inventory Forecasting - Coming Soon',
       panelID: 'inventory-panel',
     },
     {
       id: 'orders',
-      content: 'Order Analysis',
-      accessibilityLabel: 'Order Analysis',
+      content: '🔒 Order Analysis', 
+      accessibilityLabel: 'Order Analysis - Coming Soon',
       panelID: 'orders-panel',
     },
   ];
@@ -869,21 +872,36 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
   };
 
   return (
-    <BlockStack gap="500">
-      {/* Unified Dashboard Header and Content */}
-      <Card>
-        <BlockStack gap="500">
-          {/* Header Section */}
-          <BlockStack gap="400">
-            <InlineStack align="space-between" blockAlign="start">
-              <BlockStack gap="200">
-                <Text as="h1" variant="headingLg">
-                  Analytics Dashboard
-                </Text>
-                <Text as="p" variant="bodyMd" tone="subdued">
-                  Smart insights and comprehensive analytics for your store
-                </Text>
-              </BlockStack>
+    <>
+      {/* CSS for greyed out tabs */}
+      <style>{`
+        .Polaris-Tabs__Tab:nth-child(2) button,
+        .Polaris-Tabs__Tab:nth-child(3) button {
+          opacity: 0.5;
+          color: #8c9196 !important;
+          cursor: not-allowed;
+        }
+        .Polaris-Tabs__Tab:nth-child(2) button:hover,
+        .Polaris-Tabs__Tab:nth-child(3) button:hover {
+          background-color: #f6f6f7 !important;
+        }
+      `}</style>
+      
+      <BlockStack gap="500">
+        {/* Unified Dashboard Header and Content */}
+        <Card>
+          <BlockStack gap="500">
+            {/* Header Section */}
+            <BlockStack gap="400">
+              <InlineStack align="space-between" blockAlign="start">
+                <BlockStack gap="200">
+                  <Text as="h1" variant="headingLg">
+                    Analytics Dashboard
+                  </Text>
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    Smart insights and comprehensive analytics for your store
+                  </Text>
+                </BlockStack>
               
               <BlockStack gap="200" align="end">
                 <Button
@@ -929,7 +947,14 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
             <Tabs
               tabs={tabs}
               selected={activeTab}
-              onSelect={setActiveTab}
+              onSelect={(selectedTab) => {
+                // Show coming soon message for disabled tabs (1 and 2)
+                if (selectedTab === 1 || selectedTab === 2) {
+                  setShowComingSoon(true);
+                  return; // Don't change tab
+                }
+                setActiveTab(selectedTab);
+              }}
               fitted={false}
             />
           </BlockStack>
@@ -942,7 +967,50 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
           </Box>
         </BlockStack>
       </Card>
-    </BlockStack>
+      
+      {/* Coming Soon Modal */}
+      <Modal
+        open={showComingSoon}
+        onClose={() => setShowComingSoon(false)}
+        title="Feature Coming Soon"
+        primaryAction={{
+          content: 'Got it',
+          onAction: () => setShowComingSoon(false),
+        }}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Banner tone="info">
+              <BlockStack gap="200">
+                <Text as="p" variant="bodyMd">
+                  🚧 This feature is currently under development and will be available soon!
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  We're working hard to bring you advanced analytics and insights. Stay tuned for updates!
+                </Text>
+              </BlockStack>
+            </Banner>
+            
+            <Box background="bg-surface-secondary" padding="400" borderRadius="300">
+              <BlockStack gap="300">
+                <Text as="p" variant="headingSm">
+                  🎯 What's Coming:
+                </Text>
+                <BlockStack gap="200">
+                  <Text as="p" variant="bodySm">• AI-powered inventory forecasting</Text>
+                  <Text as="p" variant="bodySm">• Advanced order pattern analysis</Text>
+                  <Text as="p" variant="bodySm">• Predictive stock-out alerts</Text>
+                  <Text as="p" variant="bodySm">• Seasonal demand insights</Text>
+                  <Text as="p" variant="bodySm">• Smart reorder recommendations</Text>
+                </BlockStack>
+              </BlockStack>
+            </Box>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+      
+      </BlockStack>
+    </>
   );
 }
 
