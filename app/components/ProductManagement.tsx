@@ -117,9 +117,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [marketingTags, setMarketingTags] = useState('');
   const [seasonalPricing, setSeasonalPricing] = useState('');
   
-  // Error and success states for bulk operations
+  // Enhanced Error and success states for bulk operations
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [bulkSuccess, setBulkSuccess] = useState<string | null>(null);
+  const [bulkRetryCount, setBulkRetryCount] = useState(0);
+  const [bulkIsRetrying, setBulkIsRetrying] = useState(false);
+  const [failedOperations, setFailedOperations] = useState<string[]>([]);
+  const [bulkOperationProgress, setBulkOperationProgress] = useState({ completed: 0, total: 0, inProgress: false });
   
   const [showDraftProducts, setShowDraftProducts] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -307,11 +311,62 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     );
   };
 
+  // Enhanced error handling helpers
+  const clearBulkMessages = () => {
+    setBulkError(null);
+    setBulkSuccess(null);
+    setFailedOperations([]);
+  };
+
+  const handleBulkOperationError = (error: any, operation: string, canRetry: boolean = true) => {
+    console.error(`Bulk ${operation} failed:`, error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const isNetworkError = errorMessage.toLowerCase().includes('network') || 
+                          errorMessage.toLowerCase().includes('fetch') ||
+                          errorMessage.toLowerCase().includes('timeout');
+    
+    if (isNetworkError && canRetry && bulkRetryCount < 3) {
+      setBulkError(`${operation} failed due to network issues. Retrying... (Attempt ${bulkRetryCount + 1}/3)`);
+      return { shouldRetry: true, isNetworkError: true };
+    }
+    
+    setBulkError(`Failed to ${operation.toLowerCase()}: ${errorMessage}${canRetry ? ' Click retry to try again.' : ''}`);
+    return { shouldRetry: false, isNetworkError };
+  };
+
+  const retryBulkOperation = async (operationFunction: () => Promise<void>, operationName: string) => {
+    setBulkIsRetrying(true);
+    setBulkRetryCount(prev => prev + 1);
+    
+    try {
+      await operationFunction();
+      setBulkRetryCount(0);
+    } catch (error) {
+      handleBulkOperationError(error, operationName, bulkRetryCount < 2);
+    } finally {
+      setBulkIsRetrying(false);
+    }
+  };
+
+  const simulateApiCall = async (operation: string, delay: number = 1500): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        // Simulate occasional failures for testing error handling
+        if (Math.random() < 0.1) { // 10% chance of failure
+          reject(new Error(`Simulated ${operation} API failure - network timeout`));
+        } else {
+          resolve();
+        }
+      }, delay);
+    });
+  };
+
   const handleSelectAll = (checked: boolean) => {
     setSelectedProducts(checked ? filteredProducts.map(p => p.id) : []);
   };
 
-  // Enhanced Pricing Operations with Error Handling
+  // Enhanced Pricing Operations with Advanced Error Handling
   const handleBulkPricing = async () => {
     if (selectedProducts.length === 0) {
       setBulkError("Please select at least one product to update pricing.");
@@ -335,78 +390,132 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
     
     setIsLoading(true);
-    setBulkError(null);
-    setBulkSuccess(null);
+    clearBulkMessages();
+    setBulkOperationProgress({ completed: 0, total: selectedProducts.length, inProgress: true });
+    
+    const failed: string[] = [];
+    const successful: string[] = [];
     
     try {
-      const updates = selectedProducts.map(productId => {
+      const updates = [];
+      
+      // Process each product and collect errors
+      for (let i = 0; i < selectedProducts.length; i++) {
+        const productId = selectedProducts[i];
         const product = products.find(p => p.id === productId);
-        if (!product) return null;
-
-        let newPrice: number;
-        const currentPrice = parseFloat(product.variants.edges[0]?.node.price || '0');
         
-        if (currentPrice === 0 && priceOperation !== 'set') {
-          throw new Error(`Product "${product.title}" has no current price. Please set a fixed price first.`);
+        try {
+          if (!product) {
+            failed.push(`Product ID ${productId}: Product not found`);
+            continue;
+          }
+
+          let newPrice: number;
+          const currentPrice = parseFloat(product.variants.edges[0]?.node.price || '0');
+          
+          if (currentPrice === 0 && priceOperation !== 'set') {
+            failed.push(`${product.title}: No current price found. Please set a fixed price first.`);
+            continue;
+          }
+          
+          switch (priceOperation) {
+            case 'set':
+              newPrice = parseFloat(priceValue) || 0;
+              break;
+            case 'increase':
+              newPrice = currentPrice * (1 + (parseFloat(pricePercentage) || 0) / 100);
+              break;
+            case 'decrease':
+              newPrice = currentPrice * (1 - (parseFloat(pricePercentage) || 0) / 100);
+              break;
+            case 'round':
+              newPrice = currentPrice;
+              if (roundingRule === 'up') newPrice = Math.ceil(currentPrice);
+              else if (roundingRule === 'down') newPrice = Math.floor(currentPrice);
+              else newPrice = Math.round(currentPrice);
+              break;
+            default:
+              newPrice = currentPrice;
+          }
+
+          // Ensure minimum price
+          if (newPrice < 0.01) {
+            failed.push(`${product.title}: Calculated price ($${newPrice.toFixed(2)}) is below minimum ($0.01)`);
+            continue;
+          }
+
+          updates.push({
+            productId,
+            productTitle: product.title,
+            price: newPrice.toFixed(2),
+            compareAtPrice: applyToComparePrice ? compareAtPrice : undefined
+          });
+          
+          successful.push(product.title);
+          
+        } catch (error) {
+          failed.push(`${product?.title || productId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
         
-        switch (priceOperation) {
-          case 'set':
-            newPrice = parseFloat(priceValue) || 0;
-            break;
-          case 'increase':
-            newPrice = currentPrice * (1 + (parseFloat(pricePercentage) || 0) / 100);
-            break;
-          case 'decrease':
-            newPrice = currentPrice * (1 - (parseFloat(pricePercentage) || 0) / 100);
-            break;
-          case 'round':
-            newPrice = currentPrice;
-            if (roundingRule === 'up') newPrice = Math.ceil(currentPrice);
-            else if (roundingRule === 'down') newPrice = Math.floor(currentPrice);
-            else newPrice = Math.round(currentPrice);
-            break;
-          default:
-            newPrice = currentPrice;
-        }
-
-        // Ensure minimum price
-        if (newPrice < 0.01) {
-          throw new Error(`Calculated price for "${product.title}" would be too low ($${newPrice.toFixed(2)}). Minimum price is $0.01.`);
-        }
-
-        return {
-          productId,
-          price: newPrice.toFixed(2),
-          compareAtPrice: applyToComparePrice ? compareAtPrice : undefined
-        };
-      }).filter(Boolean);
+        setBulkOperationProgress({ 
+          completed: i + 1, 
+          total: selectedProducts.length, 
+          inProgress: true 
+        });
+      }
 
       console.log('Bulk pricing updates:', updates);
       
-      // Simulate API call - replace with actual Shopify API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      if (updates.length === 0) {
+        throw new Error('No products could be updated. Please check the errors above.');
+      }
       
-      // Success message
-      setBulkSuccess(`Successfully updated pricing for ${selectedProducts.length} products!`);
+      // Simulate API call with error handling
+      await simulateApiCall('pricing update', 1500);
       
-      // Reset form and selections
-      setPriceValue('');
-      setPricePercentage('');
-      setCompareAtPrice('');
-      setSelectedProducts([]);
+      // Success handling
+      setBulkOperationProgress({ completed: selectedProducts.length, total: selectedProducts.length, inProgress: false });
       
-      // Clear success message after 3 seconds
-      setTimeout(() => setBulkSuccess(null), 3000);
+      if (failed.length === 0) {
+        setBulkSuccess(`✅ Successfully updated pricing for all ${successful.length} products!`);
+      } else {
+        setBulkSuccess(`⚠️ Updated ${successful.length} products successfully. ${failed.length} failed (see details below).`);
+        setFailedOperations(failed);
+      }
+      
+      // Reset form and selections only if completely successful
+      if (failed.length === 0) {
+        setPriceValue('');
+        setPricePercentage('');
+        setCompareAtPrice('');
+        setSelectedProducts([]);
+      }
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => {
+        setBulkSuccess(null);
+        if (failed.length === 0) setFailedOperations([]);
+      }, 5000);
       
       // Refresh products
       await fetchAllProducts();
       
     } catch (error) {
-      console.error('Failed to update pricing:', error);
-      setBulkError(`Failed to update pricing: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setBulkOperationProgress({ completed: 0, total: 0, inProgress: false });
+      const errorResult = handleBulkOperationError(error, 'pricing update');
+      
+      if (failed.length > 0) {
+        setFailedOperations(failed);
+      }
+      
+      if (errorResult.shouldRetry) {
+        setTimeout(() => retryBulkOperation(() => handleBulkPricing(), 'pricing update'), 2000);
+      }
     } finally {
       setIsLoading(false);
+      if (!bulkIsRetrying) {
+        setBulkOperationProgress(prev => ({ ...prev, inProgress: false }));
+      }
     }
   };
 
@@ -1151,25 +1260,99 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                         <Badge tone="info">{`${selectedProducts.length} products selected`}</Badge>
                       </InlineStack>
 
-                      {/* Error and Success Banners */}
-                      {(bulkError || bulkSuccess) && (
-                        <BlockStack gap="200">
+                      {/* Enhanced Error and Success Banners */}
+                      {(bulkError || bulkSuccess || bulkOperationProgress.inProgress) && (
+                        <BlockStack gap="300">
+                          {/* Progress Indicator */}
+                          {bulkOperationProgress.inProgress && (
+                            <Banner title="Operation in Progress" tone="info">
+                              <BlockStack gap="200">
+                                <Text as="p">
+                                  Processing {bulkOperationProgress.completed} of {bulkOperationProgress.total} products...
+                                </Text>
+                                <Box maxWidth="100%">
+                                  <div style={{
+                                    width: '100%',
+                                    height: '8px',
+                                    backgroundColor: '#e0e0e0',
+                                    borderRadius: '4px',
+                                    overflow: 'hidden'
+                                  }}>
+                                    <div style={{
+                                      width: `${(bulkOperationProgress.completed / bulkOperationProgress.total) * 100}%`,
+                                      height: '100%',
+                                      backgroundColor: '#008060',
+                                      transition: 'width 0.3s ease'
+                                    }} />
+                                  </div>
+                                </Box>
+                              </BlockStack>
+                            </Banner>
+                          )}
+                          
+                          {/* Error Banner with Retry */}
                           {bulkError && (
                             <Banner
                               title="Bulk Operation Error"
                               tone="critical"
-                              onDismiss={() => setBulkError(null)}
+                              onDismiss={() => {
+                                setBulkError(null);
+                                setFailedOperations([]);
+                                setBulkRetryCount(0);
+                              }}
+                              action={bulkRetryCount < 3 && !bulkIsRetrying ? {
+                                content: bulkIsRetrying ? 'Retrying...' : 'Retry',
+                                onAction: () => retryBulkOperation(() => handleBulkPricing(), 'pricing update'),
+                                disabled: bulkIsRetrying
+                              } : undefined}
                             >
-                              <Text as="p">{bulkError}</Text>
+                              <BlockStack gap="200">
+                                <Text as="p">{bulkError}</Text>
+                                {bulkRetryCount > 0 && (
+                                  <Text as="p" variant="bodySm" tone="subdued">
+                                    Retry attempt: {bulkRetryCount}/3
+                                  </Text>
+                                )}
+                              </BlockStack>
                             </Banner>
                           )}
+                          
+                          {/* Success Banner */}
                           {bulkSuccess && (
                             <Banner
-                              title="Bulk Operation Success"
-                              tone="success"
-                              onDismiss={() => setBulkSuccess(null)}
+                              title="Bulk Operation Status"
+                              tone={failedOperations.length > 0 ? "warning" : "success"}
+                              onDismiss={() => {
+                                setBulkSuccess(null);
+                                setFailedOperations([]);
+                              }}
                             >
-                              <Text as="p">{bulkSuccess}</Text>
+                              <BlockStack gap="300">
+                                <Text as="p">{bulkSuccess}</Text>
+                                
+                                {/* Failed Operations Details */}
+                                {failedOperations.length > 0 && (
+                                  <Box background="bg-surface-secondary" padding="300" borderRadius="200">
+                                    <BlockStack gap="200">
+                                      <Text as="h4" variant="headingSm" tone="critical">
+                                        Failed Operations ({failedOperations.length}):
+                                      </Text>
+                                      <BlockStack gap="100">
+                                        {failedOperations.slice(0, 5).map((error, index) => (
+                                          <Text key={index} as="p" variant="bodySm" tone="subdued">
+                                            • {error}
+                                          </Text>
+                                        ))}
+                                        {failedOperations.length > 5 && (
+                                          <Text as="p" variant="bodySm" tone="subdued">
+                                            ... and {failedOperations.length - 5} more errors
+                                          </Text>
+                                        )}
+                                      </BlockStack>
+                                    </BlockStack>
+                                  </Box>
+                                )}
+                              </BlockStack>
                             </Banner>
                           )}
                         </BlockStack>
