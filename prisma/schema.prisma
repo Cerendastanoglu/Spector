@@ -30,3 +30,53 @@ model Session {
   collaborator  Boolean?  @default(false)
   emailVerified Boolean?  @default(false)
 }
+
+// MVP Notification System Tables
+model NotificationRule {
+  id            String   @id @default(cuid())
+  shop          String   // Which Shopify store
+  productId     String   // Shopify product ID
+  variantId     String?  // Optional: specific variant
+  productTitle  String   // Cache product name for display
+  variantTitle  String?  // Cache variant name for display
+  threshold     Int      // Alert when inventory <= this number
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relationships
+  channels      NotificationChannel[]
+  logs          NotificationLog[]
+  
+  @@index([shop])
+  @@index([shop, isActive])
+}
+
+model NotificationChannel {
+  id            String   @id @default(cuid())
+  ruleId        String
+  email         String   // Recipient email
+  createdAt     DateTime @default(now())
+  
+  // Relationships  
+  rule          NotificationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  
+  @@index([ruleId])
+}
+
+model NotificationLog {
+  id            String   @id @default(cuid())
+  ruleId        String
+  productTitle  String   // Cache for history
+  oldQuantity   Int      // Previous inventory
+  newQuantity   Int      // Current inventory
+  threshold     Int      // Threshold that was breached
+  emailsSent    Int      // How many emails sent
+  sentAt        DateTime @default(now())
+  
+  // Relationships
+  rule          NotificationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  
+  @@index([ruleId])
+  @@index([sentAt])
+}
