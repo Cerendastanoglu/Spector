@@ -171,6 +171,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   // Collapsible product details state
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
   
+  // Bulk operations modal state
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  
   // Helper function to toggle product expansion
   const toggleProductExpansion = (productId: string) => {
     const newExpanded = new Set(expandedProducts);
@@ -1436,11 +1439,90 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         </Card>
       )}
 
+      {/* Product Management Header */}
+      <Card>
+        <BlockStack gap="500">
+          {/* Header Row */}
+          <InlineStack align="space-between" blockAlign="center">
+            <Text as="h3" variant="headingMd">
+              Product Management
+            </Text>
+            <InlineStack gap="300" blockAlign="center">
+              <InlineStack gap="200">
+                <Badge tone={filteredProducts.length === 0 ? 'attention' : 'info'}>
+                  {`${filteredProducts.length} found`}
+                </Badge>
+                {selectedProducts.length > 0 && (
+                  <Badge tone="success">
+                    {`${selectedProducts.length} selected`}
+                  </Badge>
+                )}
+                {selectedVariants.length > 0 && (
+                  <Badge tone="info">
+                    {`${selectedVariants.length} variants selected`}
+                  </Badge>
+                )}
+              </InlineStack>
+              <Button 
+                onClick={fetchAllProducts} 
+                loading={isLoading || fetcher.state === 'submitting'} 
+                variant="secondary"
+                size="slim"
+              >
+                Refresh Data
+              </Button>
+            </InlineStack>
+          </InlineStack>
+          
+          {/* Bulk Operations Section */}
+          <BlockStack gap="300">
+            <InlineStack gap="300" blockAlign="center">
+              <Text as="p" variant="bodySm" fontWeight="medium" tone="subdued">
+                BULK OPERATIONS
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Select variants from the product table to enable bulk operations
+              </Text>
+            </InlineStack>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(9, minmax(85px, 1fr))', 
+              gap: '8px',
+              alignItems: 'center'
+            }}>
+              {[
+                { id: 0, label: 'Pricing', icon: MoneyIcon },
+                { id: 1, label: 'Collections', icon: CollectionIcon },
+                { id: 2, label: 'Titles', icon: EditIcon },
+                { id: 3, label: 'Descriptions', icon: ViewIcon },
+                { id: 4, label: 'Tags', icon: ProductIcon },
+                { id: 5, label: 'Inventory', icon: InventoryIcon },
+                { id: 6, label: 'Shipping', icon: DeliveryIcon },
+                { id: 7, label: 'Media', icon: ImageIcon },
+                { id: 8, label: 'History', icon: ClockIcon },
+              ].map(({ id, label, icon }) => (
+                <Button
+                  key={id}
+                  onClick={() => setActiveBulkTab(id)}
+                  disabled={selectedVariants.length === 0}
+                  variant={activeBulkTab === id ? 'primary' : 'secondary'}
+                  size="slim"
+                  icon={icon}
+                  fullWidth
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+          </BlockStack>
+        </BlockStack>
+      </Card>
+
       {/* Main Layout - Left: Management Controls, Right: Product List */}
       <div style={{ 
         display: 'flex', 
         gap: '24px', 
-        height: 'calc(100vh - 120px)',
+        height: 'calc(100vh - 200px)',
         flexDirection: 'row'
       }} className="product-management-layout">
         {/* Left Column - Product Management Controls */}
@@ -1450,34 +1532,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           flexShrink: 0
         }} className="bulk-operations-column">
           <BlockStack gap="400">
-            {/* Compact Header */}
-            <Card>
-                <BlockStack gap="300">
-                  <Text as="h3" variant="headingMd">
-                    Product Management
-                  </Text>
-                  <InlineStack gap="200" wrap={false}>
-                    <Badge tone={filteredProducts.length === 0 ? 'attention' : 'info'}>
-                      {`${filteredProducts.length} found`}
-                    </Badge>
-                    {selectedProducts.length > 0 && (
-                      <Badge tone="success">
-                        {`${selectedProducts.length} selected`}
-                      </Badge>
-                    )}
-                  </InlineStack>
-                  <Button 
-                    onClick={fetchAllProducts} 
-                    loading={isLoading || fetcher.state === 'submitting'} 
-                    variant="primary"
-                    size="slim"
-                  >
-                    Refresh Data
-                  </Button>
-                </BlockStack>
-              </Card>
-
-            {/* Bulk Operations with Vertical Navigation */}
+            {/* Bulk Operations Content */}
             <Card background="bg-surface-secondary" padding="300">
               <BlockStack gap="300">
                 <InlineStack align="space-between" blockAlign="center">
@@ -1487,72 +1542,36 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   </Badge>
                 </InlineStack>
 
-                {/* Two-column layout with vertical navigation */}
-                <div style={{ display: 'flex', gap: '20px', minHeight: '320px' }}>
-                  {/* Left side - Vertical navigation buttons */}
-                  <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: '6px', 
-                    width: '120px',
-                    flexShrink: 0
-                  }}>
-                    {[
-                      { id: 0, label: 'Pricing', icon: MoneyIcon },
-                      { id: 1, label: 'Collections', icon: CollectionIcon },
-                      { id: 2, label: 'Titles', icon: EditIcon },
-                      { id: 3, label: 'Descriptions', icon: ViewIcon },
-                      { id: 4, label: 'Tags', icon: ProductIcon },
-                      { id: 5, label: 'Inventory', icon: InventoryIcon },
-                      { id: 6, label: 'Shipping', icon: DeliveryIcon },
-                      { id: 7, label: 'Media', icon: ImageIcon },
-                      { id: 8, label: 'History', icon: ClockIcon },
-                    ].map(({ id, label, icon }) => (
-                      <Button
-                        key={id}
-                        onClick={() => setActiveBulkTab(id)}
-                        disabled={selectedVariants.length === 0}
-                        variant={activeBulkTab === id ? 'primary' : 'secondary'}
-                        size="slim"
-                        fullWidth
-                        icon={icon}
-                      >
-                        {label}
-                      </Button>
-                    ))}
-                  </div>
-
-                  {/* Right side - Content area with improved spacing */}
-                  <div style={{ 
-                    flex: 1, 
-                    minHeight: '280px',
-                    padding: '16px',
-                    backgroundColor: 'var(--p-color-bg-surface)',
-                    borderRadius: '8px',
-                    border: '1px solid var(--p-color-border-subdued)'
-                  }}>
-                    {selectedVariants.length === 0 ? (
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        height: '100%',
-                        flexDirection: 'column',
-                        gap: '16px',
-                        color: 'var(--p-color-text-subdued)',
-                        textAlign: 'center'
-                      }}>
-                        <div style={{ opacity: 0.3 }}>
-                          <Icon source={ProductIcon} />
-                        </div>
-                        <div>
-                          <Text as="p" variant="headingSm" tone="subdued">Select variants to begin</Text>
-                          <Text as="p" variant="bodySm" tone="subdued">Choose product variants from the list to enable bulk operations</Text>
-                        </div>
+                {/* Content area - full width */}
+                <div style={{ 
+                  minHeight: '320px',
+                  padding: '16px',
+                  backgroundColor: 'var(--p-color-bg-surface)',
+                  borderRadius: '8px',
+                  border: '1px solid var(--p-color-border-subdued)'
+                }}>
+                  {selectedVariants.length === 0 ? (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      height: '100%',
+                      flexDirection: 'column',
+                      gap: '16px',
+                      color: 'var(--p-color-text-subdued)',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ opacity: 0.3 }}>
+                        <Icon source={ProductIcon} />
                       </div>
-                    ) : (
-                      <Card background="bg-surface" padding="400">
-                        <BlockStack gap="400">
+                      <div>
+                        <Text as="p" variant="headingSm" tone="subdued">Select variants to begin</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">Choose product variants from the list and use the buttons above to perform bulk operations</Text>
+                      </div>
+                    </div>
+                  ) : (
+                    <Card background="bg-surface" padding="400">
+                      <BlockStack gap="400">
                       {activeBulkTab === 0 && (
                         <BlockStack gap="400">
                           <Text as="h5" variant="headingSm">Pricing Operations</Text>
@@ -1901,7 +1920,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                         </BlockStack>
                       </Card>
                     )}
-                  </div>
                 </div>
               </BlockStack>
             </Card>
@@ -1911,7 +1929,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         {/* Right Column - Product Results */}
         <div style={{ 
           flex: 1, 
-          height: 'calc(100vh - 120px)', 
+          height: 'calc(100vh - 200px)', 
           overflowY: 'auto' 
         }} className="product-results-column">
           <BlockStack gap="400">
