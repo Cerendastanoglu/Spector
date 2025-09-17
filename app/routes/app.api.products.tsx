@@ -480,5 +480,93 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
+  if (actionType === "update-product-prices") {
+    try {
+      const updates = JSON.parse(formData.get("updates") as string);
+      
+      if (!Array.isArray(updates) || updates.length === 0) {
+        return json({ error: "No updates provided" }, { status: 400 });
+      }
+
+      const results = [];
+      
+      for (const update of updates) {
+        try {
+          // Update product variant price using bulk update
+          const response = await admin.graphql(
+            `#graphql
+              mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+                productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+                  product {
+                    id
+                    variants(first: 10) {
+                      edges {
+                        node {
+                          id
+                          price
+                          compareAtPrice
+                        }
+                      }
+                    }
+                  }
+                  userErrors {
+                    field
+                    message
+                  }
+                }
+              }
+            `,
+            {
+              variables: {
+                productId: update.productId,
+                variants: [{
+                  id: update.variantId,
+                  price: update.price,
+                  compareAtPrice: update.compareAtPrice || null
+                }]
+              }
+            }
+          );
+
+          const data = await response.json();
+          
+          if (data.data?.productVariantsBulkUpdate?.userErrors?.length > 0) {
+            results.push({
+              productId: update.productId,
+              success: false,
+              error: data.data.productVariantsBulkUpdate.userErrors[0].message
+            });
+          } else {
+            const updatedVariant = data.data?.productVariantsBulkUpdate?.product?.variants?.edges?.[0]?.node;
+            results.push({
+              productId: update.productId,
+              success: true,
+              newPrice: updatedVariant?.price
+            });
+          }
+        } catch (error) {
+          results.push({
+            productId: update.productId,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      return json({ 
+        success: true, 
+        results,
+        updated: results.filter(r => r.success).length,
+        failed: results.filter(r => !r.success).length
+      });
+      
+    } catch (error) {
+      console.error('Error updating product prices:', error);
+      return json({ 
+        error: `Failed to update prices: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      }, { status: 500 });
+    }
+  }
+
   return json({ error: "Invalid action" }, { status: 400 });
 };

@@ -67,7 +67,7 @@ function calculateDynamicPriceRanges(
   
   prices.forEach((price) => {
     // Get real order data for this price point
-    const realOrders = priceToOrdersMap[price.toString()] || 0;
+    const realOrders = priceToOrdersMap[price.toFixed(2)] || 0;
     
     // Use only real order data - no simulation
     const ordersToAdd = realOrders;
@@ -175,7 +175,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                       price
                       product {
                         id
+                        title
                       }
+                    }
+                    product {
+                      id
+                      title
                     }
                   }
                 }
@@ -189,8 +194,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const productsData: any = await productsResponse.json();
     const ordersData: any = await ordersResponse.json();
     
-    console.log("🔵 Product Analytics API: Products response:", JSON.stringify(productsData, null, 2));
-    console.log("🔵 Product Analytics API: Orders response:", JSON.stringify(ordersData, null, 2));
+    console.log("🔵 Product Analytics API: Products fetched successfully");
+    console.log("🔵 Product Analytics API: Orders fetched successfully");
     
     if (productsData.errors) {
       console.error("🔴 Product Analytics API: GraphQL errors:", productsData.errors);
@@ -237,37 +242,44 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const allPrices: number[] = [];
     
     // Process orders to create price-to-orders mapping
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const priceToOrdersMap: { [price: string]: number } = {};
     let totalOrderItems = 0;
+    let ordersWithValidPrices = 0;
     
     console.log(`🔵 Processing ${orders.length} orders for price analysis...`);
     
-    orders.forEach(({ node: order }: any, orderIndex: number) => {
-      console.log(`🔵 Order ${orderIndex + 1}: ${order.name} - ${order.lineItems?.edges?.length || 0} line items`);
+    orders.forEach(({ node: order }: any) => {
+      const lineItems = order.lineItems?.edges || [];
       
-      order.lineItems?.edges?.forEach(({ node: lineItem }: any, itemIndex: number) => {
-        if (lineItem.variant?.price) {
-          const price = parseFloat(lineItem.variant.price);
-          const quantity = lineItem.quantity || 1;
-          const priceKey = price.toString();
+      lineItems.forEach(({ node: lineItem }: any) => {
+        try {
+          // Try to get price from variant first, then fallback to other sources
+          let price = null;
           
-          console.log(`🔵   Line Item ${itemIndex + 1}: Price $${price}, Quantity ${quantity}`);
-          
-          if (!priceToOrdersMap[priceKey]) {
-            priceToOrdersMap[priceKey] = 0;
+          if (lineItem.variant?.price) {
+            price = parseFloat(lineItem.variant.price);
           }
-          priceToOrdersMap[priceKey] += quantity;
-          totalOrderItems += quantity;
-        } else {
-          console.log(`🔴   Line Item ${itemIndex + 1}: Missing price data`, lineItem);
+          
+          if (price && !isNaN(price) && price > 0) {
+            const quantity = parseInt(lineItem.quantity) || 1;
+            const priceKey = price.toFixed(2);
+            
+            if (!priceToOrdersMap[priceKey]) {
+              priceToOrdersMap[priceKey] = 0;
+            }
+            priceToOrdersMap[priceKey] += quantity;
+            totalOrderItems += quantity;
+            ordersWithValidPrices++;
+          }
+        } catch (e) {
+          console.warn(`🔴 Error processing line item:`, e);
         }
       });
     });
     
     console.log(`🔵 Product Analytics API: Total order items processed: ${totalOrderItems}`);
-    console.log(`🔵 Product Analytics API: Price-to-orders mapping:`, priceToOrdersMap);
-    console.log(`🔵 Product Analytics API: Unique price points with orders: ${Object.keys(priceToOrdersMap).length}`);
+    console.log(`🔵 Product Analytics API: Orders with valid prices: ${ordersWithValidPrices}`);
+    console.log(`🔵 Product Analytics API: Unique price points: ${Object.keys(priceToOrdersMap).length}`);
 
     products.forEach(({ node: product }: any) => {
       if (product.status === 'ACTIVE') {
@@ -278,50 +290,59 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         let minPrice = Infinity;
         let maxPrice = 0;
         let totalInventory = 0;
+        let validVariants = 0;
 
         variants.forEach(({ node: variant }: any) => {
-          const price = parseFloat(variant.price || "0");
-          const inventory = variant.inventoryQuantity || 0;
-          
-          if (price > 0) {
-            variantCount++;
-            productValue += price;
-            totalPrice += price;
-            totalCatalogValue += price;
+          try {
+            const price = parseFloat(variant.price || "0");
+            const inventory = parseInt(variant.inventoryQuantity) || 0;
             
-            minPrice = Math.min(minPrice, price);
-            maxPrice = Math.max(maxPrice, price);
-            totalInventory += inventory;
-            
-            // Collect prices for dynamic range calculation
-            allPrices.push(price);
+            if (price > 0 && !isNaN(price)) {
+              validVariants++;
+              variantCount++;
+              productValue += price;
+              totalPrice += price;
+              totalCatalogValue += price;
+              
+              minPrice = Math.min(minPrice, price);
+              maxPrice = Math.max(maxPrice, price);
+              totalInventory += inventory;
+              
+              // Collect prices for dynamic range calculation
+              allPrices.push(price);
+            }
+          } catch (e) {
+            console.warn(`🔴 Error processing variant:`, e);
           }
         });
 
-        // Inventory status
-        let inventoryStatus = 'Well Stocked';
-        if (totalInventory === 0) {
-          inventoryStatus = 'Out of Stock';
-          outOfStock++;
-        } else if (totalInventory <= 10) {
-          inventoryStatus = 'Low Stock';
-          lowStock++;
-        } else {
-          wellStocked++;
+        // Only process products with valid variants
+        if (validVariants > 0) {
+          // Inventory status
+          let inventoryStatus = 'Well Stocked';
+          if (totalInventory === 0) {
+            inventoryStatus = 'Out of Stock';
+            outOfStock++;
+          } else if (totalInventory <= 10) {
+            inventoryStatus = 'Low Stock';
+            lowStock++;
+          } else {
+            wellStocked++;
+          }
+
+          const priceRange = minPrice === maxPrice 
+            ? `$${minPrice.toFixed(2)}`
+            : `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`;
+
+          topProducts.push({
+            id: product.id,
+            name: product.title || 'Unnamed Product',
+            value: productValue,
+            variants: validVariants,
+            inventoryStatus,
+            priceRange
+          });
         }
-
-        const priceRange = minPrice === maxPrice 
-          ? `$${minPrice.toFixed(2)}`
-          : `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`;
-
-        topProducts.push({
-          id: product.id,
-          name: product.title,
-          value: productValue,
-          variants: variants.length,
-          inventoryStatus,
-          priceRange
-        });
       }
     });
 
@@ -331,6 +352,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     // Sort top products by value
     topProducts.sort((a, b) => b.value - a.value);
+
+    // Ensure we have valid price data
+    if (allPrices.length === 0) {
+      console.warn("🔴 No valid prices found in products");
+    }
 
     const analyticsData: ProductAnalyticsData = {
       totalProducts,
@@ -360,7 +386,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       catalogHealth: analyticsData.catalogHealth.toFixed(1) + '%',
       wellStocked: analyticsData.inventoryDistribution.wellStocked,
       lowStock: analyticsData.inventoryDistribution.lowStock,
-      outOfStock: analyticsData.inventoryDistribution.outOfStock
+      outOfStock: analyticsData.inventoryDistribution.outOfStock,
+      priceRangesWithData: analyticsData.priceAnalysis.priceDistribution.filter(p => p.count > 0).length
     });
 
     return json({
@@ -374,6 +401,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return json({
       success: false,
       error: error instanceof Error ? error.message : "Unknown error occurred",
+      details: error instanceof Error ? error.stack : undefined
     }, { status: 500 });
   }
 };

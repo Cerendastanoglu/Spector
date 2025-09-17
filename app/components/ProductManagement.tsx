@@ -28,7 +28,7 @@ import {
   Tabs,
 } from '@shopify/polaris';
 // Import only the icons we actually use
-import { ProductIcon, EditIcon, ViewIcon, ChevronLeftIcon, ChevronRightIcon } from "@shopify/polaris-icons";
+import { ProductIcon, EditIcon, ViewIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 
 interface Product {
   id: string;
@@ -88,7 +88,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('inventory');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [bulkEditModalActive, setBulkEditModalActive] = useState(false);
   
   // Bulk Operations Tab State
   const [activeBulkTab, setActiveBulkTab] = useState(0);
@@ -123,8 +122,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [tagValue, setTagValue] = useState('');
   const [tagRemoveValue, setTagRemoveValue] = useState('');
   
-  const [vendorValue, setVendorValue] = useState('');
-  const [productTypeValue, setProductTypeValue] = useState('');
+  // Vendor functionality removed
+  // const [vendorValue, setVendorValue] = useState('');
+  // const [productTypeValue, setProductTypeValue] = useState('');
   const [costValue, setCostValue] = useState('');
   const [weightValue, setWeightValue] = useState('');
   const [originCountry, setOriginCountry] = useState('');
@@ -151,6 +151,20 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [lastFetchTime, setLastFetchTime] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
   const [maxRetries] = useState(ProductConstants.MAX_RETRIES);
+  
+  // Collapsible product details state
+  const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
+  
+  // Helper function to toggle product expansion
+  const toggleProductExpansion = (productId: string) => {
+    const newExpanded = new Set(expandedProducts);
+    if (newExpanded.has(productId)) {
+      newExpanded.delete(productId);
+    } else {
+      newExpanded.add(productId);
+    }
+    setExpandedProducts(newExpanded);
+  };
   
   // Slider state for Product Results
   const [productResultsSliderIndex, setProductResultsSliderIndex] = useState(0);
@@ -420,7 +434,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     
     setIsLoading(true);
     clearBulkMessages();
-    // setBulkOperationProgress({ completed: 0, total: selectedProducts.length, inProgress: true });
     
     const failed: string[] = [];
     const successful: string[] = [];
@@ -428,7 +441,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     try {
       const updates = [];
       
-      // Process each product and collect errors
+      // Process each product and calculate new prices
       for (let i = 0; i < selectedProducts.length; i++) {
         const productId = selectedProducts[i];
         const product = products.find(p => p.id === productId);
@@ -475,6 +488,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
 
           updates.push({
             productId,
+            variantId: product.variants.edges[0]?.node.id,
             productTitle: product.title,
             price: newPrice.toFixed(2),
             compareAtPrice: applyToComparePrice ? compareAtPrice : undefined
@@ -485,26 +499,69 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         } catch (error) {
           failed.push(`${product?.title || productId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
-        
-        // setBulkOperationProgress({ completed: i + 1, total: selectedProducts.length, inProgress: true });
       }
 
-      console.log('Bulk pricing updates:', updates);
-      
       if (updates.length === 0) {
         throw new Error('No products could be updated. Please check the errors above.');
       }
       
-      // Simulate API call with error handling
-      await simulateApiCall('pricing update', 1500);
+      // Make real API call to update prices
+      const formData = new FormData();
+      formData.append('action', 'update-product-prices');
+      formData.append('updates', JSON.stringify(updates));
       
-      // Success handling
-      // setBulkOperationProgress({ completed: selectedProducts.length, total: selectedProducts.length, inProgress: false });
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        body: formData
+      });
       
-      if (failed.length === 0) {
-        console.log(`✅ Successfully updated pricing for all ${successful.length} products!`);
-      } else {
-        console.log(`⚠️ Updated ${successful.length} products successfully. ${failed.length} failed (see details below).`);
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update prices');
+      }
+      
+      // Update UI immediately with new prices
+      if (result.success) {
+        setProducts(prevProducts => 
+          prevProducts.map(product => {
+            const update = result.results.find((r: any) => r.productId === product.id);
+            if (update && update.success) {
+              return {
+                ...product,
+                variants: {
+                  ...product.variants,
+                  edges: product.variants.edges.map(edge => ({
+                    ...edge,
+                    node: {
+                      ...edge.node,
+                      price: update.newPrice || edge.node.price
+                    }
+                  }))
+                }
+              };
+            }
+            return product;
+          })
+        );
+      }
+      
+      // Handle results
+      const apiFailed = result.results.filter((r: any) => !r.success);
+      const apiSuccessful = result.results.filter((r: any) => r.success);
+      
+      if (apiFailed.length > 0) {
+        apiFailed.forEach((failure: any) => {
+          failed.push(`${failure.productId}: ${failure.error}`);
+        });
+      }
+      
+      if (apiSuccessful.length > 0) {
+        console.log(`✅ Successfully updated pricing for ${apiSuccessful.length} products!`);
+      }
+      
+      if (failed.length > 0) {
+        console.log(`⚠️ ${apiSuccessful.length} products updated successfully. ${failed.length} failed.`);
         console.log("Failed operations:", failed);
       }
       
@@ -516,31 +573,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         setSelectedProducts([]);
       }
       
-      // Clear success message after 5 seconds
-      setTimeout(() => {
-        console.log(null);
-        if (failed.length === 0) console.log("Failed operations:", []);
-      }, 5000);
-      
-      // Refresh products
-      await fetchAllProducts();
-      
     } catch (error) {
-      // setBulkOperationProgress({ completed: 0, total: 0, inProgress: false });
-      const errorResult = handleBulkOperationError(error, 'pricing update');
-      
-      if (failed.length > 0) {
-        console.log("Failed operations:", failed);
-      }
-      
-      if (errorResult.shouldRetry) {
-        setTimeout(() => retryBulkOperation(() => handleBulkPricing(), 'pricing update'), 2000);
-      }
+      console.error('Bulk pricing error:', error);
+      setError(`Failed to update prices: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
-      if (!bulkIsRetrying) {
-        // setBulkOperationProgress(prev => ({ ...prev, inProgress: false }));
-      }
     }
   };
 
@@ -1003,49 +1040,115 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 // View product details - placeholder for future implementation
               }}
             >
-              <InlineStack align="space-between">
-                <BlockStack gap="100">
-                  <InlineStack gap="300" blockAlign="center">
-                    <div style={{ 
-                      padding: '4px',
-                      borderRadius: '4px',
-                      border: '1px solid #e1e3e5',
-                      backgroundColor: 'white',
-                      transition: 'all 0.2s ease'
-                    }}>
-                      <Checkbox
-                        checked={selectedProducts.includes(product.id)}
-                        onChange={(checked) => handleBulkSelect(product.id, checked)}
-                        label=""
-                      />
+              <BlockStack gap="200">
+                {/* Main Row: Checkbox, Title, Status, Stock, and Actions */}
+                <InlineStack align="space-between" blockAlign="center">
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <Checkbox
+                      checked={selectedProducts.includes(product.id)}
+                      onChange={(checked) => handleBulkSelect(product.id, checked)}
+                      label=""
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <Text as="h3" variant="bodyMd" fontWeight="semibold" truncate>
+                        {product.title}
+                      </Text>
                     </div>
-                    <Text as="h3" variant="bodyMd" fontWeight="semibold">
-                      {product.title}
-                    </Text>
                   </InlineStack>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {product.handle} • {product.variants.edges.length} variants
-                  </Text>
-                </BlockStack>
-                <InlineStack gap="200">
-                  <Badge tone={getBadgeTone(inventory)}>
-                    {`${inventory} units`}
-                  </Badge>
-                  <Badge tone={
-                    product.status === 'ACTIVE' ? 'success' : 
-                    product.status === 'DRAFT' ? 'attention' : 
-                    product.status === 'ARCHIVED' ? 'critical' : undefined
-                  }>
-                    {product.status}
-                  </Badge>
-                  <Button
-                    icon={ViewIcon}
-                    variant="plain"
-                    onClick={() => navigateToProduct(product, 'storefront')}
-                    accessibilityLabel={`${product.status === 'ACTIVE' ? 'View live' : 'View admin'} ${product.title}`}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <Badge tone={getBadgeTone(inventory)}>
+                      {`${inventory}`}
+                    </Badge>
+                    <Badge tone={
+                      product.status === 'ACTIVE' ? 'success' : 
+                      product.status === 'DRAFT' ? 'attention' : 
+                      product.status === 'ARCHIVED' ? 'critical' : undefined
+                    }>
+                      {product.status}
+                    </Badge>
+                    <Button
+                      icon={expandedProducts.has(product.id) ? ChevronUpIcon : ChevronDownIcon}
+                      variant="plain"
+                      size="slim"
+                      onClick={() => toggleProductExpansion(product.id)}
+                      accessibilityLabel={`${expandedProducts.has(product.id) ? 'Collapse' : 'Expand'} product details`}
+                    />
+                    <Button
+                      icon={ViewIcon}
+                      variant="plain"
+                      size="slim"
+                      onClick={() => navigateToProduct(product, 'storefront')}
+                      accessibilityLabel={`${product.status === 'ACTIVE' ? 'View live' : 'View admin'} ${product.title}`}
+                    />
+                  </div>
                 </InlineStack>
-              </InlineStack>
+
+                {/* Expandable Details Section */}
+                {expandedProducts.has(product.id) && (
+                  <Box paddingBlockStart="300" paddingInlineStart="400">
+                    <Card background="bg-surface-secondary" padding="300">
+                      <BlockStack gap="300">
+                        {/* Basic Info Row */}
+                        <InlineStack gap="600" wrap>
+                          <InlineStack gap="200" blockAlign="center">
+                            <Text as="span" variant="bodySm" fontWeight="medium">Handle:</Text>
+                            <Text as="span" variant="bodySm" tone="subdued">{product.handle}</Text>
+                          </InlineStack>
+                          <InlineStack gap="200" blockAlign="center">
+                            <Text as="span" variant="bodySm" fontWeight="medium">Variants:</Text>
+                            <Text as="span" variant="bodySm" tone="subdued">{product.variants.edges.length}</Text>
+                          </InlineStack>
+                        </InlineStack>
+                        
+                        {/* Variant Details */}
+                        {product.variants.edges.length > 0 && (
+                          <BlockStack gap="200">
+                            <Text as="p" variant="bodySm" fontWeight="medium">
+                              Pricing & Inventory
+                            </Text>
+                            <div style={{ 
+                              display: 'grid', 
+                              gridTemplateColumns: '1fr auto auto auto', 
+                              gap: '12px 16px',
+                              alignItems: 'center',
+                              fontSize: '13px'
+                            }}>
+                              {/* Headers */}
+                              <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">Variant</Text>
+                              <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">Price</Text>
+                              <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">Stock</Text>
+                              <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">SKU</Text>
+                              
+                              {/* Data rows */}
+                              {product.variants.edges.slice(0, 3).map((variant) => (
+                                <>
+                                  <Text key={`${variant.node.id}-title`} as="span" variant="bodyXs">
+                                    {variant.node.title !== 'Default Title' ? variant.node.title : 'Default'}
+                                  </Text>
+                                  <Text key={`${variant.node.id}-price`} as="span" variant="bodyXs" fontWeight="medium">
+                                    ${variant.node.price}
+                                  </Text>
+                                  <Text key={`${variant.node.id}-stock`} as="span" variant="bodyXs">
+                                    {variant.node.inventoryQuantity || 0}
+                                  </Text>
+                                  <Text key={`${variant.node.id}-sku`} as="span" variant="bodyXs" tone="subdued">
+                                    {variant.node.sku || '-'}
+                                  </Text>
+                                </>
+                              ))}
+                            </div>
+                            {product.variants.edges.length > 3 && (
+                              <Text as="p" variant="bodyXs" tone="subdued" alignment="center">
+                                ... and {product.variants.edges.length - 3} more variants
+                              </Text>
+                            )}
+                          </BlockStack>
+                        )}
+                      </BlockStack>
+                    </Card>
+                  </Box>
+                )}
+              </BlockStack>
             </ResourceItem>
           );
         }}
@@ -1087,46 +1190,41 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         </Card>
       )}
 
-      {/* Product Management Controls - Always Visible */}
-      <Card>
-        <BlockStack gap="500">
-          {/* Enhanced Product Header with Advanced Controls */}
+      {/* Main Layout - Left: Management Controls, Right: Product List */}
+      <div style={{ display: 'flex', gap: '16px', height: 'calc(100vh - 120px)' }}>
+        {/* Left Column - Product Management Controls */}
+        <div style={{ 
+          width: '400px', 
+          minWidth: '380px', 
+          paddingRight: '8px'
+        }}>
           <BlockStack gap="400">
-            <InlineStack align="space-between" blockAlign="center">
-              <InlineStack gap="300" blockAlign="center">
-                <Text as="h3" variant="headingLg">
-                  Product Management
-                </Text>
-                <Badge tone={filteredProducts.length === 0 ? 'attention' : 'info'}>
-                  {`${filteredProducts.length.toString()} ${filteredProducts.length === 1 ? 'product' : 'products'} found`}
-                </Badge>
-                {selectedProducts.length > 0 && (
-                  <Badge tone="success">
-                    {`${selectedProducts.length.toString()} selected`}
-                  </Badge>
-                )}
-              </InlineStack>
-              <InlineStack gap="300">
-                <Button
-                  onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
-                  icon={viewMode === 'table' ? ProductIcon : ViewIcon}
-                  variant="secondary"
-                >
-                  {viewMode === 'table' ? 'Card View' : 'Table View'}
-                </Button>
-                <Button 
-                  onClick={fetchAllProducts} 
-                  loading={isLoading || fetcher.state === 'submitting'} 
-                  variant="primary"
-                >
-                  Refresh Data
-                </Button>
-              </InlineStack>
-            </InlineStack>
-            
-            <Text as="p" variant="bodySm" tone="subdued">
-              Real-time inventory management with smart filtering and bulk operations
-            </Text>
+            {/* Compact Header */}
+            <Card>
+                <BlockStack gap="300">
+                  <Text as="h3" variant="headingMd">
+                    Product Management
+                  </Text>
+                  <InlineStack gap="200" wrap={false}>
+                    <Badge tone={filteredProducts.length === 0 ? 'attention' : 'info'}>
+                      {`${filteredProducts.length} found`}
+                    </Badge>
+                    {selectedProducts.length > 0 && (
+                      <Badge tone="success">
+                        {`${selectedProducts.length} selected`}
+                      </Badge>
+                    )}
+                  </InlineStack>
+                  <Button 
+                    onClick={fetchAllProducts} 
+                    loading={isLoading || fetcher.state === 'submitting'} 
+                    variant="primary"
+                    size="slim"
+                  >
+                    Refresh Data
+                  </Button>
+                </BlockStack>
+              </Card>
 
             {/* Bulk Operations Tabs */}
             <Card background="bg-surface-secondary" padding="400">
@@ -1138,7 +1236,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   </Badge>
                 </InlineStack>
 
-                <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
+                <div style={{ overflowX: 'auto', paddingBottom: '12px', marginBottom: '8px' }}>
                   <Tabs
                     tabs={[
                       { id: '0', content: 'Pricing', disabled: selectedProducts.length === 0 },
@@ -1146,15 +1244,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       { id: '2', content: 'Titles', disabled: selectedProducts.length === 0 },
                       { id: '3', content: 'Descriptions', disabled: selectedProducts.length === 0 },
                       { id: '4', content: 'Tags', disabled: selectedProducts.length === 0 },
-                      { id: '5', content: 'Vendor', disabled: selectedProducts.length === 0 },
-                      { id: '6', content: 'Inventory', disabled: selectedProducts.length === 0 },
-                      { id: '7', content: 'Shipping', disabled: selectedProducts.length === 0 },
-                      { id: '8', content: 'Media', disabled: selectedProducts.length === 0 },
-                      { id: '9', content: 'History', disabled: selectedProducts.length === 0 },
+                      { id: '5', content: 'Inventory', disabled: selectedProducts.length === 0 },
+                      { id: '6', content: 'Shipping', disabled: selectedProducts.length === 0 },
+                      { id: '7', content: 'Media', disabled: selectedProducts.length === 0 },
+                      { id: '8', content: 'History', disabled: selectedProducts.length === 0 },
                     ]}
                     selected={activeBulkTab}
                     onSelect={setActiveBulkTab}
-                    fitted
                   />
                 </div>
 
@@ -1216,7 +1312,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                           
                               <Button
                                 variant="primary"
-                                onClick={() => setBulkEditModalActive(true)}
+                                onClick={handleBulkPricing}
                             disabled={!priceValue && !pricePercentage}
                               >
                             Apply Pricing Changes
@@ -1249,7 +1345,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                           
                           <Button
                             variant="primary"
-                            onClick={() => setBulkEditModalActive(true)}
+                            onClick={handleBulkCollections}
                             disabled={selectedCollections.length === 0}
                           >
                             Apply Collection Changes
@@ -1398,36 +1494,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                           </BlockStack>
                       )}
 
-                      {activeBulkTab === 5 && (
-                          <BlockStack gap="400">
-                          <Text as="h5" variant="headingSm">Vendor Management</Text>
-                          <TextField
-                            label="Vendor Name"
-                            value={vendorValue}
-                            onChange={setVendorValue}
-                            placeholder="Enter vendor name" autoComplete="off"
-                            helpText="Set the same vendor for all selected products"
-                          />
-                          
-                          <TextField
-                            label="Product Type"
-                            value={productTypeValue}
-                            onChange={setProductTypeValue}
-                            placeholder="Enter product type" autoComplete="off"
-                            helpText="Set the same product type for all selected products"
-                          />
-                          
-                              <Button
-                            variant="primary"
-                            onClick={() => {/* TODO: Implement vendor updates */}}
-                            disabled={!vendorValue && !productTypeValue}
-                          >
-                            Apply Vendor Changes
-                              </Button>
-                                    </BlockStack>
-                      )}
 
-                      {activeBulkTab === 6 && (
+                      {activeBulkTab === 5 && (
                         <BlockStack gap="400">
                           <Text as="h5" variant="headingSm">Inventory Management</Text>
                           <TextField
@@ -1468,7 +1536,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                     </BlockStack>
                       )}
 
-                      {activeBulkTab === 7 && (
+                      {activeBulkTab === 6 && (
                         <BlockStack gap="400">
                           <Text as="h5" variant="headingSm">Shipping Management</Text>
                                             <ChoiceList
@@ -1494,7 +1562,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                               </BlockStack>
                       )}
 
-                      {activeBulkTab === 8 && (
+                      {activeBulkTab === 7 && (
                         <BlockStack gap="400">
                           <Text as="h5" variant="headingSm">Media Management</Text>
                                   <Text as="p" variant="bodySm" tone="subdued">
@@ -1515,7 +1583,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                                         </BlockStack>
                       )}
 
-                      {activeBulkTab === 9 && (
+                      {activeBulkTab === 8 && (
                         <BlockStack gap="400">
                           <Text as="h5" variant="headingSm">Operation History</Text>
                           <Text as="p" variant="bodySm" tone="subdued">
@@ -1540,14 +1608,149 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 )}
               </BlockStack>
             </Card>
-          </BlockStack>
-        </BlockStack>
-      </Card>
+            </BlockStack>
+        </div>
 
-      {/* Product Results Section */}
-      <Card>
-        <BlockStack gap="400">
-          {isLoading ? (
+        {/* Right Column - Product Results */}
+        <div style={{ 
+          flex: 1, 
+          height: 'calc(100vh - 120px)', 
+          overflowY: 'auto' 
+        }}>
+          <BlockStack gap="400">
+            {/* Smart Filters & Controls */}
+            <Card background="bg-surface-secondary" padding="400">
+              <BlockStack gap="500">
+                <InlineStack align="space-between" blockAlign="center">
+                  <Text as="h4" variant="headingSm">Filters & Search</Text>
+                  <Button
+                    variant="plain"
+                    size="slim"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setCurrentCategory('all');
+                      setShowDraftProducts(true);
+                    }}
+                  >
+                    Clear All
+                  </Button>
+                </InlineStack>
+
+                {/* Search Section */}
+                <BlockStack gap="300">
+                  <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">SEARCH & FILTER</Text>
+                  <TextField
+                    label=""
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    placeholder="Search by product name, handle, or SKU..."
+                    autoComplete="off"
+                    clearButton
+                    onClearButtonClick={() => setSearchQuery('')}
+                  />
+                </BlockStack>
+
+                {/* Filter Controls */}
+                <BlockStack gap="300">
+                  <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">CATEGORY & STATUS</Text>
+                  <InlineStack gap="300">
+                    <div style={{ flex: 1 }}>
+                      <Select
+                        label=""
+                        value={currentCategory}
+                        onChange={(value) => setCurrentCategory(value as InventoryCategory)}
+                        options={ProductConstants.CATEGORY_OPTIONS as any}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <Select
+                        label=""
+                        value={`${sortField}-${sortDirection}`}
+                        onChange={(value) => {
+                          const [field, direction] = value.split('-');
+                          setSortField(field as SortField);
+                          setSortDirection(direction as SortDirection);
+                        }}
+                        options={ProductConstants.SORT_OPTIONS as any}
+                      />
+                    </div>
+                  </InlineStack>
+                  <Checkbox
+                    checked={showDraftProducts}
+                    onChange={setShowDraftProducts}
+                    label="Include draft products in results"
+                  />
+                </BlockStack>
+
+                {/* Statistics Section */}
+                <BlockStack gap="300">
+                  <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">CURRENT VIEW STATISTICS</Text>
+                  <InlineStack gap="400" wrap>
+                    <InlineStack gap="200" blockAlign="center">
+                      <Text as="span" variant="bodySm" fontWeight="medium">{filteredProducts.length}</Text>
+                      <Text as="span" variant="bodySm" tone="subdued">Products Found</Text>
+                    </InlineStack>
+                    <InlineStack gap="200" blockAlign="center">
+                      <Text as="span" variant="bodySm" fontWeight="medium">{selectedProducts.length}</Text>
+                      <Text as="span" variant="bodySm" tone="subdued">Selected</Text>
+                    </InlineStack>
+                    <InlineStack gap="200" blockAlign="center">
+                      <Text as="span" variant="bodySm" fontWeight="medium">
+                        {filteredProducts.filter(p => p.status === 'ACTIVE').length}
+                      </Text>
+                      <Text as="span" variant="bodySm" tone="subdued">Active</Text>
+                    </InlineStack>
+                    <InlineStack gap="200" blockAlign="center">
+                      <Text as="span" variant="bodySm" fontWeight="medium">
+                        {filteredProducts.filter(p => p.totalInventory === 0).length}
+                      </Text>
+                      <Text as="span" variant="bodySm" tone="subdued">Out of Stock</Text>
+                    </InlineStack>
+                  </InlineStack>
+                </BlockStack>
+
+                {/* Quick Actions */}
+                <BlockStack gap="300">
+                  <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">QUICK ACTIONS</Text>
+                  <InlineStack gap="200" wrap>
+                    <Button
+                      variant="tertiary"
+                      size="slim"
+                      onClick={() => {
+                        const activeProducts = filteredProducts.filter(p => p.status === 'ACTIVE').map(p => p.id);
+                        setSelectedProducts(activeProducts);
+                      }}
+                      disabled={filteredProducts.filter(p => p.status === 'ACTIVE').length === 0}
+                    >
+                      Select All Active
+                    </Button>
+                    <Button
+                      variant="tertiary"
+                      size="slim"
+                      onClick={() => {
+                        const outOfStockProducts = filteredProducts.filter(p => p.totalInventory === 0).map(p => p.id);
+                        setSelectedProducts(outOfStockProducts);
+                      }}
+                      disabled={filteredProducts.filter(p => p.totalInventory === 0).length === 0}
+                    >
+                      Select Out of Stock
+                    </Button>
+                    <Button
+                      variant="tertiary"
+                      size="slim"
+                      onClick={() => setSelectedProducts([])}
+                      disabled={selectedProducts.length === 0}
+                    >
+                      Clear Selection
+                    </Button>
+                  </InlineStack>
+                </BlockStack>
+              </BlockStack>
+            </Card>
+
+            <Card>
+              <BlockStack gap="400">
+                {isLoading ? (
             <Box padding="800">
               <InlineStack align="center" gap="200">
                 <Spinner size="large" />
@@ -1603,241 +1806,19 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       >
                         Next
                       </Button>
-              </InlineStack>
+                    </InlineStack>
                   )}
                 </InlineStack>
               </InlineStack>
               
-              {/* Smart Filters & Controls - Moved to Product Results */}
-              <Card background="bg-surface-secondary" padding="400">
-                <BlockStack gap="400">
-                  <InlineStack align="space-between" blockAlign="center">
-                    <Text as="h4" variant="headingSm">Smart Filters & Controls</Text>
-                  </InlineStack>
-
-                  {/* Primary Filter Row */}
-                  <Grid>
-                    <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 3, xl: 3 }}>
-                      <BlockStack gap="200">
-                        <Text as="p" variant="bodySm" fontWeight="medium">Search Products</Text>
-                        <TextField
-                          label=""
-                          value={searchQuery}
-                          onChange={setSearchQuery}
-                          placeholder="Search by name, handle, or SKU..."
-                          autoComplete="off"
-                          clearButton
-                          onClearButtonClick={() => setSearchQuery('')}
-                        />
-                      </BlockStack>
-                    </Grid.Cell>
-
-                    <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 3, xl: 3 }}>
-                      <BlockStack gap="200">
-                        <Text as="p" variant="bodySm" fontWeight="medium">Inventory Category</Text>
-                        <Select
-                          label=""
-                          value={currentCategory}
-                          onChange={(value) => setCurrentCategory(value as InventoryCategory)}
-                          options={ProductConstants.CATEGORY_OPTIONS as any}
-                        />
-                      </BlockStack>
-                    </Grid.Cell>
-
-                    <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 3, xl: 3 }}>
-                      <BlockStack gap="200">
-                        <Text as="p" variant="bodySm" fontWeight="medium">Sort Order</Text>
-                        <Select
-                          label=""
-                          value={`${sortField}-${sortDirection}`}
-                          onChange={(value) => {
-                            const [field, direction] = value.split('-');
-                            setSortField(field as SortField);
-                            setSortDirection(direction as SortDirection);
-                          }}
-                          options={ProductConstants.SORT_OPTIONS as any}
-                        />
-                      </BlockStack>
-                    </Grid.Cell>
-
-                    <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 3, xl: 3 }}>
-                      <BlockStack gap="200">
-                        <Text as="p" variant="bodySm" fontWeight="medium">Product Visibility</Text>
-                        <Checkbox
-                          checked={showDraftProducts}
-                          onChange={setShowDraftProducts}
-                          label="Include draft products"
-                        />
-                      </BlockStack>
-                    </Grid.Cell>
-                  </Grid>
-                </BlockStack>
-              </Card>
-              
-              {viewMode === 'table' ? renderTableView() : renderCardView()}
+              {renderCardView()}
             </BlockStack>
           )}
         </BlockStack>
       </Card>
-
-      {/* Enhanced Bulk Operations Modal */}
-      <Modal
-        open={bulkEditModalActive}
-        onClose={() => setBulkEditModalActive(false)}
-        title={`Bulk Edit ${selectedProducts.length} Products`}
-        primaryAction={{
-          content: bulkOperation === 'pricing' ? 'Update Pricing' : 'Update Collections',
-          onAction: bulkOperation === 'pricing' ? handleBulkPricing : handleBulkCollections,
-          disabled: bulkOperation === 'pricing' 
-            ? (!priceValue && !pricePercentage) 
-            : selectedCollections.length === 0,
-          loading: isLoading
-        }}
-        secondaryActions={[
-          {
-            content: 'Cancel',
-            onAction: () => setBulkEditModalActive(false),
-          },
-        ]}
-      >
-        <Modal.Section>
-          <FormLayout>
-            {/* Operation Type Selector */}
-            <BlockStack gap="400">
-              <Text as="h3" variant="headingMd">Select Operation Type</Text>
-              <InlineStack gap="200">
-                <Button
-                  variant={bulkOperation === 'pricing' ? 'primary' : 'secondary'}
-                  onClick={() => setBulkOperation('pricing')}
-                >
-                  Pricing Operations
-                </Button>
-                <Button
-                  variant={bulkOperation === 'collections' ? 'primary' : 'secondary'}
-                  onClick={() => setBulkOperation('collections')}
-                >
-                  Collection Management
-                </Button>
-              </InlineStack>
-            </BlockStack>
-
-            {/* Pricing Operations */}
-            {bulkOperation === 'pricing' && (
-              <BlockStack gap="400">
-                <Text as="h4" variant="headingSm">Price Update Method</Text>
-                
-                <ChoiceList
-                  title=""
-                  choices={[
-                    { label: 'Set fixed price', value: 'set' },
-                    { label: 'Increase by percentage', value: 'increase' },
-                    { label: 'Decrease by percentage', value: 'decrease' },
-                    { label: 'Round prices', value: 'round' },
-                  ]}
-                  selected={[priceOperation]}
-                  onChange={(value) => setPriceOperation(value[0] as any)}
-                />
-
-                {priceOperation === 'set' && (
-                  <TextField
-                    label="New Price"
-                    type="number"
-                    value={priceValue}
-                    onChange={setPriceValue}
-                    prefix="$"
-                    helpText="Set the same price for all selected products"
-                    autoComplete="off"
-                  />
-                )}
-
-                {(priceOperation === 'increase' || priceOperation === 'decrease') && (
-                  <TextField
-                    label={`${priceOperation === 'increase' ? 'Increase' : 'Decrease'} Percentage`}
-                    type="number"
-                    value={pricePercentage}
-                    onChange={setPricePercentage}
-                    suffix="%"
-                    helpText={`${priceOperation === 'increase' ? 'Increase' : 'Decrease'} current prices by this percentage`}
-                    autoComplete="off"
-                  />
-                )}
-
-                {priceOperation === 'round' && (
-                  <ChoiceList
-                    title="Rounding Rule"
-                    choices={[
-                      { label: 'Round to nearest whole number', value: 'nearest' },
-                      { label: 'Round up', value: 'up' },
-                      { label: 'Round down', value: 'down' },
-                    ]}
-                    selected={[roundingRule]}
-                    onChange={(value) => setRoundingRule(value[0] as any)}
-                  />
-                )}
-
-                <Checkbox
-                  label="Also update compare at price"
-                  checked={applyToComparePrice}
-                  onChange={setApplyToComparePrice}
-                />
-
-                {applyToComparePrice && (
-                  <TextField
-                    label="Compare At Price"
-                    type="number"
-                    value={compareAtPrice}
-                    onChange={setCompareAtPrice}
-                    prefix="$"
-                    helpText="Set compare at price for all selected products"
-                    autoComplete="off"
-                  />
-                )}
-              </BlockStack>
-            )}
-
-            {/* Collection Operations */}
-            {bulkOperation === 'collections' && (
-              <BlockStack gap="400">
-                <Text as="h4" variant="headingSm">Collection Operation</Text>
-                
-                <ChoiceList
-                  title=""
-                  choices={[
-                    { label: 'Add to collections', value: 'add' },
-                    { label: 'Remove from collections', value: 'remove' },
-                    { label: 'Replace all collections', value: 'replace' },
-                  ]}
-                  selected={[collectionOperation]}
-                  onChange={(value) => setCollectionOperation(value[0] as any)}
-                />
-
-                <ChoiceList
-                  title="Select Collections"
-                  allowMultiple
-                  choices={availableCollections.map(col => ({
-                    label: col.title,
-                    value: col.id
-                  }))}
-                  selected={selectedCollections}
-                  onChange={setSelectedCollections}
-                />
-
-                {selectedCollections.length > 0 && (
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {collectionOperation === 'add' && `Will add ${selectedProducts.length} products to ${selectedCollections.length} collections`}
-                    {collectionOperation === 'remove' && `Will remove ${selectedProducts.length} products from ${selectedCollections.length} collections`}
-                    {collectionOperation === 'replace' && `Will replace all collections for ${selectedProducts.length} products with ${selectedCollections.length} selected collections`}
-                  </Text>
-                )}
-              </BlockStack>
-            )}
-
-            <Text as="p" variant="bodySm" tone="subdued">
-              This operation will affect {selectedProducts.length} selected products.
-            </Text>
-          </FormLayout>
-        </Modal.Section>
-      </Modal>
+          </BlockStack>
+        </div>
+      </div>
     </BlockStack>
   );
 }
