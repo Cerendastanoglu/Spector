@@ -130,7 +130,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [originCountry, setOriginCountry] = useState('');
   const [shippingRequirements, setShippingRequirements] = useState<string[]>([]);
   
-
+  // Filter collections based on search query
+  const filteredCollections = availableCollections.filter(collection =>
+    collection.title.toLowerCase().includes(collectionSearchQuery.toLowerCase())
+  );
   
   // Advanced Bulk Operations State
   const [seoTemplate, setSeoTemplate] = useState('');
@@ -1211,13 +1214,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                             />
                           )}
                           
-                          <Button
-                            variant="primary"
-                            onClick={() => setBulkEditModalActive(true)}
+                              <Button
+                                variant="primary"
+                                onClick={() => setBulkEditModalActive(true)}
                             disabled={!priceValue && !pricePercentage}
-                          >
+                              >
                             Apply Pricing Changes
-                          </Button>
+                              </Button>
                     </BlockStack>
                       )}
 
@@ -1251,11 +1254,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                           >
                             Apply Collection Changes
                           </Button>
-                    </BlockStack>
+                              </BlockStack>
                       )}
 
                       {activeBulkTab === 2 && (
-                        <BlockStack gap="400">
+                      <BlockStack gap="400">
                           <Text as="h5" variant="headingSm">Title Updates</Text>
                           <ChoiceList
                             title="Title Operation"
@@ -1270,7 +1273,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                           
                           {titleOperation === 'replace' ? (
                             <InlineStack gap="300">
-                              <TextField
+                                        <TextField
                                 label="Find"
                                 value={titleReplaceFrom}
                                 onChange={setTitleReplaceFrom}
@@ -1284,24 +1287,24 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                               />
                             </InlineStack>
                           ) : (
-                            <TextField
+                                            <TextField
                               label={titleOperation === 'prefix' ? 'Prefix Text' : 'Suffix Text'}
                               value={titleValue}
                               onChange={setTitleValue}
                               placeholder={titleOperation === 'prefix' ? 'Add to beginning...' : 'Add to end...'}
-                              autoComplete="off"
+                                              autoComplete="off"
                             />
                           )}
                           
-                          <Button
-                            variant="primary"
+                                    <Button
+                                      variant="primary"
                             onClick={() => {/* TODO: Implement title updates */}}
                             disabled={!titleValue && !titleReplaceFrom}
                           >
                             Apply Title Changes
-                          </Button>
-                        </BlockStack>
-                      )}
+                                    </Button>
+                                </BlockStack>
+                              )}
 
                       {activeBulkTab === 3 && (
                         <BlockStack gap="400">
@@ -1319,7 +1322,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                           
                           {descriptionOperation === 'replace' ? (
                             <InlineStack gap="300">
-                              <TextField
+                                    <TextField
                                 label="Find"
                                 value={descriptionReplaceFrom}
                                 onChange={setDescriptionReplaceFrom}
@@ -1339,17 +1342,17 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                               onChange={setDescriptionValue}
                               multiline={4}
                               placeholder={descriptionOperation === 'append' ? 'Add to end of descriptions...' : 'Add to beginning of descriptions...'}
-                              autoComplete="off"
+                                      autoComplete="off"
                             />
                           )}
                           
-                              <Button
-                                variant="primary"
+                                    <Button
+                                      variant="primary"
                             onClick={() => {/* TODO: Implement description updates */}}
                             disabled={!descriptionValue && !descriptionReplaceFrom}
                               >
                             Apply Description Changes
-                              </Button>
+                                    </Button>
                         </BlockStack>
                       )}
 
@@ -1385,18 +1388,18 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                             />
                           )}
                           
-                              <Button
-                            variant="primary"
+                                      <Button
+                                        variant="primary"
                             onClick={() => {/* TODO: Implement tag updates */}}
                             disabled={!tagValue && !tagRemoveValue}
                           >
                             Apply Tag Changes
-                              </Button>
-                        </BlockStack>
+                                      </Button>
+                          </BlockStack>
                       )}
 
                       {activeBulkTab === 5 && (
-                        <BlockStack gap="400">
+                          <BlockStack gap="400">
                           <Text as="h5" variant="headingSm">Vendor Management</Text>
                           <TextField
                             label="Vendor Name"
@@ -1421,7 +1424,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                           >
                             Apply Vendor Changes
                               </Button>
-                        </BlockStack>
+                                    </BlockStack>
                       )}
 
                       {activeBulkTab === 6 && (
@@ -1437,7 +1440,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                             helpText="Set the cost price for all selected products"
                           />
                           
-                          <TextField
+                                      <TextField
                             label="Weight"
                             type="number"
                             value={weightValue}
@@ -1468,7 +1471,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       {activeBulkTab === 7 && (
                         <BlockStack gap="400">
                           <Text as="h5" variant="headingSm">Shipping Management</Text>
-                          <ChoiceList
+                                            <ChoiceList
                             title="Shipping Requirements"
                             choices={[
                               { label: 'Requires shipping', value: 'shipping' },
@@ -1478,16 +1481,16 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                             ]}
                             selected={shippingRequirements}
                             onChange={setShippingRequirements}
-                            allowMultiple
+                                              allowMultiple
                           />
                           
-                          <Button
-                            variant="primary"
+                                        <Button
+                                          variant="primary"
                             onClick={() => {/* TODO: Implement shipping updates */}}
                             disabled={shippingRequirements.length === 0}
                           >
                             Apply Shipping Changes
-                          </Button>
+                                        </Button>
                               </BlockStack>
                       )}
 
@@ -1503,21 +1506,21 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                             <li>Video management</li>
                             <li>Image optimization</li>
                           </ul>
-                          <Button
-                            variant="secondary"
+                                        <Button
+                                          variant="secondary"
                             disabled
                           >
                             Coming Soon
-                          </Button>
-                              </BlockStack>
+                                        </Button>
+                                        </BlockStack>
                       )}
 
                       {activeBulkTab === 9 && (
                         <BlockStack gap="400">
                           <Text as="h5" variant="headingSm">Operation History</Text>
-                                          <Text as="p" variant="bodySm" tone="subdued">
+                          <Text as="p" variant="bodySm" tone="subdued">
                             Track all bulk operations and their results. This will include:
-                                          </Text>
+                          </Text>
                           <ul>
                             <li>Operation history and timestamps</li>
                             <li>Success/failure reports</li>
@@ -1532,10 +1535,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                           </Button>
                                       </BlockStack>
                                 )}
-                              </BlockStack>
+                    </BlockStack>
                   </Card>
-                          )}
-                        </BlockStack>
+                )}
+              </BlockStack>
             </Card>
           </BlockStack>
         </BlockStack>
