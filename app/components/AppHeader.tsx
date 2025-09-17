@@ -35,6 +35,15 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
         className="theme-toggle-button"
         onClick={toggleTheme}
         aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          borderRadius: '8px',
+          padding: '8px',
+          cursor: 'pointer',
+          color: theme === 'dark' ? '#b0b0b0' : '#666',
+          transition: 'all 0.3s ease'
+        }}
       >
         <Icon source={theme === 'light' ? MoonIcon : SunIcon} />
       </button>
@@ -44,7 +53,9 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
   // Mobile-friendly settings button - icon only
   const mobileSettingsButton = (
     <div className={activeTab === "settings" ? "nav-button-active" : "nav-button-inactive"} style={{
-      background: activeTab === "settings" ? 'white' : 'transparent',
+      background: activeTab === "settings" 
+        ? (theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'white')
+        : 'transparent',
       borderRadius: '12px',
       padding: '2px',
       border: activeTab === "settings" ? '2px solid #FF204E' : '1px solid transparent',
@@ -65,7 +76,9 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
   // Desktop settings button with text
   const desktopSettingsButton = (
     <div className={activeTab === "settings" ? "nav-button-active" : "nav-button-inactive"} style={{
-      background: activeTab === "settings" ? 'white' : 'transparent',
+      background: activeTab === "settings" 
+        ? (theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'white')
+        : 'transparent',
       borderRadius: '12px',
       padding: '2px',
       border: activeTab === "settings" ? '2px solid #FF204E' : '1px solid transparent',
@@ -147,11 +160,13 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
         </div>
       </div>
       
-      {/* Clean App Branding - Smaller Size */}
+      {/* Clean App Branding - Theme-aware */}
       <BlockStack gap="050">
         <Text as="h1" variant="headingLg">
           <span style={{ 
-            background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
+            background: theme === 'dark' 
+              ? 'linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%)'
+              : 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
@@ -172,7 +187,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
         </Text>
         <Text as="p" variant="bodyXs">
           <span style={{
-            color: '#666',
+            color: theme === 'dark' ? '#b0b0b0' : '#666',
             fontWeight: 'medium',
             fontFamily: 'inherit' // Easy to change font family later
           }}>
@@ -187,7 +202,9 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
     <InlineStack gap="200" align="center">
       {/* Dashboard Button */}
       <div className={activeTab === "dashboard" ? "nav-button-active" : "nav-button-inactive"} style={{
-        background: activeTab === "dashboard" ? 'white' : 'transparent',
+        background: activeTab === "dashboard" 
+          ? (theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'white')
+          : 'transparent',
         borderRadius: '12px',
         padding: '2px',
         border: activeTab === "dashboard" ? '2px solid #FF204E' : '1px solid transparent',
@@ -206,7 +223,9 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
       {/* Product Management with Badge */}
       <InlineStack gap="100" align="center">
         <div className={activeTab === "out-of-stock" ? "nav-button-active" : "nav-button-inactive"} style={{
-          background: activeTab === "out-of-stock" ? 'white' : 'transparent',
+          background: activeTab === "out-of-stock" 
+            ? (theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'white')
+            : 'transparent',
           borderRadius: '12px',
           padding: '2px',
           border: activeTab === "out-of-stock" ? '2px solid #FF204E' : '1px solid transparent',
@@ -249,7 +268,9 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
       
       {/* Notifications Button */}
       <div className={activeTab === "notifications" ? "nav-button-active" : "nav-button-inactive"} style={{
-        background: activeTab === "notifications" ? 'white' : 'transparent',
+        background: activeTab === "notifications" 
+          ? (theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'white')
+          : 'transparent',
         borderRadius: '12px',
         padding: '2px',
         border: activeTab === "notifications" ? '2px solid #FF204E' : '1px solid transparent',
@@ -273,7 +294,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
       {/* Add CSS animations to document head */}
       <style dangerouslySetInnerHTML={{
         __html: `
-          /* Button styling */
+          /* Button styling - Theme aware */
           .nav-button-active button {
             background: transparent !important;
             border: none !important;
@@ -296,24 +317,28 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
             background: transparent !important;
             border: none !important;
             box-shadow: none !important;
-            color: #666 !important;
+            color: ${theme === 'dark' ? '#b0b0b0' : '#666'} !important;
             font-weight: medium !important;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
           }
           
           .nav-button-inactive button span {
-            color: #666 !important;
+            color: ${theme === 'dark' ? '#b0b0b0' : '#666'} !important;
             font-weight: medium !important;
           }
           
           .nav-button-inactive button svg {
-            fill: #666 !important;
+            fill: ${theme === 'dark' ? '#b0b0b0' : '#666'} !important;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
           }
           
           .nav-button-inactive button:hover {
             background: rgba(255, 32, 78, 0.1) !important;
             transform: translateY(-1px) !important;
+          }
+          
+          .nav-button-inactive button:hover span {
+            color: #A0153E !important;
           }
           
           .nav-button-inactive button:hover svg {
@@ -358,10 +383,14 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
       }} />
       
       <div className="app-header" style={{
-        background: 'linear-gradient(135deg, #fdf2f5 0%, #fef7f9 50%, #fdf2f5 100%)',
-        borderBottom: '1px solid #e0e0e0',
+        background: theme === 'dark'
+          ? 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%)'
+          : 'linear-gradient(135deg, #fdf2f5 0%, #fef7f9 50%, #fdf2f5 100%)',
+        borderBottom: theme === 'dark' ? '1px solid #404040' : '1px solid #e0e0e0',
         borderRadius: '0 0 24px 24px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(255, 32, 78, 0.1)',
+        boxShadow: theme === 'dark'
+          ? '0 4px 20px rgba(0,0,0,0.3), 0 2px 8px rgba(255, 32, 78, 0.2)'
+          : '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(255, 32, 78, 0.1)',
         position: 'sticky',
         top: 0,
         zIndex: 100,
@@ -369,11 +398,15 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
         overflow: 'hidden'
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = '0 6px 30px rgba(0,0,0,0.12), 0 4px 12px rgba(255, 32, 78, 0.15)';
+        e.currentTarget.style.boxShadow = theme === 'dark'
+          ? '0 6px 30px rgba(0,0,0,0.4), 0 4px 12px rgba(255, 32, 78, 0.25)'
+          : '0 6px 30px rgba(0,0,0,0.12), 0 4px 12px rgba(255, 32, 78, 0.15)';
         e.currentTarget.style.transform = 'translateY(-1px)';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(255, 32, 78, 0.1)';
+        e.currentTarget.style.boxShadow = theme === 'dark'
+          ? '0 4px 20px rgba(0,0,0,0.3), 0 2px 8px rgba(255, 32, 78, 0.2)'
+          : '0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(255, 32, 78, 0.1)';
         e.currentTarget.style.transform = 'translateY(0)';
       }}>
         <Box padding="500" position="relative">
@@ -401,11 +434,17 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
             {/* Mobile: Navigation on second row */}
             <Box paddingBlockStart="400">
               <div style={{
-                background: 'rgba(255, 255, 255, 0.8)',
+                background: theme === 'dark'
+                  ? 'rgba(42, 42, 42, 0.9)'
+                  : 'rgba(255, 255, 255, 0.8)',
                 borderRadius: '12px',
                 padding: '12px 16px',
-                border: '1px solid rgba(255, 32, 78, 0.2)',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.08), 0 2px 8px rgba(255, 32, 78, 0.1)',
+                border: theme === 'dark'
+                  ? '1px solid rgba(255, 32, 78, 0.3)'
+                  : '1px solid rgba(255, 32, 78, 0.2)',
+                boxShadow: theme === 'dark'
+                  ? '0 4px 12px rgba(0,0,0,0.3), 0 2px 8px rgba(255, 32, 78, 0.2)'
+                  : '0 4px 12px rgba(0,0,0,0.08), 0 2px 8px rgba(255, 32, 78, 0.1)',
                 backdropFilter: 'blur(10px)',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 display: 'flex',
@@ -422,11 +461,17 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
               <InlineStack gap="600" align="center">
                 {logoMarkup}
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.8)',
+                  background: theme === 'dark'
+                    ? 'rgba(42, 42, 42, 0.9)'
+                    : 'rgba(255, 255, 255, 0.8)',
                   borderRadius: '8px',
                   padding: '8px 16px',
-                  border: '1px solid rgba(255, 32, 78, 0.2)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                  border: theme === 'dark'
+                    ? '1px solid rgba(255, 32, 78, 0.3)'
+                    : '1px solid rgba(255, 32, 78, 0.2)',
+                  boxShadow: theme === 'dark'
+                    ? '0 2px 8px rgba(0,0,0,0.2)'
+                    : '0 2px 8px rgba(0,0,0,0.06)',
                   backdropFilter: 'blur(10px)'
                 }}>
                   <InlineStack gap="100" align="center">
@@ -509,6 +554,20 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
           [data-help-button] div {
             font-size: 30px !important;
           }
+        }
+        
+        /* Theme toggle button styling */
+        .theme-toggle-button:hover {
+          background: rgba(255, 32, 78, 0.1) !important;
+          color: #A0153E !important;
+        }
+        
+        .theme-toggle-button svg {
+          transition: all 0.3s ease !important;
+        }
+        
+        .theme-toggle-button:hover svg {
+          fill: #A0153E !important;
         }
       `}</style>
     </>
