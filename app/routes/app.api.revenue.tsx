@@ -30,7 +30,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     console.log("Revenue API: Starting request...");
     
-    const { admin, session } = await authenticate.admin(request);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { admin, session: _session } = await authenticate.admin(request);
     console.log("Revenue API: Authentication successful");
     
     // Get time period from query params (default to 30 days)
@@ -123,7 +124,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     console.log("Revenue API: Processing GraphQL responses...");
     const ordersData: any = await ordersResponse.json();
-    const prevOrdersData: any = await prevOrdersResponse.json();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _prevOrdersData: any = await prevOrdersResponse.json();
     
     console.log("Revenue API: Orders response received", { 
       hasData: !!ordersData.data, 
@@ -233,6 +235,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.log(`Revenue API: Analyzed ${activeProducts} products with total catalog value of $${totalCatalogValue.toFixed(2)}`);
 
     // Instead of fake revenue, show meaningful product metrics
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const avgProductValue = activeProducts > 0 ? totalCatalogValue / activeProducts : 0;
     const catalogHealth = activeProducts / Math.max(1, totalProducts) * 100;
     

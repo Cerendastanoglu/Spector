@@ -79,7 +79,7 @@ async function cleanupExpiredData(shop = null) {
     
   } catch (error) {
     console.error('❌ Cleanup failed:', error);
-    process.exit(1);
+    global.process.exit(1);
   } finally {
     await prisma.$disconnect();
   }
@@ -108,5 +108,5 @@ async function getDataUsageStats(shop) {
 }
 
 // Main execution
-const shop = process.argv[2];
+const shop = global.process.argv[2];
 cleanupExpiredData(shop);

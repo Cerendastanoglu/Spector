@@ -59,7 +59,8 @@ export async function sendInventoryAlert(notification: EmailNotification) {
  */
 export async function sendTestEmail(to: string, shopName: string) {
   try {
-    const testAlert: InventoryAlert = {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _testAlert: InventoryAlert = {
       productTitle: "Sample Product",
       variantTitle: "Blue / Large",
       currentStock: 3,

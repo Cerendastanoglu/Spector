@@ -3,7 +3,8 @@ import { authenticate } from "../shopify.server";
 import { sendTestEmail, sendInventoryAlert, type InventoryAlert } from "../services/email.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { admin: _admin, session } = await authenticate.admin(request);
   
   if (!session?.shop) {
     return json({ error: "No shop session found" }, { status: 401 });

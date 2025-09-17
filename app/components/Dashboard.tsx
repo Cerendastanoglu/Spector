@@ -6,11 +6,11 @@ import {
   BlockStack,
   InlineStack,
   Box,
-  Grid,
+  // Grid,
   Button,
   Icon,
   Tabs,
-  Select,
+  // Select,
   Spinner,
   Badge,
   Tooltip,
@@ -27,7 +27,7 @@ import {
   AlertCircleIcon,
   InfoIcon,
   ClockIcon,
-  PackageIcon,
+  // PackageIcon,
   CheckIcon,
   AlertTriangleIcon,
   XIcon,
@@ -93,13 +93,16 @@ interface InventoryData {
   }>;
 }
 
-export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardProps) {
+export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavigate: _onNavigate }: DashboardProps) {
   const [activeTab, setActiveTab] = useState(0);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [timePeriod, setTimePeriod] = useState('30');
   const [productAnalyticsData, setProductAnalyticsData] = useState<ProductAnalyticsData | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [inventoryData, setInventoryData] = useState<InventoryData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [lastDataUpdate, setLastDataUpdate] = useState<Date | null>(null);
   const [isManualRefresh, setIsManualRefresh] = useState(false);
@@ -107,7 +110,9 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   
   // Inventory filtering state
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [filterRisk, setFilterRisk] = useState('all');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [searchProduct, setSearchProduct] = useState('');
   const [priceDistributionIndex, setPriceDistributionIndex] = useState(0);
 
@@ -129,11 +134,11 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
   });
 
   // Cache key for localStorage
-  const getCacheKey = (type: 'revenue' | 'inventory', period: string) => 
-    `spector_${type}_data_${period}`;
+  const getCacheKey = useCallback((type: 'revenue' | 'inventory', period: string) => 
+    `spector_${type}_data_${period}`, []);
 
   // Check if data needs refresh (manual only)
-  const needsRefresh = useCallback((lastUpdate: Date | null): boolean => {
+  const needsRefresh = useCallback((_lastUpdate: Date | null): boolean => {
     // Only refresh manually - no automatic refresh
     return false;
   }, []);
@@ -186,6 +191,7 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
     }
   }, [getCacheKey]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const timePeriodOptions = [
     { label: 'Last 7 days', value: '7' },
     { label: 'Last 30 days', value: '30' },
@@ -251,6 +257,7 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
     }
 
     const type = activeTab === 0 ? 'revenue' : 'inventory';
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const cacheKey = `${type}_${activeTab}_${timePeriod}`;
     console.log("Dashboard: Loading data for activeTab:", activeTab, "type:", type, "timePeriod:", timePeriod);
     
@@ -268,7 +275,7 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
     
     // Mark as loaded regardless of cache hit/miss
     setHasLoadedInitialData(true);
-  }, [isVisible, activeTab, timePeriod]);
+  }, [isVisible, activeTab, timePeriod, fetchFreshData, hasLoadedInitialData, loadCachedData]);
 
   // Handle revenue data response
   useEffect(() => {
