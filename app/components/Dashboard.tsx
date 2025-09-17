@@ -31,6 +31,8 @@ import {
   CheckIcon,
   AlertTriangleIcon,
   XIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from "@shopify/polaris-icons";
 
 interface DashboardProps {
@@ -65,6 +67,7 @@ interface ProductAnalyticsData {
     priceDistribution: Array<{
       range: string;
       count: number;
+      orders: number;
     }>;
   };
 }
@@ -106,6 +109,9 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
   // Inventory filtering state
   const [filterRisk, setFilterRisk] = useState('all');
   const [searchProduct, setSearchProduct] = useState('');
+  const [priceDistributionIndex, setPriceDistributionIndex] = useState(0);
+
+  // Top Products Slider State
   
   const productAnalyticsFetcher = useFetcher<{ success: boolean; data?: ProductAnalyticsData; error?: string }>();
   const inventoryFetcher = useFetcher<{ success: boolean; data?: InventoryData; error?: string }>();
@@ -566,7 +572,7 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
                       </Box>
                       <BlockStack gap="100">
                         <Text as="p" variant="bodyMd" fontWeight="semibold">Low Stock</Text>
-                        <Text as="p" variant="bodyXs" tone="subdued">Needs replenishment</Text>
+                        <Text as="p" variant="bodyXs" tone="subdued">Low inventory levels</Text>
                       </BlockStack>
                     </InlineStack>
                     <Text as="p" variant="heading2xl" fontWeight="bold">
@@ -611,60 +617,184 @@ export function Dashboard({ isVisible, outOfStockCount, onNavigate }: DashboardP
                 </BlockStack>
               </Box>
             )}
+            
+            {/* Stock Definition Note */}
+            {productAnalyticsData?.inventoryDistribution && (
+              <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+                  <strong>Low Stock:</strong> Products with 10 or fewer units remaining • <strong>Well Stocked:</strong> Products with more than 10 units
+                </Text>
+              </Box>
+            )}
           </BlockStack>
         </Card>
 
-        {/* Price Distribution - Better Horizontal Layout */}
+        {/* Price Distribution - Horizontal Slider Layout */}
         <Card>
           <BlockStack gap="400">
-            <Text as="h3" variant="headingMd" fontWeight="semibold">
-              Price Distribution Analysis
-            </Text>
+            <BlockStack gap="200">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h3" variant="headingMd" fontWeight="semibold">
+                  Price Distribution Analysis
+                </Text>
+                {productAnalyticsData?.priceAnalysis?.priceDistribution && productAnalyticsData.priceAnalysis.priceDistribution.length > 5 && (
+                <InlineStack gap="300" blockAlign="center">
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Showing {Math.min(priceDistributionIndex + 1, productAnalyticsData.priceAnalysis.priceDistribution.length)} - {Math.min(priceDistributionIndex + 5, productAnalyticsData.priceAnalysis.priceDistribution.length)} of {productAnalyticsData.priceAnalysis.priceDistribution.length} ranges
+                  </Text>
+                  <InlineStack gap="200">
+                    <Button
+                      size="medium"
+                      disabled={priceDistributionIndex === 0}
+                      onClick={() => setPriceDistributionIndex(Math.max(0, priceDistributionIndex - 5))}
+                      icon={ChevronLeftIcon}
+                    />
+                    <Button
+                      size="medium"
+                      disabled={priceDistributionIndex + 5 >= productAnalyticsData.priceAnalysis.priceDistribution.length}
+                      onClick={() => setPriceDistributionIndex(Math.min(productAnalyticsData.priceAnalysis.priceDistribution.length - 5, priceDistributionIndex + 5))}
+                      icon={ChevronRightIcon}
+                    />
+                  </InlineStack>
+                </InlineStack>
+              )}
+              </InlineStack>
+              
+              {/* Order Data Status Note */}
+              {productAnalyticsData?.priceAnalysis?.priceDistribution && (
+                <Box padding="300" background="bg-surface-info" borderRadius="200" borderWidth="025" borderColor="border-info">
+                  <InlineStack gap="200" blockAlign="center">
+                    <Icon source={InfoIcon} tone="info" />
+                    <Text as="p" variant="bodyXs">
+                      <strong>Orders Data:</strong> Shows actual order quantities from your store's order history. 
+                      Ranges showing 0 orders have no recent sales. This data updates as new orders are placed.
+                    </Text>
+                  </InlineStack>
+                </Box>
+              )}
+            </BlockStack>
             
             {productAnalyticsData?.priceAnalysis?.priceDistribution ? (
-              <BlockStack gap="300">
-                {productAnalyticsData.priceAnalysis.priceDistribution.map((range, index) => (
-                  <Box 
-                    key={index} 
-                    padding="400" 
-                    background="bg-surface" 
-                    borderRadius="200" 
-                    borderWidth="025" 
-                    borderColor="border"
-                  >
-                    <InlineStack align="space-between" blockAlign="center">
-                      <InlineStack gap="400" blockAlign="center">
-                        <Box 
-                          background="bg-surface-info" 
-                          padding="200" 
-                          borderRadius="100"
-                          minWidth="40px"
-                        >
-                          <Text as="span" variant="bodyXs" fontWeight="bold" alignment="center">
-                            ${index + 1}
-                          </Text>
-                        </Box>
-                        <BlockStack gap="100">
-                          <Text as="p" variant="bodyMd" fontWeight="semibold">
-                            {range.range}
-                          </Text>
-                          <Text as="p" variant="bodyXs" tone="subdued">
-                            Price range category
-                          </Text>
-                        </BlockStack>
-                      </InlineStack>
-                      
-                      <InlineStack gap="200" blockAlign="center">
-                        <Text as="p" variant="headingLg" fontWeight="bold">
-                          {range.count}
-                        </Text>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          {range.count === 1 ? 'product' : 'products'}
-                        </Text>
-                      </InlineStack>
-                    </InlineStack>
-                  </Box>
-                ))}
+              <BlockStack gap="400">
+                
+                {/* Simple Price Range Table */}
+                <div style={{ width: '100%', overflowX: 'auto' }}>
+                  <table style={{ 
+                    width: '100%', 
+                    borderCollapse: 'separate', 
+                    borderSpacing: '0 8px',
+                    fontSize: '14px'
+                  }}>
+                    <thead>
+                      <tr style={{ 
+                        backgroundColor: '#f9fafb', 
+                        borderRadius: '8px'
+                      }}>
+                        <th style={{ 
+                          padding: '12px 16px', 
+                          textAlign: 'left', 
+                          fontWeight: '600',
+                          color: '#374151',
+                          borderRadius: '8px 0 0 0'
+                        }}>
+                          Price Range
+                        </th>
+                        <th style={{ 
+                          padding: '12px 16px', 
+                          textAlign: 'right', 
+                          fontWeight: '600',
+                          color: '#374151'
+                        }}>
+                          Products
+                        </th>
+                        <th style={{ 
+                          padding: '12px 16px', 
+                          textAlign: 'right', 
+                          fontWeight: '600',
+                          color: '#374151'
+                        }}>
+                          Orders
+                        </th>
+                        <th style={{ 
+                          padding: '12px 16px', 
+                          textAlign: 'right', 
+                          fontWeight: '600',
+                          color: '#374151',
+                          borderRadius: '0 8px 8px 0'
+                        }}>
+                          Percentage
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productAnalyticsData.priceAnalysis.priceDistribution
+                        .slice(priceDistributionIndex, priceDistributionIndex + 5)
+                        .map((range, index) => {
+                          const percentage = productAnalyticsData.priceAnalysis.priceDistribution.length > 0 
+                            ? Math.round((range.count / productAnalyticsData.priceAnalysis.priceDistribution.reduce((sum, r) => sum + r.count, 0)) * 100) 
+                            : 0;
+                          const hasProducts = range.count > 0;
+                          
+                          return (
+                            <tr 
+                              key={priceDistributionIndex + index}
+                              style={{ 
+                                backgroundColor: hasProducts ? '#ffffff' : '#f9fafb',
+                                border: hasProducts ? '1px solid #e5e7eb' : '1px solid #f3f4f6',
+                                borderRadius: '8px'
+                              }}
+                            >
+                              <td style={{ 
+                                padding: '16px', 
+                                fontWeight: '500',
+                                color: hasProducts ? '#111827' : '#6b7280',
+                                borderRadius: '8px 0 0 0'
+                              }}>
+                                {range.range}
+                              </td>
+                              <td style={{ 
+                                padding: '16px', 
+                                textAlign: 'right',
+                                fontWeight: '600',
+                                color: hasProducts ? '#059669' : '#6b7280'
+                              }}>
+                                {range.count}
+                              </td>
+                              <td style={{ 
+                                padding: '16px', 
+                                textAlign: 'right',
+                                fontWeight: '600',
+                                color: hasProducts ? '#dc2626' : '#6b7280'
+                              }}>
+                                {range.orders || 0}
+                              </td>
+                              <td style={{ 
+                                padding: '16px', 
+                                textAlign: 'right',
+                                fontWeight: '500',
+                                color: '#6b7280',
+                                borderRadius: '0 8px 8px 0'
+                              }}>
+                                {percentage}%
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {/* Summary Info */}
+                <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      <strong>Price Range:</strong> ${productAnalyticsData.priceAnalysis.minPrice.toFixed(2)} - ${productAnalyticsData.priceAnalysis.maxPrice.toFixed(2)}
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      <strong>Average Price:</strong> ${productAnalyticsData.priceAnalysis.avgPrice.toFixed(2)}
+                    </Text>
+                  </InlineStack>
+                </Box>
               </BlockStack>
             ) : (
               <Box padding="600" background="bg-surface-secondary" borderRadius="300">

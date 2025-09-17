@@ -28,8 +28,94 @@ interface ProductAnalyticsData {
     priceDistribution: Array<{
       range: string;
       count: number;
+      orders: number;
     }>;
   };
+}
+
+// Function to create comprehensive price ranges that work for all price levels
+function calculateDynamicPriceRanges(
+  prices: number[], 
+  priceToOrdersMap: { [price: string]: number } = {}
+): Array<{ range: string; count: number; orders: number }> {
+  if (prices.length === 0) {
+    return [];
+  }
+
+  // Comprehensive price ranges that work for any store
+  const ranges = {
+    "Under $10": { count: 0, orders: 0 },
+    "$10-$25": { count: 0, orders: 0 },
+    "$25-$50": { count: 0, orders: 0 },
+    "$50-$100": { count: 0, orders: 0 },
+    "$100-$250": { count: 0, orders: 0 },
+    "$250-$500": { count: 0, orders: 0 },
+    "$500-$750": { count: 0, orders: 0 },
+    "$750-$1,000": { count: 0, orders: 0 },
+    "$1,000-$1,500": { count: 0, orders: 0 },
+    "$1,500-$2,500": { count: 0, orders: 0 },
+    "$2,500-$5,000": { count: 0, orders: 0 },
+    "$5,000-$10,000": { count: 0, orders: 0 },
+    "Over $10,000": { count: 0, orders: 0 }
+  };
+  
+  // Check if we have enough real order data
+  const totalRealOrders = Object.values(priceToOrdersMap).reduce((sum, orders) => sum + orders, 0);
+  
+  console.log(`🔵 Total real orders: ${totalRealOrders}`);
+  console.log(`🔵 Real order data available: ${totalRealOrders > 0 ? 'Yes' : 'No'}`);
+  
+  prices.forEach((price) => {
+    // Get real order data for this price point
+    const realOrders = priceToOrdersMap[price.toString()] || 0;
+    
+    // Use only real order data - no simulation
+    const ordersToAdd = realOrders;
+    
+    if (price < 10) {
+      ranges["Under $10"].count++;
+      ranges["Under $10"].orders += ordersToAdd;
+    } else if (price < 25) {
+      ranges["$10-$25"].count++;
+      ranges["$10-$25"].orders += ordersToAdd;
+    } else if (price < 50) {
+      ranges["$25-$50"].count++;
+      ranges["$25-$50"].orders += ordersToAdd;
+    } else if (price < 100) {
+      ranges["$50-$100"].count++;
+      ranges["$50-$100"].orders += ordersToAdd;
+    } else if (price < 250) {
+      ranges["$100-$250"].count++;
+      ranges["$100-$250"].orders += ordersToAdd;
+    } else if (price < 500) {
+      ranges["$250-$500"].count++;
+      ranges["$250-$500"].orders += ordersToAdd;
+    } else if (price < 750) {
+      ranges["$500-$750"].count++;
+      ranges["$500-$750"].orders += ordersToAdd;
+    } else if (price < 1000) {
+      ranges["$750-$1,000"].count++;
+      ranges["$750-$1,000"].orders += ordersToAdd;
+    } else if (price < 1500) {
+      ranges["$1,000-$1,500"].count++;
+      ranges["$1,000-$1,500"].orders += ordersToAdd;
+    } else if (price < 2500) {
+      ranges["$1,500-$2,500"].count++;
+      ranges["$1,500-$2,500"].orders += ordersToAdd;
+    } else if (price < 5000) {
+      ranges["$2,500-$5,000"].count++;
+      ranges["$2,500-$5,000"].orders += ordersToAdd;
+    } else if (price < 10000) {
+      ranges["$5,000-$10,000"].count++;
+      ranges["$5,000-$10,000"].orders += ordersToAdd;
+    } else {
+      ranges["Over $10,000"].count++;
+      ranges["Over $10,000"].orders += ordersToAdd;
+    }
+  });
+  
+  // Return all ranges, including those with 0 count for consistent slider display
+  return Object.entries(ranges).map(([range, { count, orders }]) => ({ range, count, orders }));
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -40,7 +126,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { admin } = await authenticate.admin(request);
     console.log("🔵 Product Analytics API: Authentication successful");
 
-    // Simple GraphQL query to get products
+    // GraphQL query to get products and orders
     const productsResponse = await admin.graphql(`
       query {
         products(first: 50) {
@@ -65,8 +151,46 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     `);
 
+    // GraphQL query to get recent orders (last 250 orders)
+    const ordersResponse = await admin.graphql(`
+      query {
+        orders(first: 250, sortKey: CREATED_AT, reverse: true) {
+          edges {
+            node {
+              id
+              name
+              createdAt
+              totalPriceSet {
+                shopMoney {
+                  amount
+                }
+              }
+              lineItems(first: 50) {
+                edges {
+                  node {
+                    id
+                    quantity
+                    variant {
+                      id
+                      price
+                      product {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `);
+
     const productsData: any = await productsResponse.json();
-    console.log("🔵 Product Analytics API: GraphQL response:", JSON.stringify(productsData, null, 2));
+    const ordersData: any = await ordersResponse.json();
+    
+    console.log("🔵 Product Analytics API: Products response:", JSON.stringify(productsData, null, 2));
+    console.log("🔵 Product Analytics API: Orders response:", JSON.stringify(ordersData, null, 2));
     
     if (productsData.errors) {
       console.error("🔴 Product Analytics API: GraphQL errors:", productsData.errors);
@@ -76,8 +200,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }, { status: 500 });
     }
 
+    if (ordersData.errors) {
+      console.error("🔴 Product Analytics API: Orders GraphQL errors:", ordersData.errors);
+      return json({ 
+        success: false, 
+        error: `Orders GraphQL Error: ${ordersData.errors[0]?.message || "Unknown error"}` 
+      }, { status: 500 });
+    }
+
     const products = productsData.data?.products?.edges || [];
+    const orders = ordersData.data?.orders?.edges || [];
+    
     console.log(`🔵 Product Analytics API: Found ${products.length} products`);
+    console.log(`🔵 Product Analytics API: Found ${orders.length} orders`);
 
     // Process product data
     let totalProducts = products.length;
@@ -98,13 +233,40 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       priceRange: string;
     }> = [];
 
-    const priceRanges = {
-      "Under $25": 0,
-      "$25-$50": 0,
-      "$50-$100": 0,
-      "$100-$250": 0,
-      "Over $250": 0
-    };
+    // Dynamic price ranges that will be calculated based on actual data
+    let allPrices: number[] = [];
+    
+    // Process orders to create price-to-orders mapping
+    const priceToOrdersMap: { [price: string]: number } = {};
+    let totalOrderItems = 0;
+    
+    console.log(`🔵 Processing ${orders.length} orders for price analysis...`);
+    
+    orders.forEach(({ node: order }: any, orderIndex: number) => {
+      console.log(`🔵 Order ${orderIndex + 1}: ${order.name} - ${order.lineItems?.edges?.length || 0} line items`);
+      
+      order.lineItems?.edges?.forEach(({ node: lineItem }: any, itemIndex: number) => {
+        if (lineItem.variant?.price) {
+          const price = parseFloat(lineItem.variant.price);
+          const quantity = lineItem.quantity || 1;
+          const priceKey = price.toString();
+          
+          console.log(`🔵   Line Item ${itemIndex + 1}: Price $${price}, Quantity ${quantity}`);
+          
+          if (!priceToOrdersMap[priceKey]) {
+            priceToOrdersMap[priceKey] = 0;
+          }
+          priceToOrdersMap[priceKey] += quantity;
+          totalOrderItems += quantity;
+        } else {
+          console.log(`🔴   Line Item ${itemIndex + 1}: Missing price data`, lineItem);
+        }
+      });
+    });
+    
+    console.log(`🔵 Product Analytics API: Total order items processed: ${totalOrderItems}`);
+    console.log(`🔵 Product Analytics API: Price-to-orders mapping:`, priceToOrdersMap);
+    console.log(`🔵 Product Analytics API: Unique price points with orders: ${Object.keys(priceToOrdersMap).length}`);
 
     products.forEach(({ node: product }: any) => {
       if (product.status === 'ACTIVE') {
@@ -130,12 +292,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             maxPrice = Math.max(maxPrice, price);
             totalInventory += inventory;
             
-            // Price categorization
-            if (price < 25) priceRanges["Under $25"]++;
-            else if (price < 50) priceRanges["$25-$50"]++;
-            else if (price < 100) priceRanges["$50-$100"]++;
-            else if (price < 250) priceRanges["$100-$250"]++;
-            else priceRanges["Over $250"]++;
+            // Collect prices for dynamic range calculation
+            allPrices.push(price);
           }
         });
 
@@ -187,15 +345,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       },
       priceAnalysis: {
         avgPrice: avgProductPrice,
-        minPrice: variantCount > 0 ? Math.min(...topProducts.map(p => parseFloat(p.priceRange.split(' ')[0].substring(1)))) : 0,
-        maxPrice: variantCount > 0 ? Math.max(...topProducts.map(p => {
-          const range = p.priceRange.split(' - ');
-          return parseFloat(range[range.length - 1].substring(1));
-        })) : 0,
-        priceDistribution: Object.entries(priceRanges).map(([range, count]) => ({
-          range,
-          count
-        }))
+        minPrice: allPrices.length > 0 ? Math.min(...allPrices) : 0,
+        maxPrice: allPrices.length > 0 ? Math.max(...allPrices) : 0,
+        priceDistribution: calculateDynamicPriceRanges(allPrices, priceToOrdersMap)
       }
     };
 
