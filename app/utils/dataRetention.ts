@@ -90,7 +90,7 @@ export async function cleanupExpiredData(dataType: DataType, shop?: string): Pro
 
   try {
     switch (dataType) {
-      case 'analytics':
+      case 'analytics': {
         const analyticsResult = await prisma.analyticsSnapshot.deleteMany({
           where: {
             ...(shop && { shop }),
@@ -101,8 +101,9 @@ export async function cleanupExpiredData(dataType: DataType, shop?: string): Pro
         });
         deletedCount += analyticsResult.count;
         break;
+      }
 
-      case 'products':
+      case 'products': {
         const productsResult = await prisma.productAnalytics.deleteMany({
           where: {
             ...(shop && { shop }),
@@ -113,8 +114,9 @@ export async function cleanupExpiredData(dataType: DataType, shop?: string): Pro
         });
         deletedCount += productsResult.count;
         break;
+      }
 
-      case 'logs':
+      case 'logs': {
         const logsResult = await prisma.notificationLog.deleteMany({
           where: {
             ...(shop && { shop }),
@@ -125,10 +127,12 @@ export async function cleanupExpiredData(dataType: DataType, shop?: string): Pro
         });
         deletedCount += logsResult.count;
         break;
+      }
 
-      case 'notifications':
+      case 'notifications': {
         // Notification logs are handled in the 'logs' case above
         break;
+      }
 
       default:
         console.warn(`Unknown data type for cleanup: ${dataType}`);
