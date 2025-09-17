@@ -28,7 +28,7 @@ import {
   Divider,
 } from '@shopify/polaris';
 // Import only the icons we actually use
-import { ProductIcon, EditIcon, ViewIcon, ExportIcon } from "@shopify/polaris-icons";
+import { ProductIcon, EditIcon, ViewIcon, ExportIcon, ChevronLeftIcon, ChevronRightIcon } from "@shopify/polaris-icons";
 
 interface Product {
   id: string;
@@ -130,6 +130,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
   const [retryCount, setRetryCount] = useState(0);
   const [maxRetries] = useState(ProductConstants.MAX_RETRIES);
+  
+  // Slider state for Product Results
+  const [productResultsSliderIndex, setProductResultsSliderIndex] = useState(0);
+  const [productsPerPage] = useState(10); // Number of products to show per page
 
   // Thresholds for inventory categorization (use constants)
   // Removed duplicated constants
@@ -229,6 +233,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       setIsLoading(false);
     }
   }, [fetcher.state]);
+
+  // Reset slider when filters change
+  useEffect(() => {
+    setProductResultsSliderIndex(0);
+  }, [searchQuery, currentCategory, showDraftProducts, sortField, sortDirection]);
 
   // Filter and sort products
   const filteredProducts = products.filter(product => {
@@ -868,7 +877,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   };
 
   const renderTableView = () => {
-    const rows = filteredProducts.map(product => {
+    const paginatedProducts = filteredProducts.slice(productResultsSliderIndex, productResultsSliderIndex + productsPerPage);
+    const rows = paginatedProducts.map(product => {
       const inventory = product.totalInventory;
       const productKey = product.id;
       return [
@@ -957,9 +967,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   };
 
   const renderCardView = () => {
+    const paginatedProducts = filteredProducts.slice(productResultsSliderIndex, productResultsSliderIndex + productsPerPage);
     return (
       <ResourceList
-        items={filteredProducts}
+        items={paginatedProducts}
         renderItem={(product) => {
           const inventory = product.totalInventory;
           return (
@@ -1826,9 +1837,31 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 <Text as="h4" variant="headingMd">
                   Product Results
                 </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Showing {filteredProducts.length} of {products.length} products
-                </Text>
+                <InlineStack gap="300" blockAlign="center">
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Showing {Math.min(productResultsSliderIndex + 1, filteredProducts.length)} - {Math.min(productResultsSliderIndex + productsPerPage, filteredProducts.length)} of {filteredProducts.length} products
+                  </Text>
+                  {filteredProducts.length > productsPerPage && (
+                    <InlineStack gap="200" blockAlign="center">
+                      <Button
+                        size="micro"
+                        disabled={productResultsSliderIndex === 0}
+                        onClick={() => setProductResultsSliderIndex(Math.max(0, productResultsSliderIndex - productsPerPage))}
+                        icon={ChevronLeftIcon}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        size="micro"
+                        disabled={productResultsSliderIndex + productsPerPage >= filteredProducts.length}
+                        onClick={() => setProductResultsSliderIndex(Math.min(filteredProducts.length - productsPerPage, productResultsSliderIndex + productsPerPage))}
+                        icon={ChevronRightIcon}
+                      >
+                        Next
+                      </Button>
+                    </InlineStack>
+                  )}
+                </InlineStack>
               </InlineStack>
               {viewMode === 'table' ? renderTableView() : renderCardView()}
             </BlockStack>

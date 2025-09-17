@@ -170,6 +170,8 @@ export function Notifications({ isVisible }: NotificationsProps) {
   const [variantThresholds, setVariantThresholds] = useState<{[variantId: string]: number}>({}); // Track threshold values for each variant
   const [selectedProductsSliderIndex, setSelectedProductsSliderIndex] = useState(0); // Track slider position for selected products
   const [summarySliderIndex, setSummarySliderIndex] = useState(0); // Track slider position for summary section
+  const [productSelectionSliderIndex, setProductSelectionSliderIndex] = useState(0); // Track slider position for product selection
+  const [productsPerPage] = useState(6); // Number of products to show per page in selection
   
   // Step 2: Notification Channels
   const [channels, setChannels] = useState<NotificationChannel[]>([]);
@@ -574,6 +576,16 @@ export function Notifications({ isVisible }: NotificationsProps) {
     return matchesSearch && matchesLocation && matchesTags && matchesCollection;
   });
 
+  // Reset sliders when filters change
+  useEffect(() => {
+    setProductSelectionSliderIndex(0);
+  }, [productSearchQuery, selectionMode, selectedLocations, selectedTags, selectedCollections]);
+
+  // Reset summary slider when selected products change
+  useEffect(() => {
+    setSummarySliderIndex(0);
+  }, [selectedProducts]);
+
   const renderSetupProgress = () => (
     <Card>
       <BlockStack gap="400">
@@ -813,7 +825,36 @@ export function Notifications({ isVisible }: NotificationsProps) {
                 </InlineStack>
                 
                 <BlockStack gap="400">
-                  {filteredProducts.map((product) => {
+                  {/* Product Selection Slider Controls */}
+                  {filteredProducts.length > productsPerPage && (
+                    <Card background="bg-surface-secondary" padding="300">
+                      <InlineStack align="space-between" blockAlign="center">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Showing {Math.min(productSelectionSliderIndex + 1, filteredProducts.length)} - {Math.min(productSelectionSliderIndex + productsPerPage, filteredProducts.length)} of {filteredProducts.length} products
+                        </Text>
+                        <InlineStack gap="200" blockAlign="center">
+                          <Button
+                            size="micro"
+                            disabled={productSelectionSliderIndex === 0}
+                            onClick={() => setProductSelectionSliderIndex(Math.max(0, productSelectionSliderIndex - productsPerPage))}
+                            icon={ChevronLeftIcon}
+                          >
+                            Previous
+                          </Button>
+                          <Button
+                            size="micro"
+                            disabled={productSelectionSliderIndex + productsPerPage >= filteredProducts.length}
+                            onClick={() => setProductSelectionSliderIndex(Math.min(filteredProducts.length - productsPerPage, productSelectionSliderIndex + productsPerPage))}
+                            icon={ChevronRightIcon}
+                          >
+                            Next
+                          </Button>
+                        </InlineStack>
+                      </InlineStack>
+                    </Card>
+                  )}
+                  
+                  {filteredProducts.slice(productSelectionSliderIndex, productSelectionSliderIndex + productsPerPage).map((product) => {
                     const isProductSelected = selectedProducts.includes(product.id);
                     const totalVariants = product.variants?.length || 1;
                     
@@ -1375,22 +1416,53 @@ export function Notifications({ isVisible }: NotificationsProps) {
                   Monitoring products with tags: {selectedTags.join(', ')} ({selectedProductsDetails.length} products)
                 </Text>
               ) : (
-                <BlockStack gap="200">
-                  {selectedProductsDetails.slice(0, 10).map((product) => {
-                    if (!product) return null;
-                    return (
-                      <InlineStack key={product.id} gap="200" blockAlign="center">
-                        <Text as="p" variant="bodySm">
-                          • {product.title} (Alert at ≤ {variantThresholds[product.id] || 5} units)
+                <BlockStack gap="300">
+                  {/* Summary Slider Controls */}
+                  {selectedProductsDetails.length > 5 && (
+                    <Card background="bg-surface-secondary" padding="300">
+                      <InlineStack align="space-between" blockAlign="center">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Showing {Math.min(summarySliderIndex + 1, selectedProductsDetails.length)} - {Math.min(summarySliderIndex + 5, selectedProductsDetails.length)} of {selectedProductsDetails.length} products
                         </Text>
+                        <InlineStack gap="200" blockAlign="center">
+                          <Button
+                            size="micro"
+                            disabled={summarySliderIndex === 0}
+                            onClick={() => setSummarySliderIndex(Math.max(0, summarySliderIndex - 5))}
+                            icon={ChevronLeftIcon}
+                          >
+                            Previous
+                          </Button>
+                          <Button
+                            size="micro"
+                            disabled={summarySliderIndex + 5 >= selectedProductsDetails.length}
+                            onClick={() => setSummarySliderIndex(Math.min(selectedProductsDetails.length - 5, summarySliderIndex + 5))}
+                            icon={ChevronRightIcon}
+                          >
+                            Next
+                          </Button>
+                        </InlineStack>
                       </InlineStack>
-                    );
-                  })}
-                  {selectedProductsDetails.length > 10 && (
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      ... and {selectedProductsDetails.length - 10} more products
-                    </Text>
+                    </Card>
                   )}
+                  
+                  <BlockStack gap="200">
+                    {selectedProductsDetails.slice(summarySliderIndex, summarySliderIndex + 5).map((product) => {
+                      if (!product) return null;
+                      return (
+                        <InlineStack key={product.id} gap="200" blockAlign="center">
+                          <Text as="p" variant="bodySm">
+                            • {product.title} (Alert at ≤ {variantThresholds[product.id] || 5} units)
+                          </Text>
+                        </InlineStack>
+                      );
+                    })}
+                    {selectedProductsDetails.length > 5 && selectedProductsDetails.length > summarySliderIndex + 5 && (
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        ... and {selectedProductsDetails.length - (summarySliderIndex + 5)} more products
+                      </Text>
+                    )}
+                  </BlockStack>
                 </BlockStack>
               )}
             </BlockStack>

@@ -443,37 +443,111 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
         </Box>
       </div>
       
-      {/* Floating Help Guide */}
-      <div 
-      data-help-button
-      style={{
-        position: 'fixed',
-        bottom: '24px',
-        right: '24px',
-        zIndex: 1000,
-        background: 'linear-gradient(135deg, #fdf2f5 0%, #fef7f9 100%)',
-        borderRadius: '50%',
-        width: '56px',
-        height: '56px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.15), 0 2px 8px rgba(255, 32, 78, 0.2)',
-        cursor: 'pointer',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        border: '2px solid rgba(255, 32, 78, 0.3)'
-      }}
-      onClick={() => onTabChange("help")}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'scale(1.1)';
-        e.currentTarget.style.boxShadow = '0 6px 30px rgba(0,0,0,0.2), 0 4px 12px rgba(255, 32, 78, 0.3)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'scale(1)';
-        e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.15), 0 2px 8px rgba(255, 32, 78, 0.2)';
-      }}>
-        <Icon source={QuestionCircleIcon} tone="base" />
-      </div>
+      {/* Enhanced Floating Help Button */}
+      <Tooltip content="Get Help & Documentation">
+        <div 
+          data-help-button
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: 9999,
+            background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)',
+            borderRadius: '24px',
+            width: '72px',
+            height: '72px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 16px 48px rgba(44, 44, 44, 0.4), 0 8px 24px rgba(0,0,0,0.3), inset 0 2px 0 rgba(255,255,255,0.15), 0 0 0 3px rgba(255, 32, 78, 0.2)',
+            cursor: 'pointer',
+            transition: 'all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            border: '2px solid rgba(255, 32, 78, 0.3)',
+            backdropFilter: 'blur(20px)',
+            overflow: 'hidden',
+            transform: 'translateZ(0)',
+            willChange: 'transform, box-shadow, background'
+          }}
+          onClick={() => onTabChange("help")}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.15) translateY(-6px) rotate(8deg)';
+            e.currentTarget.style.boxShadow = '0 24px 72px rgba(44, 44, 44, 0.5), 0 16px 40px rgba(0,0,0,0.4), inset 0 2px 0 rgba(255,255,255,0.25), 0 0 0 4px rgba(255, 32, 78, 0.4)';
+            e.currentTarget.style.background = 'linear-gradient(135deg, #1a1a1a 0%, #2c2c2c 100%)';
+            e.currentTarget.style.border = '2px solid rgba(255, 32, 78, 0.6)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1) translateY(0) rotate(0deg)';
+            e.currentTarget.style.boxShadow = '0 16px 48px rgba(44, 44, 44, 0.4), 0 8px 24px rgba(0,0,0,0.3), inset 0 2px 0 rgba(255,255,255,0.15), 0 0 0 3px rgba(255, 32, 78, 0.2)';
+            e.currentTarget.style.background = 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)';
+            e.currentTarget.style.border = '2px solid rgba(255, 32, 78, 0.3)';
+          }}>
+          {/* Animated background effect */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%, rgba(255,255,255,0.1) 100%)',
+            animation: 'shimmer 3s ease-in-out infinite',
+            borderRadius: '14px'
+          }} />
+          
+          
+          {/* Question mark icon with enhanced styling */}
+          <div style={{
+            position: 'relative',
+            zIndex: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            height: '100%'
+          }}>
+            <div style={{
+              color: 'white',
+              fontSize: '36px',
+              filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))',
+              transition: 'all 0.3s ease',
+              transform: 'scale(1)',
+              fontWeight: 'bold'
+            }}>
+              <Icon source={QuestionCircleIcon} tone="base" />
+            </div>
+          </div>
+          
+        </div>
+      </Tooltip>
+      
+      {/* Add CSS animations */}
+      <style>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        
+        
+        [data-help-button] {
+          position: fixed !important;
+          bottom: 24px !important;
+          right: 24px !important;
+          z-index: 9999 !important;
+        }
+        
+        @media (max-width: 768px) {
+          [data-help-button] {
+            width: 64px !important;
+            height: 64px !important;
+            bottom: 16px !important;
+            right: 16px !important;
+            border-radius: 20px !important;
+          }
+          
+          [data-help-button] div {
+            font-size: 30px !important;
+          }
+        }
+      `}</style>
     </>
   );
 }
