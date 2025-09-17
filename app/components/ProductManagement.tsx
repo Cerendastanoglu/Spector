@@ -24,11 +24,26 @@ import {
   EmptyState,
   FormLayout,
   ChoiceList,
+  Icon,
   // Banner,
   Tabs,
 } from '@shopify/polaris';
 // Import only the icons we actually use
-import { ProductIcon, EditIcon, ViewIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
+import { 
+  ProductIcon, 
+  EditIcon, 
+  ViewIcon, 
+  ChevronLeftIcon, 
+  ChevronRightIcon, 
+  ChevronDownIcon, 
+  ChevronUpIcon,
+  MoneyIcon,
+  CollectionIcon,
+  InventoryIcon,
+  DeliveryIcon,
+  ImageIcon,
+  ClockIcon
+} from "@shopify/polaris-icons";
 
 interface Product {
   id: string;
@@ -83,6 +98,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [selectedVariants, setSelectedVariants] = useState<string[]>([]);
   const [currentCategory, setCurrentCategory] = useState<InventoryCategory>(initialCategory);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [searchQuery, setSearchQuery] = useState('');
@@ -164,6 +180,58 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       newExpanded.add(productId);
     }
     setExpandedProducts(newExpanded);
+  };
+
+  // Helper functions for variant selection
+  const getProductVariantIds = (productId: string): string[] => {
+    const product = filteredProducts.find(p => p.id === productId);
+    return product ? product.variants.edges.map(v => v.node.id) : [];
+  };
+
+  const getSelectedVariantsForProduct = (productId: string): string[] => {
+    const variantIds = getProductVariantIds(productId);
+    return selectedVariants.filter(variantId => variantIds.includes(variantId));
+  };
+
+  const getProductSelectionState = (productId: string): 'none' | 'some' | 'all' => {
+    const variantIds = getProductVariantIds(productId);
+    const selectedCount = selectedVariants.filter(variantId => variantIds.includes(variantId)).length;
+    
+    if (selectedCount === 0) return 'none';
+    if (selectedCount === variantIds.length) return 'all';
+    return 'some';
+  };
+
+  const handleProductSelection = (productId: string, checked: boolean) => {
+    const variantIds = getProductVariantIds(productId);
+    
+    if (checked) {
+      // Select all variants for this product
+      setSelectedVariants(prev => [...new Set([...prev, ...variantIds])]);
+      // Also add to selectedProducts for compatibility with existing bulk operations
+      setSelectedProducts(prev => [...new Set([...prev, productId])]);
+    } else {
+      // Deselect all variants for this product
+      setSelectedVariants(prev => prev.filter(id => !variantIds.includes(id)));
+      // Remove from selectedProducts
+      setSelectedProducts(prev => prev.filter(id => id !== productId));
+    }
+  };
+
+  const handleVariantSelection = (productId: string, variantId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedVariants(prev => [...prev, variantId]);
+      // Check if all variants are now selected, if so add product to selectedProducts
+      const variantIds = getProductVariantIds(productId);
+      const newSelectedVariants = [...selectedVariants, variantId];
+      if (variantIds.every(id => newSelectedVariants.includes(id))) {
+        setSelectedProducts(prev => [...new Set([...prev, productId])]);
+      }
+    } else {
+      setSelectedVariants(prev => prev.filter(id => id !== variantId));
+      // Remove product from selectedProducts since not all variants are selected
+      setSelectedProducts(prev => prev.filter(id => id !== productId));
+    }
   };
   
   // Slider state for Product Results
@@ -348,11 +416,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   });
 
   const handleBulkSelect = (productId: string, checked: boolean) => {
-    setSelectedProducts(prev => 
-      checked 
-        ? [...prev, productId]
-        : prev.filter(id => id !== productId)
-    );
+    handleProductSelection(productId, checked);
   };
 
   // Enhanced error handling helpers
@@ -937,7 +1001,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       return [
         <InlineStack key={`${productKey}-title`} gap="200" blockAlign="center">
           <Checkbox
-            checked={selectedProducts.includes(product.id)}
+            checked={getProductSelectionState(product.id) !== 'none'}
             onChange={(checked) => handleBulkSelect(product.id, checked)}
             label=""
           />
@@ -947,12 +1011,31 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
             size="small"
           />
           <BlockStack gap="100">
-            <Text as="span" variant="bodyMd" fontWeight="semibold">
-              {product.title}
-            </Text>
-            <Text as="span" variant="bodySm" tone="subdued">
-              {product.handle}
-            </Text>
+            <InlineStack gap="200" blockAlign="center">
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: product.status === 'ACTIVE' ? '#4CAF50' : product.status === 'DRAFT' ? '#FFC107' : '#9E9E9E',
+                flexShrink: 0
+              }} />
+              <Text as="span" variant="bodyMd" fontWeight="semibold">
+                {product.title}
+              </Text>
+            </InlineStack>
+            <InlineStack gap="200" blockAlign="center" wrap>
+              <Text as="span" variant="bodySm" tone="subdued">
+                {product.handle}
+              </Text>
+              <Text as="span" variant="bodySm" fontWeight="medium">
+                ${(() => {
+                  const prices = product.variants.edges.map(edge => parseFloat(edge.node.price));
+                  const minPrice = Math.min(...prices);
+                  const maxPrice = Math.max(...prices);
+                  return minPrice === maxPrice ? minPrice.toFixed(2) : `${minPrice.toFixed(2)} - ${maxPrice.toFixed(2)}`;
+                })()}
+              </Text>
+            </InlineStack>
           </BlockStack>
         </InlineStack>,
         // Price column - show main variant price or price range
@@ -983,13 +1066,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         <Badge key={`${productKey}-inventory`} tone={getBadgeTone(inventory)}>
           {`${inventory} units`}
         </Badge>,
-        <Badge key={`${productKey}-status`} tone={
-          product.status === 'ACTIVE' ? 'success' : 
-          product.status === 'DRAFT' ? 'attention' : 
-          product.status === 'ARCHIVED' ? 'critical' : undefined
-        }>
-          {product.status}
-        </Badge>,
+
         <Text key={`${productKey}-variants`} as="span" variant="bodySm">
           {product.variants.edges.length} variant{product.variants.edges.length !== 1 ? 's' : ''}
         </Text>,
@@ -1045,13 +1122,30 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 <InlineStack align="space-between" blockAlign="center">
                   <InlineStack gap="200" blockAlign="center" wrap={false}>
                     <Checkbox
-                      checked={selectedProducts.includes(product.id)}
+                      checked={getProductSelectionState(product.id) !== 'none'}
                       onChange={(checked) => handleBulkSelect(product.id, checked)}
                       label=""
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <Text as="h3" variant="bodyMd" fontWeight="semibold" truncate>
-                        {product.title}
+                      <InlineStack gap="200" blockAlign="center">
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: product.status === 'ACTIVE' ? '#4CAF50' : product.status === 'DRAFT' ? '#FFC107' : '#9E9E9E',
+                          flexShrink: 0
+                        }} />
+                        <Text as="h3" variant="bodyMd" fontWeight="semibold" truncate>
+                          {product.title}
+                        </Text>
+                      </InlineStack>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        ${(() => {
+                          const prices = product.variants.edges.map(edge => parseFloat(edge.node.price));
+                          const minPrice = Math.min(...prices);
+                          const maxPrice = Math.max(...prices);
+                          return minPrice === maxPrice ? minPrice.toFixed(2) : `${minPrice.toFixed(2)} - ${maxPrice.toFixed(2)}`;
+                        })()}
                       </Text>
                     </div>
                   </InlineStack>
@@ -1059,13 +1153,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                     <Badge tone={getBadgeTone(inventory)}>
                       {`${inventory}`}
                     </Badge>
-                    <Badge tone={
-                      product.status === 'ACTIVE' ? 'success' : 
-                      product.status === 'DRAFT' ? 'attention' : 
-                      product.status === 'ARCHIVED' ? 'critical' : undefined
-                    }>
-                      {product.status}
-                    </Badge>
+
                     <Button
                       icon={expandedProducts.has(product.id) ? ChevronUpIcon : ChevronDownIcon}
                       variant="plain"
@@ -1083,69 +1171,201 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   </div>
                 </InlineStack>
 
-                {/* Expandable Details Section */}
+                {/* Enhanced Expandable Details Section */}
                 {expandedProducts.has(product.id) && (
                   <Box paddingBlockStart="300" paddingInlineStart="400">
-                    <Card background="bg-surface-secondary" padding="300">
-                      <BlockStack gap="300">
-                        {/* Basic Info Row */}
-                        <InlineStack gap="600" wrap>
-                          <InlineStack gap="200" blockAlign="center">
-                            <Text as="span" variant="bodySm" fontWeight="medium">Handle:</Text>
-                            <Text as="span" variant="bodySm" tone="subdued">{product.handle}</Text>
-                          </InlineStack>
-                          <InlineStack gap="200" blockAlign="center">
-                            <Text as="span" variant="bodySm" fontWeight="medium">Variants:</Text>
-                            <Text as="span" variant="bodySm" tone="subdued">{product.variants.edges.length}</Text>
-                          </InlineStack>
+                    <div style={{ minHeight: '320px' }}>
+                      <Card background="bg-surface-secondary" padding="400">
+                      <BlockStack gap="400">
+                        {/* Quick Actions Bar */}
+                        <InlineStack gap="200" wrap>
+                          <Button
+                            variant="tertiary"
+                            size="slim"
+                            onClick={() => window.open(product.adminUrl, '_blank')}
+                            disabled={!product.adminUrl}
+                          >
+                            Edit in Admin
+                          </Button>
+                          <Button
+                            variant="tertiary"
+                            size="slim"
+                            onClick={() => window.open(product.storefrontUrl, '_blank')}
+                            disabled={!product.storefrontUrl}
+                          >
+                            View Store
+                          </Button>
+                          <Button
+                            variant="tertiary"
+                            size="slim"
+                            onClick={() => {
+                              const newSelected = selectedProducts.includes(product.id) 
+                                ? selectedProducts.filter(id => id !== product.id)
+                                : [...selectedProducts, product.id];
+                              setSelectedProducts(newSelected);
+                            }}
+                            tone={selectedProducts.includes(product.id) ? 'critical' : 'success'}
+                          >
+                            {selectedProducts.includes(product.id) ? 'Deselect' : 'Select'} Product
+                          </Button>
                         </InlineStack>
-                        
-                        {/* Variant Details */}
+
+                        {/* Product Info Grid - Only show when there are multiple variants */}
+                        {product.variants.edges.length > 1 && (
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                            gap: '20px'
+                          }}>
+                            {/* Basic Details */}
+                            <BlockStack gap="200">
+                              <Text as="p" variant="bodySm" fontWeight="medium">Product Details</Text>
+                              <BlockStack gap="100">
+                                <InlineStack gap="200" blockAlign="center">
+                                  <Text as="span" variant="bodyXs" fontWeight="medium">Handle:</Text>
+                                  <Text as="span" variant="bodyXs" tone="subdued">{product.handle}</Text>
+                                </InlineStack>
+
+                                <InlineStack gap="200" blockAlign="center">
+                                  <Text as="span" variant="bodyXs" fontWeight="medium">ID:</Text>
+                                  <Text as="span" variant="bodyXs" tone="subdued">{product.id.slice(-8)}</Text>
+                                </InlineStack>
+                              </BlockStack>
+                            </BlockStack>
+
+                            {/* Pricing Summary */}
+                            <BlockStack gap="200">
+                              <Text as="p" variant="bodySm" fontWeight="medium">Pricing Overview</Text>
+                              <BlockStack gap="100">
+                                <InlineStack gap="200" blockAlign="center">
+                                  <Text as="span" variant="bodyXs" fontWeight="medium">Price Range:</Text>
+                                  <Text as="span" variant="bodyXs" tone="subdued">
+                                    ${Math.min(...product.variants.edges.map(v => parseFloat(v.node.price)))} - 
+                                    ${Math.max(...product.variants.edges.map(v => parseFloat(v.node.price)))}
+                                  </Text>
+                                </InlineStack>
+                                <InlineStack gap="200" blockAlign="center">
+                                  <Text as="span" variant="bodyXs" fontWeight="medium">Variants:</Text>
+                                  <Text as="span" variant="bodyXs" tone="subdued">{product.variants.edges.length}</Text>
+                                </InlineStack>
+                                <InlineStack gap="200" blockAlign="center">
+                                  <Text as="span" variant="bodyXs" fontWeight="medium">Total Stock:</Text>
+                                  <Text as="span" variant="bodyXs" tone="subdued">{product.totalInventory}</Text>
+                                </InlineStack>
+                              </BlockStack>
+                            </BlockStack>
+
+                            {/* URLs & Links */}
+                            <BlockStack gap="200">
+                              <Text as="p" variant="bodySm" fontWeight="medium">Links & Access</Text>
+                              <BlockStack gap="100">
+                                <InlineStack gap="200" blockAlign="center">
+                                  <Text as="span" variant="bodyXs" fontWeight="medium">Admin URL:</Text>
+                                  <Text as="span" variant="bodyXs" tone="subdued">
+                                    {product.adminUrl ? 'Available' : 'Not available'}
+                                  </Text>
+                                </InlineStack>
+                                <InlineStack gap="200" blockAlign="center">
+                                  <Text as="span" variant="bodyXs" fontWeight="medium">Store URL:</Text>
+                                  <Text as="span" variant="bodyXs" tone="subdued">
+                                    {product.storefrontUrl ? 'Available' : 'Not available'}
+                                  </Text>
+                                </InlineStack>
+                                <InlineStack gap="200" blockAlign="center">
+                                  <Text as="span" variant="bodyXs" fontWeight="medium">Has Image:</Text>
+                                  <Text as="span" variant="bodyXs" tone="subdued">
+                                    {product.featuredMedia?.preview?.image ? 'Yes' : 'No'}
+                                  </Text>
+                                </InlineStack>
+                              </BlockStack>
+                            </BlockStack>
+                          </div>
+                        )}
+
+                        {/* Variant Management Section */}
                         {product.variants.edges.length > 0 && (
-                          <BlockStack gap="200">
-                            <Text as="p" variant="bodySm" fontWeight="medium">
-                              Pricing & Inventory
-                            </Text>
+                          <BlockStack gap="300">
+                            <InlineStack align="space-between" blockAlign="center">
+                              <Text as="p" variant="bodySm" fontWeight="medium">
+                                Variant Management ({product.variants.edges.length} variants)
+                              </Text>
+                              <Button
+                                variant="plain"
+                                size="slim"
+                                onClick={() => handleProductSelection(product.id, true)}
+                                disabled={getProductSelectionState(product.id) === 'all'}
+                              >
+                                {getProductSelectionState(product.id) === 'all' ? 'All Selected' : 'Select All Variants'}
+                              </Button>
+                            </InlineStack>
+                            
                             <div style={{ 
                               display: 'grid', 
-                              gridTemplateColumns: '1fr auto auto auto', 
-                              gap: '12px 16px',
+                              gridTemplateColumns: 'auto 1fr auto auto auto auto', 
+                              gap: '8px 12px',
                               alignItems: 'center',
-                              fontSize: '13px'
+                              fontSize: '12px',
+                              maxHeight: '200px',
+                              overflowY: 'auto',
+                              backgroundColor: 'var(--p-color-bg-surface)',
+                              padding: '12px',
+                              borderRadius: '6px'
                             }}>
                               {/* Headers */}
+                              <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">Select</Text>
                               <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">Variant</Text>
                               <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">Price</Text>
                               <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">Stock</Text>
                               <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">SKU</Text>
+                              <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">Actions</Text>
                               
-                              {/* Data rows */}
-                              {product.variants.edges.slice(0, 3).map((variant) => (
+                              {/* Variant rows */}
+                              {product.variants.edges.map((variant) => (
                                 <>
+                                  <Checkbox
+                                    key={`${variant.node.id}-checkbox`}
+                                    label=""
+                                    checked={selectedVariants.includes(variant.node.id)}
+                                    onChange={(checked) => handleVariantSelection(product.id, variant.node.id, checked)}
+                                  />
                                   <Text key={`${variant.node.id}-title`} as="span" variant="bodyXs">
                                     {variant.node.title !== 'Default Title' ? variant.node.title : 'Default'}
                                   </Text>
                                   <Text key={`${variant.node.id}-price`} as="span" variant="bodyXs" fontWeight="medium">
                                     ${variant.node.price}
                                   </Text>
-                                  <Text key={`${variant.node.id}-stock`} as="span" variant="bodyXs">
+                                  <Text 
+                                    key={`${variant.node.id}-stock`} 
+                                    as="span" 
+                                    variant="bodyXs"
+                                    tone={variant.node.inventoryQuantity === 0 ? 'critical' : 'success'}
+                                  >
                                     {variant.node.inventoryQuantity || 0}
                                   </Text>
                                   <Text key={`${variant.node.id}-sku`} as="span" variant="bodyXs" tone="subdued">
                                     {variant.node.sku || '-'}
                                   </Text>
+                                  <Button
+                                    key={`${variant.node.id}-edit`}
+                                    variant="plain"
+                                    size="slim"
+                                    onClick={() => {
+                                      // Copy variant ID to clipboard for easy access
+                                      navigator.clipboard.writeText(variant.node.id);
+                                    }}
+                                  >
+                                    Copy ID
+                                  </Button>
                                 </>
                               ))}
                             </div>
-                            {product.variants.edges.length > 3 && (
-                              <Text as="p" variant="bodyXs" tone="subdued" alignment="center">
-                                ... and {product.variants.edges.length - 3} more variants
-                              </Text>
-                            )}
                           </BlockStack>
                         )}
+
+
                       </BlockStack>
                     </Card>
+                    </div>
                   </Box>
                 )}
               </BlockStack>
@@ -1161,7 +1381,33 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   }
 
   return (
-    <BlockStack gap="600">
+    <>
+      <style>{`
+        @media (max-width: 768px) {
+          .product-management-layout {
+            flex-direction: column !important;
+            height: auto !important;
+            gap: 16px !important;
+          }
+          .bulk-operations-column {
+            width: 100% !important;
+            min-width: auto !important;
+            margin-bottom: 16px;
+          }
+          .product-results-column {
+            height: 60vh !important;
+          }
+        }
+        @media (min-width: 1200px) {
+          .product-management-layout {
+            gap: 32px !important;
+          }
+          .bulk-operations-column {
+            width: 440px !important;
+          }
+        }
+      `}</style>
+      <BlockStack gap="600">
       {/* Error Display */}
       {error && (
         <Card background="bg-surface-critical">
@@ -1191,13 +1437,18 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       )}
 
       {/* Main Layout - Left: Management Controls, Right: Product List */}
-      <div style={{ display: 'flex', gap: '16px', height: 'calc(100vh - 120px)' }}>
+      <div style={{ 
+        display: 'flex', 
+        gap: '24px', 
+        height: 'calc(100vh - 120px)',
+        flexDirection: 'row'
+      }} className="product-management-layout">
         {/* Left Column - Product Management Controls */}
         <div style={{ 
-          width: '400px', 
-          minWidth: '380px', 
-          paddingRight: '8px'
-        }}>
+          width: '420px', 
+          minWidth: '400px', 
+          flexShrink: 0
+        }} className="bulk-operations-column">
           <BlockStack gap="400">
             {/* Compact Header */}
             <Card>
@@ -1226,38 +1477,82 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 </BlockStack>
               </Card>
 
-            {/* Bulk Operations Tabs */}
-            <Card background="bg-surface-secondary" padding="400">
-              <BlockStack gap="400">
+            {/* Bulk Operations with Vertical Navigation */}
+            <Card background="bg-surface-secondary" padding="300">
+              <BlockStack gap="300">
                 <InlineStack align="space-between" blockAlign="center">
-                  <Text as="h4" variant="headingSm">Bulk Operations</Text>
-                  <Badge tone={selectedProducts.length > 0 ? 'success' : 'attention'}>
-                    {selectedProducts.length > 0 ? `${selectedProducts.length} products selected` : 'No products selected'}
+                  <Text as="h4" variant="bodyMd" fontWeight="semibold">Bulk Operations</Text>
+                  <Badge tone={selectedVariants.length > 0 ? 'success' : 'attention'}>
+                    {selectedVariants.length > 0 ? `${selectedVariants.length} variants selected` : 'No variants selected'}
                   </Badge>
                 </InlineStack>
 
-                <div style={{ overflowX: 'auto', paddingBottom: '12px', marginBottom: '8px' }}>
-                  <Tabs
-                    tabs={[
-                      { id: '0', content: 'Pricing', disabled: selectedProducts.length === 0 },
-                      { id: '1', content: 'Collections', disabled: selectedProducts.length === 0 },
-                      { id: '2', content: 'Titles', disabled: selectedProducts.length === 0 },
-                      { id: '3', content: 'Descriptions', disabled: selectedProducts.length === 0 },
-                      { id: '4', content: 'Tags', disabled: selectedProducts.length === 0 },
-                      { id: '5', content: 'Inventory', disabled: selectedProducts.length === 0 },
-                      { id: '6', content: 'Shipping', disabled: selectedProducts.length === 0 },
-                      { id: '7', content: 'Media', disabled: selectedProducts.length === 0 },
-                      { id: '8', content: 'History', disabled: selectedProducts.length === 0 },
-                    ]}
-                    selected={activeBulkTab}
-                    onSelect={setActiveBulkTab}
-                  />
-                </div>
+                {/* Two-column layout with vertical navigation */}
+                <div style={{ display: 'flex', gap: '20px', minHeight: '320px' }}>
+                  {/* Left side - Vertical navigation buttons */}
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '6px', 
+                    width: '120px',
+                    flexShrink: 0
+                  }}>
+                    {[
+                      { id: 0, label: 'Pricing', icon: MoneyIcon },
+                      { id: 1, label: 'Collections', icon: CollectionIcon },
+                      { id: 2, label: 'Titles', icon: EditIcon },
+                      { id: 3, label: 'Descriptions', icon: ViewIcon },
+                      { id: 4, label: 'Tags', icon: ProductIcon },
+                      { id: 5, label: 'Inventory', icon: InventoryIcon },
+                      { id: 6, label: 'Shipping', icon: DeliveryIcon },
+                      { id: 7, label: 'Media', icon: ImageIcon },
+                      { id: 8, label: 'History', icon: ClockIcon },
+                    ].map(({ id, label, icon }) => (
+                      <Button
+                        key={id}
+                        onClick={() => setActiveBulkTab(id)}
+                        disabled={selectedVariants.length === 0}
+                        variant={activeBulkTab === id ? 'primary' : 'secondary'}
+                        size="slim"
+                        fullWidth
+                        icon={icon}
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
 
-                {/* Bulk Operation Content */}
-                {selectedProducts.length > 0 && (
-                  <Card background="bg-surface" padding="400">
-                    <BlockStack gap="400">
+                  {/* Right side - Content area with improved spacing */}
+                  <div style={{ 
+                    flex: 1, 
+                    minHeight: '280px',
+                    padding: '16px',
+                    backgroundColor: 'var(--p-color-bg-surface)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--p-color-border-subdued)'
+                  }}>
+                    {selectedVariants.length === 0 ? (
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        height: '100%',
+                        flexDirection: 'column',
+                        gap: '16px',
+                        color: 'var(--p-color-text-subdued)',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{ opacity: 0.3 }}>
+                          <Icon source={ProductIcon} />
+                        </div>
+                        <div>
+                          <Text as="p" variant="headingSm" tone="subdued">Select variants to begin</Text>
+                          <Text as="p" variant="bodySm" tone="subdued">Choose product variants from the list to enable bulk operations</Text>
+                        </div>
+                      </div>
+                    ) : (
+                      <Card background="bg-surface" padding="400">
+                        <BlockStack gap="400">
                       {activeBulkTab === 0 && (
                         <BlockStack gap="400">
                           <Text as="h5" variant="headingSm">Pricing Operations</Text>
@@ -1601,14 +1896,16 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                           >
                             Coming Soon
                           </Button>
-                                      </BlockStack>
-                                )}
-                    </BlockStack>
-                  </Card>
-                )}
+                        </BlockStack>
+                      )}
+                        </BlockStack>
+                      </Card>
+                    )}
+                  </div>
+                </div>
               </BlockStack>
             </Card>
-            </BlockStack>
+          </BlockStack>
         </div>
 
         {/* Right Column - Product Results */}
@@ -1616,7 +1913,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           flex: 1, 
           height: 'calc(100vh - 120px)', 
           overflowY: 'auto' 
-        }}>
+        }} className="product-results-column">
           <BlockStack gap="400">
             {/* Smart Filters & Controls */}
             <Card background="bg-surface-secondary" padding="400">
@@ -1691,8 +1988,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       <Text as="span" variant="bodySm" tone="subdued">Products Found</Text>
                     </InlineStack>
                     <InlineStack gap="200" blockAlign="center">
-                      <Text as="span" variant="bodySm" fontWeight="medium">{selectedProducts.length}</Text>
-                      <Text as="span" variant="bodySm" tone="subdued">Selected</Text>
+                      <Text as="span" variant="bodySm" fontWeight="medium">{selectedVariants.length}</Text>
+                      <Text as="span" variant="bodySm" tone="subdued">Variants Selected</Text>
                     </InlineStack>
                     <InlineStack gap="200" blockAlign="center">
                       <Text as="span" variant="bodySm" fontWeight="medium">
@@ -1717,8 +2014,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       variant="tertiary"
                       size="slim"
                       onClick={() => {
-                        const activeProducts = filteredProducts.filter(p => p.status === 'ACTIVE').map(p => p.id);
-                        setSelectedProducts(activeProducts);
+                        const activeProducts = filteredProducts.filter(p => p.status === 'ACTIVE');
+                        activeProducts.forEach(product => handleProductSelection(product.id, true));
                       }}
                       disabled={filteredProducts.filter(p => p.status === 'ACTIVE').length === 0}
                     >
@@ -1728,8 +2025,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       variant="tertiary"
                       size="slim"
                       onClick={() => {
-                        const outOfStockProducts = filteredProducts.filter(p => p.totalInventory === 0).map(p => p.id);
-                        setSelectedProducts(outOfStockProducts);
+                        const outOfStockProducts = filteredProducts.filter(p => p.totalInventory === 0);
+                        outOfStockProducts.forEach(product => handleProductSelection(product.id, true));
                       }}
                       disabled={filteredProducts.filter(p => p.totalInventory === 0).length === 0}
                     >
@@ -1738,8 +2035,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                     <Button
                       variant="tertiary"
                       size="slim"
-                      onClick={() => setSelectedProducts([])}
-                      disabled={selectedProducts.length === 0}
+                      onClick={() => {
+                        setSelectedProducts([]);
+                        setSelectedVariants([]);
+                      }}
+                      disabled={selectedProducts.length === 0 && selectedVariants.length === 0}
                     >
                       Clear Selection
                     </Button>
@@ -1820,5 +2120,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         </div>
       </div>
     </BlockStack>
+    </>
   );
 }
