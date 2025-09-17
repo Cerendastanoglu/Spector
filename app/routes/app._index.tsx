@@ -13,6 +13,7 @@ import { AppHeader } from "../components/AppHeader";
 import { Dashboard } from "../components/Dashboard";
 import { Notifications } from "../components/Notifications";
 import { WelcomeModal } from "../components/WelcomeModal";
+import { Help } from "../components/Help";
 import { OptimizedComponents, useComponentPreloader } from "../utils/lazyLoader";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -126,6 +127,8 @@ export default function Index() {
         return <OptimizedComponents.ProductManagement isVisible={true} />;
       case "notifications":
         return <Notifications isVisible={true} />;
+      case "help":
+        return <Help isVisible={true} />;
       case "settings":
         return (
           <BlockStack gap="500">

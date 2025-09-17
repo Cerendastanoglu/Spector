@@ -80,3 +80,52 @@ model NotificationLog {
   @@index([ruleId])
   @@index([sentAt])
 }
+
+// Analytics Data Storage with Retention and Encryption
+model AnalyticsSnapshot {
+  id            String   @id @default(cuid())
+  shop          String   // Which Shopify store
+  dataType      String   // 'revenue', 'products', 'inventory', etc.
+  encryptedData String   // Encrypted JSON data
+  metadata      String?  // Encrypted metadata (optional)
+  createdAt     DateTime @default(now())
+  expiresAt     DateTime // When this data should be deleted
+  
+  @@index([shop, dataType])
+  @@index([expiresAt])
+  @@index([createdAt])
+}
+
+// Product Analytics Cache (without order data)
+model ProductAnalytics {
+  id                String   @id @default(cuid())
+  shop              String
+  productId         String
+  productTitle      String
+  variantId         String?
+  variantTitle      String?
+  price             Float
+  inventoryQuantity Int
+  totalInventory    Int
+  status            String
+  lastUpdated       DateTime @default(now())
+  expiresAt         DateTime // Data retention policy
+  
+  @@index([shop, productId])
+  @@index([expiresAt])
+  @@index([lastUpdated])
+}
+
+// Data Retention Policies
+model DataRetentionPolicy {
+  id          String   @id @default(cuid())
+  shop        String
+  dataType    String   // Type of data (analytics, logs, etc.)
+  retentionDays Int    // How many days to keep data
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([shop, dataType])
+  @@index([shop])
+}
