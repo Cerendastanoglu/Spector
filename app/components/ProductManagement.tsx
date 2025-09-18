@@ -25,6 +25,8 @@ import {
   FormLayout,
   ChoiceList,
   Icon,
+  Collapsible,
+  Link,
   // Banner,
   Tabs,
 } from '@shopify/polaris';
@@ -59,8 +61,20 @@ interface Product {
       };
     };
   };
+  media?: {
+    edges: Array<{
+      node: {
+        id: string;
+        image?: {
+          url: string;
+          altText?: string;
+        };
+      };
+    }>;
+  };
   totalInventory: number;
   status: string;
+  tags?: string[];
   adminUrl?: string;
   storefrontUrl?: string;
   collections?: {
@@ -100,6 +114,104 @@ type ViewMode = 'table' | 'cards';
 type SortField = 'title' | 'inventory' | 'status' | 'updated' | 'created' | 'price' | 'variants';
 type SortDirection = 'asc' | 'desc';
 
+// Product Image Slideshow Component
+const ProductImageSlideshow: React.FC<{ 
+  product: Product; 
+  size?: 'small' | 'medium' | 'large' 
+}> = ({ product, size = 'small' }) => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  
+  // Get all available images
+  const images = React.useMemo(() => {
+    const mediaImages = product.media?.edges
+      ?.map(edge => edge.node.image)
+      .filter(img => img && img.url) || [];
+    
+    const featuredImage = product.featuredMedia?.preview?.image;
+    
+    // Combine images, ensuring featured image is first if it exists and isn't already in media
+    const allImages = [];
+    if (featuredImage) {
+      allImages.push(featuredImage);
+    }
+    
+    // Add media images that aren't the same as featured image
+    mediaImages.forEach(img => {
+      if (img && (!featuredImage || img.url !== featuredImage.url)) {
+        allImages.push(img);
+      }
+    });
+    
+    return allImages;
+  }, [product.featuredMedia, product.media]);
+  
+  // Reset current index when product changes
+  React.useEffect(() => {
+    setCurrentImageIndex(0);
+  }, [product.id]);
+  
+  if (images.length === 0) {
+    return (
+      <Thumbnail
+        source={ProductIcon}
+        alt={product.title}
+        size={size}
+      />
+    );
+  }
+  
+  if (images.length === 1) {
+    return (
+      <Thumbnail
+        source={images[0].url}
+        alt={images[0].altText || product.title}
+        size={size}
+      />
+    );
+  }
+  
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <Thumbnail
+        source={images[currentImageIndex]?.url || ProductIcon}
+        alt={images[currentImageIndex]?.altText || product.title}
+        size={size}
+      />
+      {images.length > 1 && (
+        <div style={{
+          position: 'absolute',
+          bottom: '-8px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          gap: '4px',
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          padding: '2px 6px',
+          borderRadius: '8px',
+          backdropFilter: 'blur(4px)'
+        }}>
+          {images.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentImageIndex(index)}
+              style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                border: 'none',
+                backgroundColor: index === currentImageIndex ? '#fff' : 'rgba(255, 255, 255, 0.4)',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s ease'
+              }}
+              aria-label={`View image ${index + 1} of ${images.length}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export function ProductManagement({ isVisible, initialCategory = 'all' }: ProductManagementProps) {
   // Default export settings since Settings component was removed
   // const exportSettings = {
@@ -136,10 +248,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [applyCompareChanges, setApplyCompareChanges] = useState(false);
   
   // Collection Management State
-  const [collectionOperation, setCollectionOperation] = useState<'add' | 'remove' | 'replace'>('add');
+  const [collectionOperation, setCollectionOperation] = useState<'add' | 'remove'>('add');
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [availableCollections, setAvailableCollections] = useState<{id: string, title: string}[]>([]);
   const [collectionSearchQuery, setCollectionSearchQuery] = useState('');
+  const [showCurrentCollections, setShowCurrentCollections] = useState(false);
   
   // Collection Filter State
   const [filterByCollection, setFilterByCollection] = useState<string>('');
@@ -147,6 +260,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   // Currency State
   const [storeCurrency, setStoreCurrency] = useState<string>('USD');
   const [currencySymbol, setCurrencySymbol] = useState<string>('$');
+  const [shopDomain, setShopDomain] = useState<string>('');
   
   // New Bulk Operations State
   const [titleOperation, setTitleOperation] = useState<'prefix' | 'suffix' | 'replace'>('prefix');
@@ -632,26 +746,38 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     const successful: string[] = [];
     
     try {
-      const updates = [];
+      // Process each selected variant individually
+      const variantUpdates = [];
       
-      // Process each product and calculate new prices
-      for (let i = 0; i < selectedProducts.length; i++) {
-        const productId = selectedProducts[i];
-        const product = products.find(p => p.id === productId);
+      for (let i = 0; i < selectedVariants.length; i++) {
+        const variantId = selectedVariants[i];
         
-        try {
-          if (!product) {
-            failed.push(`Product ID ${productId}: Product not found`);
-            continue;
+        // Find the product and variant
+        let targetProduct = null;
+        let targetVariant = null;
+        
+        for (const product of products) {
+          const variant = product.variants.edges.find(edge => edge.node.id === variantId);
+          if (variant) {
+            targetProduct = product;
+            targetVariant = variant.node;
+            break;
           }
+        }
+        
+        if (!targetProduct || !targetVariant) {
+          failed.push(`Variant ID ${variantId}: Variant not found`);
+          continue;
+        }
 
+        try {
           let newPrice: number;
           let newComparePrice: string | null = null;
-          const currentPrice = parseFloat(product.variants.edges[0]?.node.price || '0');
-          const currentComparePrice = product.variants.edges[0]?.node.compareAtPrice ? parseFloat(product.variants.edges[0].node.compareAtPrice) : null;
+          const currentPrice = parseFloat(targetVariant.price || '0');
+          const currentComparePrice = targetVariant.compareAtPrice ? parseFloat(targetVariant.compareAtPrice) : null;
           
           if (currentPrice === 0 && priceOperation !== 'set') {
-            failed.push(`${product.title}: No current price found. Please set a fixed price first.`);
+            failed.push(`${targetProduct.title} (${targetVariant.title}): No current price found. Please set a fixed price first.`);
             continue;
           }
           
@@ -682,7 +808,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
 
           // Ensure minimum price
           if (newPrice < 0.01) {
-            failed.push(`${product.title}: Calculated price ($${newPrice.toFixed(2)}) is below minimum ($0.01)`);
+            failed.push(`${targetProduct.title} (${targetVariant.title}): Calculated price ($${newPrice.toFixed(2)}) is below minimum ($0.01)`);
             continue;
           }
 
@@ -698,7 +824,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   newComparePrice = (currentComparePrice * (1 + compareIncreasePercent / 100)).toFixed(2);
                 } else {
                   // Skip if no existing compare price
-                  console.log(`${product.title}: No existing compare price to increase`);
+                  console.log(`${targetProduct.title} (${targetVariant.title}): No existing compare price to increase`);
                 }
                 break;
               case 'decrease':
@@ -707,7 +833,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   newComparePrice = (currentComparePrice * (1 - compareDecreasePercent / 100)).toFixed(2);
                 } else {
                   // Skip if no existing compare price
-                  console.log(`${product.title}: No existing compare price to decrease`);
+                  console.log(`${targetProduct.title} (${targetVariant.title}): No existing compare price to decrease`);
                 }
                 break;
               case 'remove':
@@ -716,29 +842,29 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
             }
           }
 
-          updates.push({
-            productId,
-            variantId: product.variants.edges[0]?.node.id,
-            productTitle: product.title,
+          variantUpdates.push({
+            productId: targetProduct.id,
+            variantId: targetVariant.id,
+            productTitle: targetProduct.title,
             price: newPrice.toFixed(2),
             compareAtPrice: newComparePrice
           });
           
-          successful.push(product.title);
+          successful.push(`${targetProduct.title} (${targetVariant.title})`);
           
         } catch (error) {
-          failed.push(`${product?.title || productId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          failed.push(`${targetProduct?.title || targetVariant.id} (${targetVariant.title}): ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
 
-      if (updates.length === 0) {
-        throw new Error('No products could be updated. Please check the errors above.');
+      if (variantUpdates.length === 0) {
+        throw new Error('No variants could be updated. Please check the errors above.');
       }
       
       // Make real API call to update prices
       const formData = new FormData();
       formData.append('action', 'update-product-prices');
-      formData.append('updates', JSON.stringify(updates));
+      formData.append('updates', JSON.stringify(variantUpdates));
       
       const response = await fetch('/app/api/products', {
         method: 'POST',
@@ -755,24 +881,26 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       if (result.success) {
         setProducts(prevProducts => 
           prevProducts.map(product => {
-            const update = result.results.find((r: any) => r.productId === product.id);
-            if (update && update.success) {
-              return {
-                ...product,
-                variants: {
-                  ...product.variants,
-                  edges: product.variants.edges.map(edge => ({
-                    ...edge,
-                    node: {
-                      ...edge.node,
-                      price: update.newPrice || edge.node.price,
-                      compareAtPrice: update.newCompareAtPrice !== undefined ? update.newCompareAtPrice : edge.node.compareAtPrice
-                    }
-                  }))
-                }
-              };
-            }
-            return product;
+            return {
+              ...product,
+              variants: {
+                ...product.variants,
+                edges: product.variants.edges.map(edge => {
+                  const variantUpdate = result.results.find((r: any) => r.variantId === edge.node.id);
+                  if (variantUpdate && variantUpdate.success) {
+                    return {
+                      ...edge,
+                      node: {
+                        ...edge.node,
+                        price: variantUpdate.newPrice || edge.node.price,
+                        compareAtPrice: variantUpdate.newCompareAtPrice !== undefined ? variantUpdate.newCompareAtPrice : edge.node.compareAtPrice
+                      }
+                    };
+                  }
+                  return edge;
+                })
+              }
+            };
           })
         );
       }
@@ -827,6 +955,372 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
   };
 
+  // Separate handler for regular pricing only
+  const handleBulkRegularPricing = async () => {
+    if (selectedVariants.length === 0) {
+      setError("Please select at least one variant to update pricing.");
+      return;
+    }
+    
+    // Validation based on operation type
+    if (priceOperation === 'set' && (!priceValue || parseFloat(priceValue) <= 0)) {
+      setError("Please enter a valid price greater than $0.");
+      return;
+    }
+    
+    if ((priceOperation === 'increase' || priceOperation === 'decrease') && (!pricePercentage || pricePercentage.trim() === '' || isNaN(parseFloat(pricePercentage)))) {
+      setError("Please enter a valid percentage for price adjustment.");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    
+    const failed: string[] = [];
+    const successful: string[] = [];
+    
+    try {
+      // Process each selected variant individually
+      const variantUpdates = [];
+      
+      for (let i = 0; i < selectedVariants.length; i++) {
+        const variantId = selectedVariants[i];
+        
+        // Find the product and variant
+        let targetProduct = null;
+        let targetVariant = null;
+        
+        for (const product of products) {
+          const variant = product.variants.edges.find(edge => edge.node.id === variantId);
+          if (variant) {
+            targetProduct = product;
+            targetVariant = variant.node;
+            break;
+          }
+        }
+
+        if (!targetProduct || !targetVariant) {
+          failed.push(`Variant ${variantId}: Product not found`);
+          continue;
+        }
+
+        try {
+          const currentPrice = parseFloat(targetVariant.price);
+
+          if (currentPrice === 0 && priceOperation !== 'set') {
+            failed.push(`${targetProduct.title} (${targetVariant.title}): No current price found. Please set a fixed price first.`);
+            continue;
+          }
+
+          let newPrice = currentPrice;
+
+          // Calculate new regular price
+          switch (priceOperation) {
+            case 'set':
+              newPrice = parseFloat(priceValue);
+              break;
+            case 'increase':
+              const increasePercent = parseFloat(pricePercentage) || 0;
+              newPrice = currentPrice * (1 + increasePercent / 100);
+              break;
+            case 'decrease':
+              const decreasePercent = parseFloat(pricePercentage) || 0;
+              newPrice = currentPrice * (1 - decreasePercent / 100);
+              break;
+            case 'round':
+              if (roundingRule === 'up') {
+                newPrice = Math.ceil(currentPrice);
+              } else if (roundingRule === 'down') {
+                newPrice = Math.floor(currentPrice);
+              } else {
+                newPrice = Math.round(currentPrice);
+              }
+              break;
+            default:
+              newPrice = currentPrice;
+          }
+
+          // Ensure minimum price
+          if (newPrice < 0.01) {
+            failed.push(`${targetProduct.title} (${targetVariant.title}): Calculated price ($${newPrice.toFixed(2)}) is below minimum ($0.01)`);
+            continue;
+          }
+
+          variantUpdates.push({
+            productId: targetProduct.id,
+            variantId: targetVariant.id,
+            productTitle: targetProduct.title,
+            price: newPrice.toFixed(2),
+            compareAtPrice: targetVariant.compareAtPrice // Keep existing compare price
+          });
+          
+          successful.push(`${targetProduct.title} (${targetVariant.title})`);
+          
+        } catch (error) {
+          console.error(`Error updating variant ${targetVariant.id}:`, error);
+          failed.push(`${targetProduct?.title || targetVariant.id} (${targetVariant.title}): ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      if (variantUpdates.length === 0) {
+        throw new Error('No variants could be updated. Please check the errors above.');
+      }
+      
+      // Make API call to update prices
+      const formData = new FormData();
+      formData.append('action', 'update-product-prices');
+      formData.append('updates', JSON.stringify(variantUpdates));
+      
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update prices');
+      }
+      
+      // Update UI immediately with new prices
+      if (result.success) {
+        setProducts(prevProducts => 
+          prevProducts.map(product => {
+            return {
+              ...product,
+              variants: {
+                ...product.variants,
+                edges: product.variants.edges.map(edge => {
+                  const variantUpdate = result.results.find((r: any) => r.variantId === edge.node.id);
+                  if (variantUpdate && variantUpdate.success) {
+                    return {
+                      ...edge,
+                      node: {
+                        ...edge.node,
+                        price: variantUpdate.newPrice || edge.node.price
+                      }
+                    };
+                  }
+                  return edge;
+                })
+              }
+            };
+          })
+        );
+      }
+      
+      // Handle results
+      const apiFailed = result.results.filter((r: any) => !r.success);
+      const apiSuccessful = result.results.filter((r: any) => r.success);
+      
+      if (apiFailed.length > 0) {
+        apiFailed.forEach((failure: any) => {
+          failed.push(`${failure.productId}: ${failure.error}`);
+        });
+      }
+      
+      if (apiSuccessful.length > 0) {
+        console.log(`✅ Successfully updated regular pricing for ${apiSuccessful.length} variants!`);
+      }
+      
+      if (failed.length > 0) {
+        console.log(`⚠️ ${apiSuccessful.length} variants updated successfully. ${failed.length} failed.`);
+        console.log("Failed operations:", failed);
+      }
+      
+      // Reset form only if completely successful
+      if (failed.length === 0) {
+        setPriceValue('');
+        setPricePercentage('0');
+      }
+      
+    } catch (error) {
+      console.error('Bulk regular pricing error:', error);
+      setError(`Failed to update regular prices: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Separate handler for compare pricing only
+  const handleBulkComparePricing = async () => {
+    if (selectedVariants.length === 0) {
+      setError("Please select at least one variant to update compare pricing.");
+      return;
+    }
+    
+    // Validation based on operation type
+    if (compareOperation === 'set' && (!compareValue || parseFloat(compareValue) <= 0)) {
+      setError("Please enter a valid compare price greater than $0.");
+      return;
+    }
+    
+    if ((compareOperation === 'increase' || compareOperation === 'decrease') && (!comparePercentage || comparePercentage.trim() === '' || isNaN(parseFloat(comparePercentage)))) {
+      setError("Please enter a valid percentage for compare price adjustment.");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    
+    const failed: string[] = [];
+    const successful: string[] = [];
+    
+    try {
+      // Process each selected variant individually
+      const variantUpdates = [];
+      
+      for (let i = 0; i < selectedVariants.length; i++) {
+        const variantId = selectedVariants[i];
+        
+        // Find the product and variant
+        let targetProduct = null;
+        let targetVariant = null;
+        
+        for (const product of products) {
+          const variant = product.variants.edges.find(edge => edge.node.id === variantId);
+          if (variant) {
+            targetProduct = product;
+            targetVariant = variant.node;
+            break;
+          }
+        }
+
+        if (!targetProduct || !targetVariant) {
+          failed.push(`Variant ${variantId}: Product not found`);
+          continue;
+        }
+
+        try {
+          const currentComparePrice = targetVariant.compareAtPrice ? parseFloat(targetVariant.compareAtPrice) : null;
+          let newComparePrice = currentComparePrice;
+
+          // Calculate new compare price
+          switch (compareOperation) {
+            case 'set':
+              newComparePrice = parseFloat(compareValue);
+              break;
+            case 'increase':
+              if (currentComparePrice !== null) {
+                const compareIncreasePercent = parseFloat(comparePercentage) || 0;
+                newComparePrice = (currentComparePrice * (1 + compareIncreasePercent / 100));
+              } else {
+                console.log(`${targetProduct.title} (${targetVariant.title}): No existing compare price to increase`);
+                continue; // Skip this variant
+              }
+              break;
+            case 'decrease':
+              if (currentComparePrice !== null) {
+                const compareDecreasePercent = parseFloat(comparePercentage) || 0;
+                newComparePrice = (currentComparePrice * (1 - compareDecreasePercent / 100));
+              } else {
+                console.log(`${targetProduct.title} (${targetVariant.title}): No existing compare price to decrease`);
+                continue; // Skip this variant
+              }
+              break;
+            case 'remove':
+              newComparePrice = null;
+              break;
+          }
+
+          variantUpdates.push({
+            productId: targetProduct.id,
+            variantId: targetVariant.id,
+            productTitle: targetProduct.title,
+            price: targetVariant.price, // Keep existing regular price
+            compareAtPrice: newComparePrice
+          });
+          
+          successful.push(`${targetProduct.title} (${targetVariant.title})`);
+          
+        } catch (error) {
+          console.error(`Error updating variant ${targetVariant.id}:`, error);
+          failed.push(`${targetProduct?.title || targetVariant.id} (${targetVariant.title}): ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      if (variantUpdates.length === 0) {
+        throw new Error('No variants could be updated. Please check the errors above.');
+      }
+      
+      // Make API call to update prices
+      const formData = new FormData();
+      formData.append('action', 'update-product-prices');
+      formData.append('updates', JSON.stringify(variantUpdates));
+      
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update compare prices');
+      }
+      
+      // Update UI immediately with new compare prices
+      if (result.success) {
+        setProducts(prevProducts => 
+          prevProducts.map(product => {
+            return {
+              ...product,
+              variants: {
+                ...product.variants,
+                edges: product.variants.edges.map(edge => {
+                  const variantUpdate = result.results.find((r: any) => r.variantId === edge.node.id);
+                  if (variantUpdate && variantUpdate.success) {
+                    return {
+                      ...edge,
+                      node: {
+                        ...edge.node,
+                        compareAtPrice: variantUpdate.newCompareAtPrice !== undefined ? variantUpdate.newCompareAtPrice : edge.node.compareAtPrice
+                      }
+                    };
+                  }
+                  return edge;
+                })
+              }
+            };
+          })
+        );
+      }
+      
+      // Handle results
+      const apiFailed = result.results.filter((r: any) => !r.success);
+      const apiSuccessful = result.results.filter((r: any) => r.success);
+      
+      if (apiFailed.length > 0) {
+        apiFailed.forEach((failure: any) => {
+          failed.push(`${failure.productId}: ${failure.error}`);
+        });
+      }
+      
+      if (apiSuccessful.length > 0) {
+        console.log(`✅ Successfully updated compare pricing for ${apiSuccessful.length} variants!`);
+      }
+      
+      if (failed.length > 0) {
+        console.log(`⚠️ ${apiSuccessful.length} variants updated successfully. ${failed.length} failed.`);
+        console.log("Failed operations:", failed);
+      }
+      
+      // Reset form only if completely successful
+      if (failed.length === 0) {
+        setCompareAtPrice('');
+        setCompareValue('');
+        setComparePercentage('0');
+        setApplyCompareChanges(false);
+      }
+      
+    } catch (error) {
+      console.error('Bulk compare pricing error:', error);
+      setError(`Failed to update compare prices: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Enhanced Collection Management with Error Handling
   const handleBulkCollections = async () => {
     if (selectedProducts.length === 0) {
@@ -842,60 +1336,182 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     setIsLoading(true);
     setError(null);
     
+    const failed: string[] = [];
+    const successful: string[] = [];
+    
     try {
-      // Update products with selected collections
-      setProducts(prevProducts => 
-        prevProducts.map(product => {
-          if (selectedProducts.includes(product.id)) {
-            const selectedCollectionObjects = availableCollections.filter(col => 
-              selectedCollections.includes(col.id)
-            );
-            
-            // Get current collections as array of nodes
-            const currentCollectionNodes = product.collections?.edges?.map(edge => edge.node) || [];
-            
-            let updatedCollectionNodes = [...currentCollectionNodes];
-            
-            if (collectionOperation === 'add') {
-              // Add selected collections (avoid duplicates)
-              const existingCollectionIds = updatedCollectionNodes.map(col => col.id);
-              const newCollections = selectedCollectionObjects
-                .filter(col => !existingCollectionIds.includes(col.id))
-                .map(col => ({ id: col.id, handle: col.title.toLowerCase().replace(/\s+/g, '-'), title: col.title }));
-              
-              updatedCollectionNodes = [...updatedCollectionNodes, ...newCollections];
-            } else if (collectionOperation === 'remove') {
-              // Remove selected collections
-              updatedCollectionNodes = updatedCollectionNodes.filter(col => 
-                !selectedCollections.includes(col.id)
-              );
-            }
-            
-            return {
-              ...product,
-              collections: {
-                edges: updatedCollectionNodes.map(node => ({ node }))
-              }
-            };
-          }
-          return product;
-        })
-      );
+      // Prepare updates for API call
+      const updates = selectedProducts.map(productId => ({
+        productId,
+        collectionIds: selectedCollections,
+        operation: collectionOperation
+      }));
       
-      // Success message
+      // Make API call to update collections
+      const formData = new FormData();
+      formData.append('action', 'update-collections');
+      formData.append('updates', JSON.stringify(updates));
+      
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update collections');
+      }
+      
+      // Handle results
+      const apiFailed = result.results.filter((r: any) => !r.success);
+      const apiSuccessful = result.results.filter((r: any) => r.success);
+      
+      if (apiFailed.length > 0) {
+        apiFailed.forEach((failure: any) => {
+          failed.push(`${failure.productId}: ${failure.error}`);
+        });
+      }
+      
+      if (apiSuccessful.length > 0) {
+        apiSuccessful.forEach((success: any) => {
+          const product = products.find(p => p.id === success.productId);
+          successful.push(product?.title || success.productId);
+        });
+      }
+      
+      // Update local state to reflect changes
+      if (result.success) {
+        // Fetch updated product data to refresh collections
+        await fetchAllProducts();
+      }
+      
       const actionText = collectionOperation === 'add' ? 'added to' : 'removed from';
       const collectionNames = selectedCollections.map(id => 
         availableCollections.find(col => col.id === id)?.title
       ).filter(Boolean).join(', ');
       
-      console.log(`Successfully ${actionText} collections (${collectionNames}) for ${selectedProducts.length} products!`);
+      if (successful.length > 0) {
+        console.log(`✅ Successfully ${actionText} collections (${collectionNames}) for ${successful.length} products!`);
+      }
       
-      // Reset collection selections but keep product selections
-      setSelectedCollections([]);
+      if (failed.length > 0) {
+        console.log(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
+        console.log("Failed operations:", failed);
+      }
+      
+      // Reset collection selections only if completely successful
+      if (failed.length === 0) {
+        setSelectedCollections([]);
+      }
       
     } catch (error) {
       console.error('Failed to update collections:', error);
       setError(`Failed to update collections: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBulkTags = async () => {
+    if (selectedProducts.length === 0) {
+      setError("Please select at least one product to update tags.");
+      return;
+    }
+    
+    if (tagOperation === 'add' && !tagValue) {
+      setError("Please provide tags to add.");
+      return;
+    }
+    
+    if (tagOperation === 'remove' && !tagRemoveValue) {
+      setError("Please provide tags to remove.");
+      return;
+    }
+    
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      const productIds = selectedProducts; // selectedProducts is already an array of IDs
+      
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'update-tags',
+          productIds,
+          tagOperation,
+          tagValue: tagOperation === 'add' ? tagValue : undefined,
+          tagRemoveValue: tagOperation === 'remove' ? tagRemoveValue : undefined,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update tags');
+      }
+
+      // Update local state with the new tags
+      setProducts(prevProducts => 
+        prevProducts.map(product => {
+          const updatedProduct = result.updatedProducts?.find((p: any) => p.id === product.id);
+          if (updatedProduct) {
+            return { ...product, tags: updatedProduct.tags };
+          }
+          return product;
+        })
+      );
+      
+      // Process results like the collections handler
+      const successful: string[] = [];
+      const failed: string[] = [];
+      
+      if (result.failedProducts && result.failedProducts.length > 0) {
+        result.failedProducts.forEach((failure: any) => {
+          failed.push(`${failure.productId}: ${failure.error}`);
+        });
+      }
+      
+      if (result.updatedProducts && result.updatedProducts.length > 0) {
+        result.updatedProducts.forEach((success: any) => {
+          const product = products.find(p => p.id === success.id);
+          successful.push(product?.title || success.id);
+        });
+      }
+      
+      // Update local state to reflect changes
+      if (result.success) {
+        // Fetch updated product data to refresh tags
+        await fetchAllProducts();
+      }
+      
+      const actionText = tagOperation === 'add' ? 'added tags to' : 
+                        tagOperation === 'remove' ? 'removed tags from' : 'updated tags for';
+      const tagNames = tagOperation === 'add' ? tagValue : tagRemoveValue;
+      
+      if (successful.length > 0) {
+        console.log(`✅ Successfully ${actionText} ${successful.length} products! Tags: ${tagNames}`);
+      }
+      
+      if (failed.length > 0) {
+        console.log(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
+        console.log("Failed operations:", failed);
+      }
+      
+      // Clear form only if completely successful
+      if (failed.length === 0) {
+        setTagValue('');
+        setTagRemoveValue('');
+      }
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update tags';
+      console.error('Failed to update tags:', error);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -918,52 +1534,192 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
     
     setIsLoading(true);
-    setError(null);
+    setError("");
     
     try {
-      // Update product titles
+      const productIds = selectedProducts; // selectedProducts is already an array of IDs
+      
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'update-titles',
+          productIds,
+          titleOperation,
+          titleValue: titleOperation !== 'replace' ? titleValue : undefined,
+          titleReplaceFrom: titleOperation === 'replace' ? titleReplaceFrom : undefined,
+          titleReplaceTo: titleOperation === 'replace' ? titleReplaceTo : undefined,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update titles');
+      }
+
+      // Update local state with the new titles
       setProducts(prevProducts => 
         prevProducts.map(product => {
-          if (selectedProducts.includes(product.id)) {
-            let newTitle = product.title;
-            
-            if (titleOperation === 'prefix') {
-              newTitle = `${titleValue} ${product.title}`;
-            } else if (titleOperation === 'suffix') {
-              newTitle = `${product.title} ${titleValue}`;
-            } else if (titleOperation === 'replace') {
-              newTitle = product.title.replace(new RegExp(titleReplaceFrom, 'g'), titleReplaceTo);
-            }
-            
-            return {
-              ...product,
-              title: newTitle
-            };
+          const updatedProduct = result.updatedProducts?.find((p: any) => p.id === product.id);
+          if (updatedProduct) {
+            return { ...product, title: updatedProduct.title };
           }
           return product;
         })
       );
       
-      // Success message
-      let operationText = '';
-      if (titleOperation === 'prefix') {
-        operationText = `Added prefix "${titleValue}" to`;
-      } else if (titleOperation === 'suffix') {
-        operationText = `Added suffix "${titleValue}" to`;
-      } else {
-        operationText = `Replaced "${titleReplaceFrom}" with "${titleReplaceTo}" in`;
+      // Process results like other handlers
+      const successful: string[] = [];
+      const failed: string[] = [];
+      
+      if (result.results) {
+        result.results.forEach((resultItem: any) => {
+          if (resultItem.success) {
+            const product = products.find(p => p.id === resultItem.productId);
+            successful.push(product?.title || resultItem.productId);
+          } else {
+            failed.push(`${resultItem.productId}: ${resultItem.error}`);
+          }
+        });
+      }
+
+      // Update local state to reflect changes
+      if (result.success) {
+        // Fetch updated product data to refresh titles
+        await fetchAllProducts();
       }
       
-      console.log(`Successfully ${operationText} ${selectedProducts.length} product titles!`);
+      let operationText = '';
+      if (titleOperation === 'prefix') {
+        operationText = `added prefix "${titleValue}" to`;
+      } else if (titleOperation === 'suffix') {
+        operationText = `added suffix "${titleValue}" to`;
+      } else {
+        operationText = `replaced "${titleReplaceFrom}" with "${titleReplaceTo}" in`;
+      }
       
-      // Reset title form but keep product selections
-      setTitleValue('');
-      setTitleReplaceFrom('');
-      setTitleReplaceTo('');
+      if (successful.length > 0) {
+        console.log(`✅ Successfully ${operationText} ${successful.length} product titles!`);
+      }
+      
+      if (failed.length > 0) {
+        console.log(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
+        console.log("Failed operations:", failed);
+      }
+      
+      // Clear form only if completely successful
+      if (failed.length === 0) {
+        setTitleValue('');
+        setTitleReplaceFrom('');
+        setTitleReplaceTo('');
+      }
       
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update titles';
       console.error('Failed to update titles:', error);
-      setError(`Failed to update titles: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBulkDescriptionUpdate = async () => {
+    if (selectedProducts.length === 0) {
+      setError("Please select at least one product to update descriptions.");
+      return;
+    }
+    
+    // Validation based on operation type
+    if ((descriptionOperation === 'append' || descriptionOperation === 'prepend') && !descriptionValue) {
+      setError("Please enter description text to add.");
+      return;
+    }
+    
+    if (descriptionOperation === 'replace' && (!descriptionReplaceFrom || !descriptionReplaceTo)) {
+      setError("Please provide both find and replace text for description replacement.");
+      return;
+    }
+    
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'update-descriptions',
+          productIds: selectedProducts,
+          descriptionOperation,
+          descriptionValue,
+          descriptionReplaceFrom,
+          descriptionReplaceTo,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error Response:', errorText);
+        throw new Error(`Failed to update descriptions: ${errorText}`);
+      }
+      
+      const result = await response.json();
+
+      // Process results like other handlers
+      const successful: string[] = [];
+      const failed: string[] = [];
+      
+      if (result.results) {
+        result.results.forEach((resultItem: any) => {
+          if (resultItem.success) {
+            const product = products.find(p => p.id === resultItem.productId);
+            successful.push(product?.title || resultItem.productId);
+          } else {
+            failed.push(`${resultItem.productId}: ${resultItem.error}`);
+          }
+        });
+      }
+
+      // Update local state to reflect changes
+      if (result.success) {
+        // Fetch updated product data to refresh descriptions
+        await fetchAllProducts();
+      }
+      
+      let operationText = '';
+      if (descriptionOperation === 'append') {
+        operationText = `appended text to descriptions of`;
+      } else if (descriptionOperation === 'prepend') {
+        operationText = `prepended text to descriptions of`;
+      } else {
+        operationText = `replaced "${descriptionReplaceFrom}" with "${descriptionReplaceTo}" in descriptions of`;
+      }
+      
+      if (successful.length > 0) {
+        console.log(`✅ Successfully ${operationText} ${successful.length} products!`);
+      }
+      
+      if (failed.length > 0) {
+        console.log(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
+        console.log("Failed operations:", failed);
+      }
+      
+      // Clear form only if completely successful
+      if (failed.length === 0) {
+        setDescriptionValue('');
+        setDescriptionReplaceFrom('');
+        setDescriptionReplaceTo('');
+      }
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update descriptions';
+      console.error('Failed to update descriptions:', error);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -976,58 +1732,66 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
     
     setIsLoading(true);
-    setError(null);
+    setError("");
     
     try {
       if (inventoryOperation === 'stock') {
-        const quantity = parseInt(stockQuantity) || 0;
+        const response = await fetch('/app/api/products', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'update-inventory',
+            variantIds: selectedVariants,
+            inventoryOperation,
+            stockQuantity,
+            stockUpdateMethod,
+          }),
+        });
+
+        const result = await response.json();
         
-        // Update product variants with new stock quantities
-        setProducts(prevProducts => 
-          prevProducts.map(product => {
-            if (selectedProducts.includes(product.id)) {
-              return {
-                ...product,
-                variants: {
-                  ...product.variants,
-                  edges: product.variants.edges.map(edge => {
-                    let newQuantity = edge.node.inventoryQuantity;
-                    
-                    if (stockUpdateMethod === 'set') {
-                      newQuantity = quantity;
-                    } else if (stockUpdateMethod === 'add') {
-                      newQuantity = edge.node.inventoryQuantity + quantity;
-                    } else if (stockUpdateMethod === 'subtract') {
-                      newQuantity = Math.max(0, edge.node.inventoryQuantity - quantity);
-                    }
-                    
-                    return {
-                      ...edge,
-                      node: {
-                        ...edge.node,
-                        inventoryQuantity: newQuantity
-                      }
-                    };
-                  })
-                },
-                totalInventory: product.variants.edges.reduce((total, edge) => {
-                  let newQuantity = edge.node.inventoryQuantity;
-                  if (stockUpdateMethod === 'set') {
-                    newQuantity = quantity;
-                  } else if (stockUpdateMethod === 'add') {
-                    newQuantity = edge.node.inventoryQuantity + quantity;
-                  } else if (stockUpdateMethod === 'subtract') {
-                    newQuantity = Math.max(0, edge.node.inventoryQuantity - quantity);
-                  }
-                  return total + newQuantity;
-                }, 0)
-              };
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to update inventory');
+        }
+
+        // Process results like other handlers
+        const successful: string[] = [];
+        const failed: string[] = [];
+        
+        if (result.results) {
+          result.results.forEach((resultItem: any) => {
+            if (resultItem.success) {
+              successful.push(resultItem.variantId);
+            } else {
+              failed.push(`${resultItem.variantId}: ${resultItem.error}`);
             }
-            return product;
-          })
-        );
+          });
+        }
+
+        // Update local state to reflect changes
+        if (result.success) {
+          // Fetch updated product data to refresh inventory
+          await fetchAllProducts();
+        }
         
-        console.log(`Successfully ${stockUpdateMethod === 'set' ? 'set' : stockUpdateMethod === 'add' ? 'added' : 'subtracted'} ${quantity} stock for ${selectedProducts.length} products!`);
+        const actionText = stockUpdateMethod === 'set' ? 'set stock to' : 
+                          stockUpdateMethod === 'add' ? 'added' : 'subtracted';
+        
+        if (successful.length > 0) {
+          console.log(`✅ Successfully ${actionText} ${stockQuantity} for ${successful.length} variants!`);
+        }
+        
+        if (failed.length > 0) {
+          console.log(`⚠️ ${successful.length} variants updated successfully. ${failed.length} failed.`);
+          console.log("Failed operations:", failed);
+        }
+        
+        // Clear form only if completely successful
+        if (failed.length === 0) {
+          setStockQuantity('');
+        }
         
       } else if (inventoryOperation === 'sku') {
         // Update SKUs based on the selected method
@@ -1267,27 +2031,60 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
   };
 
-  // Load store currency
+  // Load store currency from Shopify API
   const loadStoreCurrency = async () => {
     try {
-      // In a real implementation, you would fetch this from Shopify API
-      // For now, we'll simulate it with mock data
-      const mockCurrency = 'USD'; // This would come from shop.currencyCode in Shopify
-      const currencySymbols: { [key: string]: string } = {
-        'USD': '$',
-        'EUR': '€',
-        'GBP': '£',
-        'CAD': 'C$',
-        'AUD': 'A$',
-        'JPY': '¥',
-        'CHF': 'CHF ',
-        'SEK': 'kr',
-        'NOK': 'kr',
-        'DKK': 'kr',
-      };
+      const formData = new FormData();
+      formData.append('action', 'get-shop-info');
       
-      setStoreCurrency(mockCurrency);
-      setCurrencySymbol(currencySymbols[mockCurrency] || '$');
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.shop) {
+        const currencyCode = result.shop.currencyCode || 'USD';
+        
+        const currencySymbols: { [key: string]: string } = {
+          'USD': '$',
+          'EUR': '€',
+          'GBP': '£',
+          'CAD': 'C$',
+          'AUD': 'A$',
+          'JPY': '¥',
+          'CHF': 'CHF ',
+          'SEK': 'kr',
+          'NOK': 'kr',
+          'DKK': 'kr',
+          'TRY': '₺',  // Turkish Lira
+          'TL': '₺',   // Alternative for Turkish Lira
+          'INR': '₹',
+          'CNY': '¥',
+          'BRL': 'R$',
+          'MXN': '$',
+          'RUB': '₽',
+          'KRW': '₩',
+          'PLN': 'zł',
+          'CZK': 'Kč',
+          'HUF': 'Ft',
+          'ZAR': 'R',
+        };
+        
+        setStoreCurrency(currencyCode);
+        setCurrencySymbol(currencySymbols[currencyCode] || currencyCode + ' ');
+        
+        // Extract shop domain from myshopifyDomain (e.g., "my-shop.myshopify.com" -> "my-shop")
+        const domain = result.shop.myshopifyDomain || '';
+        const shopName = domain.split('.')[0];
+        setShopDomain(shopName);
+        
+        console.log(`💰 Store currency loaded: ${currencyCode} (${currencySymbols[currencyCode] || currencyCode})`);
+        console.log(`🏪 Shop domain: ${shopName}`);
+      } else {
+        throw new Error(result.error || 'Failed to fetch shop info');
+      }
     } catch (error) {
       console.error('Failed to load store currency:', error);
       // Fallback to USD
@@ -1520,11 +2317,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           padding: '4px 0'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-            <Thumbnail
-              source={product.featuredMedia?.preview?.image?.url || ProductIcon}
-              alt={product.featuredMedia?.preview?.image?.altText || product.title}
-              size="small"
-            />
+            <ProductImageSlideshow product={product} size="small" />
           </div>
           <div style={{ 
             display: 'flex', 
@@ -1570,9 +2363,15 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   e.currentTarget.style.transform = 'translateX(0)';
                 }}
               >
-                <Text as="span" variant="bodyMd" fontWeight="semibold">
-                  {product.title}
-                </Text>
+                <Link
+                  url={shopDomain ? `https://admin.shopify.com/store/${shopDomain}/products/${product.id.split('/').pop()}` : '#'}
+                  external
+                  removeUnderline
+                >
+                  <Text as="span" variant="bodyMd" fontWeight="semibold">
+                    {product.title}
+                  </Text>
+                </Link>
               </div>
             </div>
             <div style={{ 
@@ -1933,6 +2732,44 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                                 </InlineStack>
                               </BlockStack>
                             </BlockStack>
+
+                            {/* Tags Section */}
+                            {product.tags && product.tags.length > 0 && (
+                              <BlockStack gap="200">
+                                <Text as="p" variant="bodySm" fontWeight="medium">Tags</Text>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                  {product.tags.slice(0, 6).map((tag, index) => (
+                                    <div
+                                      key={index}
+                                      style={{
+                                        backgroundColor: '#f3f4f6',
+                                        padding: '2px 8px',
+                                        borderRadius: '12px',
+                                        fontSize: '12px',
+                                        color: '#374151',
+                                        border: '1px solid #e5e7eb'
+                                      }}
+                                    >
+                                      {tag}
+                                    </div>
+                                  ))}
+                                  {product.tags.length > 6 && (
+                                    <div
+                                      style={{
+                                        backgroundColor: '#f3f4f6',
+                                        padding: '2px 8px',
+                                        borderRadius: '12px',
+                                        fontSize: '12px',
+                                        color: '#6b7280',
+                                        border: '1px solid #e5e7eb'
+                                      }}
+                                    >
+                                      +{product.tags.length - 6} more
+                                    </div>
+                                  )}
+                                </div>
+                              </BlockStack>
+                            )}
                           </div>
                         )}
 
@@ -2196,10 +3033,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 { id: 1, label: 'Collections', icon: CollectionIcon },
                 { id: 2, label: 'Content', icon: EditIcon },
                 { id: 3, label: 'Inventory', icon: InventoryIcon },
-                { id: 4, label: 'Discounts', icon: MoneyIcon },
-                { id: 5, label: 'Media', icon: ImageIcon },
+                { id: 4, label: 'Status', icon: StatusIcon },
+                { id: 5, label: 'Discounts', icon: MoneyIcon },
                 { id: 6, label: 'SEO', icon: SearchIcon },
-                { id: 7, label: 'Status', icon: StatusIcon },
               ].map(({ id, label, icon }) => (
                 <Button
                   key={id}
@@ -2273,56 +3109,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                     <Card background="bg-surface" padding="400">
                       <BlockStack gap="400">
 
-                      {activeBulkTab === 4 && (
-                        <BlockStack gap="400">
-                          <Text as="h5" variant="headingSm">Discount Operations</Text>
-                          <ChoiceList
-                            title="Discount Update Method"
-                            choices={[
-                              { label: 'Set Fixed Discount - Apply same discount to all products', value: 'set' },
-                              { label: 'Increase by Percentage - Add percentage to current discounts', value: 'increase' },
-                              { label: 'Decrease by Percentage - Subtract percentage from current discounts', value: 'decrease' },
-                            ]}
-                            selected={[discountOperation]}
-                            onChange={(value) => setDiscountOperation(value[0] as any)}
-                          />
-                          {discountOperation === 'set' && (
-                            <TextField
-                              label="New Discount (%)"
-                              type="number"
-                              value={discountValue}
-                              onChange={setDiscountValue}
-                              placeholder="0" autoComplete="off"
-                              suffix="%"
-                              helpText="Set the same discount for all selected products"
-                            />
-                          )}
-                          {(discountOperation === 'increase' || discountOperation === 'decrease') && (
-                            <TextField
-                              label={`${discountOperation === 'increase' ? 'Increase' : 'Decrease'} Discount Percentage`}
-                              type="number"
-                              value={discountPercentage}
-                              onChange={setDiscountPercentage}
-                              placeholder="0" autoComplete="off"
-                              suffix="%"
-                              helpText={`${discountOperation === 'increase' ? 'Increase' : 'Decrease'} current discounts by this percentage`}
-                            />
-                          )}
-                          
-                          <Button
-                            variant="primary"
-                            onClick={handleBulkDiscount}
-                            disabled={
-                              selectedVariants.length === 0 ||
-                              (discountOperation === 'set' && (!discountValue || parseFloat(discountValue) < 0 || parseFloat(discountValue) > 100)) ||
-                              ((discountOperation === 'increase' || discountOperation === 'decrease') && (!discountPercentage || parseFloat(discountPercentage) <= 0))
-                            }
-                            loading={isLoading}
-                          >
-                            Apply Discount Changes
-                          </Button>
-                        </BlockStack>
-                      )}
+
                       {activeBulkTab === 0 && (
                         <BlockStack gap="400">
                           <Text as="h5" variant="headingSm">Pricing Operations</Text>
@@ -2435,19 +3222,34 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                             )}
                           </div>
                           
+                          {/* Separate buttons for regular and compare pricing */}
+                          <InlineStack gap="400">
+                            <Button
+                              variant="primary"
+                              onClick={handleBulkRegularPricing}
+                              disabled={
+                                selectedVariants.length === 0 ||
+                                (priceOperation === 'set' && !priceValue) ||
+                                ((priceOperation === 'increase' || priceOperation === 'decrease') && (!pricePercentage || pricePercentage === '0'))
+                              }
+                            >
+                              Apply Regular Pricing
+                            </Button>
+                            
+                            {applyCompareChanges && (
                               <Button
-                                variant="primary"
-                                onClick={handleBulkPricing}
+                                variant="secondary"
+                                onClick={handleBulkComparePricing}
                                 disabled={
                                   selectedVariants.length === 0 ||
-                                  (priceOperation === 'set' && !priceValue) ||
-                                  ((priceOperation === 'increase' || priceOperation === 'decrease') && (!pricePercentage || pricePercentage === '0')) ||
-                                  (applyCompareChanges && compareOperation === 'set' && !compareValue) ||
-                                  (applyCompareChanges && (compareOperation === 'increase' || compareOperation === 'decrease') && (!comparePercentage || comparePercentage === '0'))
+                                  (compareOperation === 'set' && !compareValue) ||
+                                  ((compareOperation === 'increase' || compareOperation === 'decrease') && (!comparePercentage || comparePercentage === '0'))
                                 }
                               >
-                            Apply Pricing Changes
+                                Apply Compare Pricing
                               </Button>
+                            )}
+                          </InlineStack>
                         </BlockStack>
                       )}
 
@@ -2461,11 +3263,95 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                               choices={[
                                 { label: 'Add to Collections', value: 'add' },
                                 { label: 'Remove from Collections', value: 'remove' },
-                                { label: 'Replace Collections', value: 'replace' },
                               ]}
                               selected={[collectionOperation]}
                               onChange={(value) => setCollectionOperation(value[0] as any)}
                             />
+                            
+                            {/* Current Collections Display */}
+                            {selectedProducts.length > 0 && (
+                              <Collapsible
+                                id="current-collections"
+                                open={showCurrentCollections}
+                                transition={{duration: '200ms', timingFunction: 'ease-in-out'}}
+                              >
+                                <div style={{
+                                  border: '1px solid var(--p-color-border-subdued)',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  backgroundColor: 'var(--p-color-bg-surface-secondary)'
+                                }}>
+                                  <Text as="h6" variant="headingXs" fontWeight="medium">
+                                    Current Collections for Selected Products
+                                  </Text>
+                                  <div style={{ marginTop: '8px' }}>
+                                    {(() => {
+                                      // Get all collections from selected products
+                                      const currentCollections = new Map();
+                                      const selectedProductsData = products.filter(p => selectedProducts.includes(p.id));
+                                      
+                                      selectedProductsData.forEach(product => {
+                                        const productCollections = product.collections?.edges?.map(edge => edge.node) || [];
+                                        productCollections.forEach(collection => {
+                                          if (!currentCollections.has(collection.id)) {
+                                            currentCollections.set(collection.id, {
+                                              ...collection,
+                                              productCount: 0,
+                                              products: []
+                                            });
+                                          }
+                                          currentCollections.get(collection.id).productCount++;
+                                          currentCollections.get(collection.id).products.push(product.title);
+                                        });
+                                      });
+
+                                      const collectionsArray = Array.from(currentCollections.values());
+                                      
+                                      if (collectionsArray.length === 0) {
+                                        return (
+                                          <Text as="p" variant="bodySm" tone="subdued">
+                                            Selected products are not in any collections
+                                          </Text>
+                                        );
+                                      }
+
+                                      return collectionsArray.map(collection => (
+                                        <div key={collection.id} style={{ 
+                                          marginBottom: '8px',
+                                          padding: '8px',
+                                          backgroundColor: 'var(--p-color-bg-surface)',
+                                          borderRadius: '4px',
+                                          border: '1px solid var(--p-color-border)'
+                                        }}>
+                                          <InlineStack align="space-between" blockAlign="center">
+                                            <BlockStack gap="100">
+                                              <Text as="p" variant="bodySm" fontWeight="medium">
+                                                {collection.title}
+                                              </Text>
+                                              <Text as="p" variant="bodySm" tone="subdued">
+                                                {collection.productCount} of {selectedProducts.length} selected products
+                                              </Text>
+                                            </BlockStack>
+                                            <Badge tone={collection.productCount === selectedProducts.length ? 'success' : 'attention'}>
+                                              {collection.productCount === selectedProducts.length ? 'All' : `${collection.productCount}/${selectedProducts.length}`}
+                                            </Badge>
+                                          </InlineStack>
+                                        </div>
+                                      ));
+                                    })()}
+                                  </div>
+                                </div>
+                              </Collapsible>
+                            )}
+                            
+                            <Button
+                              variant="plain"
+                              onClick={() => setShowCurrentCollections(!showCurrentCollections)}
+                              disabled={selectedProducts.length === 0}
+                              icon={showCurrentCollections ? ChevronUpIcon : ChevronDownIcon}
+                            >
+                              {showCurrentCollections ? 'Hide' : 'Show'} Current Collections
+                            </Button>
                             
                             <TextField
                               label="Search Collections"
@@ -2557,8 +3443,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                               
                               <Button
                                 variant="secondary"
-                                onClick={() => {/* TODO: Implement tag updates */}}
+                                onClick={handleBulkTags}
                                 disabled={!tagValue && !tagRemoveValue}
+                                loading={isLoading}
                               >
                                 Apply Tags
                               </Button>
@@ -2660,11 +3547,38 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                               )}
                               
                               <Button
-                                variant="secondary"
-                                onClick={() => {/* TODO: Implement description updates */}}
-                                disabled={!descriptionValue && !descriptionReplaceFrom}
+                                variant="primary"
+                                onClick={handleBulkDescriptionUpdate}
+                                disabled={
+                                  selectedProducts.length === 0 ||
+                                  ((descriptionOperation === 'append' || descriptionOperation === 'prepend') && !descriptionValue) ||
+                                  (descriptionOperation === 'replace' && (!descriptionReplaceFrom || !descriptionReplaceTo))
+                                }
+                                loading={isLoading}
                               >
                                 Apply Descriptions
+                              </Button>
+                            </BlockStack>
+                          </Box>
+
+                          {/* Media Management Section */}
+                          <Box padding="400" background="bg-surface-tertiary" borderRadius="200">
+                            <BlockStack gap="400">
+                              <Text as="h5" variant="headingSm">Media Management</Text>
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                Media management features will be available soon. This will include:
+                              </Text>
+                              <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
+                                <li>Bulk image upload and replacement</li>
+                                <li>Alt text updates for accessibility</li>
+                                <li>Video management and optimization</li>
+                                <li>Image quality optimization</li>
+                              </ul>
+                              <Button
+                                variant="secondary"
+                                disabled
+                              >
+                                Media Management (Coming Soon)
                               </Button>
                             </BlockStack>
                           </Box>
@@ -2831,26 +3745,136 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
 
                       {activeBulkTab === 4 && (
                         <BlockStack gap="400">
-                          <Text as="h5" variant="headingSm">Media Management</Text>
+                          <Text as="h5" variant="headingSm">Status & Visibility</Text>
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Media management features will be available soon. This will include:
+                            Manage product status, visibility, and publication settings for selected products.
                           </Text>
-                          <ul>
-                            <li>Bulk image upload and replacement</li>
-                            <li>Alt text updates for accessibility</li>
-                            <li>Video management</li>
-                            <li>Image optimization</li>
-                          </ul>
+                          
+                          <ChoiceList
+                            title="Status Operation"
+                            choices={[
+                              { label: 'Change Product Status', value: 'status' },
+                              { label: 'Update Visibility', value: 'visibility' },
+                              { label: 'Set Publication Date', value: 'publish-date' },
+                            ]}
+                            selected={[statusOperation]}
+                            onChange={(value) => setStatusOperation(value[0] as any)}
+                          />
+                          
+                          {statusOperation === 'status' && (
+                            <ChoiceList
+                              title="Product Status"
+                              choices={[
+                                { label: 'Active - Products are live and visible', value: 'ACTIVE' },
+                                { label: 'Draft - Products are saved but not published', value: 'DRAFT' },
+                                { label: 'Archived - Products are hidden from all channels', value: 'ARCHIVED' },
+                              ]}
+                              selected={[newProductStatus]}
+                              onChange={(value) => setNewProductStatus(value[0] as any)}
+                            />
+                          )}
+                          
+                          {statusOperation === 'visibility' && (
+                            <ChoiceList
+                              title="Visibility Settings"
+                              choices={[
+                                { label: 'Show in Online Store', value: 'online-store' },
+                                { label: 'Hide from Online Store', value: 'hidden' },
+                                { label: 'Available in Point of Sale', value: 'pos' },
+                                { label: 'Show in Search Results', value: 'search' },
+                              ]}
+                              selected={visibilitySettings}
+                              onChange={setVisibilitySettings}
+                              allowMultiple
+                            />
+                          )}
+                          
+                          {statusOperation === 'publish-date' && (
+                            <TextField
+                              label="Publication Date & Time"
+                              type="datetime-local"
+                              value={publishDate}
+                              onChange={setPublishDate}
+                              autoComplete="off"
+                              helpText="Set when products should be automatically published"
+                            />
+                          )}
+                          
                           <Button
                             variant="secondary"
-                            disabled
+                            onClick={() => {/* TODO: Implement status updates */}}
+                            disabled={
+                              selectedProducts.length === 0 ||
+                              (statusOperation === 'status' && !newProductStatus) ||
+                              (statusOperation === 'visibility' && visibilitySettings.length === 0) ||
+                              (statusOperation === 'publish-date' && !publishDate)
+                            }
                           >
-                            Coming Soon
+                            Apply Status Changes (Coming Soon)
                           </Button>
                         </BlockStack>
                       )}
 
                       {activeBulkTab === 5 && (
+                        <BlockStack gap="400">
+                          <Text as="h5" variant="headingSm">Discount Management</Text>
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Apply discounts and promotional pricing to selected products.
+                          </Text>
+                          
+                          <ChoiceList
+                            title="Discount Operation"
+                            choices={[
+                              { label: 'Set Discount Percentage', value: 'set' },
+                              { label: 'Increase Current Discounts', value: 'increase' },
+                              { label: 'Decrease Current Discounts', value: 'decrease' },
+                            ]}
+                            selected={[discountOperation]}
+                            onChange={(value) => setDiscountOperation(value[0] as any)}
+                          />
+                          
+                          {discountOperation === 'set' && (
+                            <TextField
+                              label="Discount Percentage"
+                              type="number"
+                              value={discountValue}
+                              onChange={setDiscountValue}
+                              placeholder="25"
+                              autoComplete="off"
+                              suffix="%"
+                              helpText="Set discount percentage (0-100%)"
+                            />
+                          )}
+                          
+                          {(discountOperation === 'increase' || discountOperation === 'decrease') && (
+                            <TextField
+                              label={`${discountOperation === 'increase' ? 'Increase' : 'Decrease'} Discount Percentage`}
+                              type="number"
+                              value={discountPercentage}
+                              onChange={setDiscountPercentage}
+                              placeholder="10"
+                              autoComplete="off"
+                              suffix="%"
+                              helpText={`${discountOperation === 'increase' ? 'Increase' : 'Decrease'} current discounts by this percentage`}
+                            />
+                          )}
+                          
+                          <Button
+                            variant="primary"
+                            onClick={handleBulkDiscount}
+                            disabled={
+                              selectedVariants.length === 0 ||
+                              (discountOperation === 'set' && (!discountValue || parseFloat(discountValue) < 0 || parseFloat(discountValue) > 100)) ||
+                              ((discountOperation === 'increase' || discountOperation === 'decrease') && (!discountPercentage || parseFloat(discountPercentage) <= 0))
+                            }
+                            loading={isLoading}
+                          >
+                            Apply Discounts
+                          </Button>
+                        </BlockStack>
+                      )}
+
+                      {activeBulkTab === 6 && (
                         <BlockStack gap="400">
                           <Text as="h5" variant="headingSm">SEO & Metadata</Text>
                           <Text as="p" variant="bodySm" tone="subdued">
@@ -2925,7 +3949,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                           )}
                           
                           <Button
-                            variant="primary"
+                            variant="secondary"
                             onClick={() => {/* TODO: Implement SEO updates */}}
                             disabled={
                               selectedProducts.length === 0 ||
@@ -2935,86 +3959,14 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                               (seoOperation === 'handles' && handleUpdateMethod === 'suffix' && !handleSuffix)
                             }
                           >
-                            Apply SEO Changes
+                            Apply SEO Changes (Coming Soon)
                           </Button>
                         </BlockStack>
                       )}
 
-                      {activeBulkTab === 6 && (
-                        <BlockStack gap="400">
-                          <Text as="h5" variant="headingSm">Status & Visibility</Text>
-                          <Text as="p" variant="bodySm" tone="subdued">
-                            Manage product status, visibility, and publication settings.
-                          </Text>
-                          
-                          <ChoiceList
-                            title="Status Operation"
-                            choices={[
-                              { label: 'Change Product Status', value: 'status' },
-                              { label: 'Update Visibility', value: 'visibility' },
-                              { label: 'Set Publication Date', value: 'publish-date' },
-                            ]}
-                            selected={[statusOperation]}
-                            onChange={(value) => setStatusOperation(value[0] as any)}
-                          />
-                          
-                          {statusOperation === 'status' && (
-                            <ChoiceList
-                              title="Product Status"
-                              choices={[
-                                { label: 'Active - Make products live', value: 'ACTIVE' },
-                                { label: 'Draft - Save as draft', value: 'DRAFT' },
-                                { label: 'Archived - Archive products', value: 'ARCHIVED' },
-                              ]}
-                              selected={[newProductStatus]}
-                              onChange={(value) => setNewProductStatus(value[0] as any)}
-                            />
-                          )}
-                          
-                          {statusOperation === 'visibility' && (
-                            <ChoiceList
-                              title="Visibility Settings"
-                              choices={[
-                                { label: 'Visible in Online Store', value: 'online-store' },
-                                { label: 'Hidden from Online Store', value: 'hidden' },
-                                { label: 'Available on Sales Channels', value: 'sales-channels' },
-                              ]}
-                              selected={visibilitySettings}
-                              onChange={setVisibilitySettings}
-                              allowMultiple
-                            />
-                          )}
-                          
-                          {statusOperation === 'publish-date' && (
-                            <TextField
-                              label="Publication Date"
-                              type="datetime-local"
-                              value={publishDate}
-                              onChange={setPublishDate}
-                              autoComplete="off"
-                              helpText="Set when products should be published"
-                            />
-                          )}
-                          
-                          <Button
-                            variant="primary"
-                            onClick={() => {/* TODO: Implement status updates */}}
-                            disabled={
-                              selectedProducts.length === 0 ||
-                              (statusOperation === 'status' && !newProductStatus) ||
-                              (statusOperation === 'visibility' && visibilitySettings.length === 0) ||
-                              (statusOperation === 'publish-date' && !publishDate)
-                            }
-                          >
-                            Apply Status Changes
-                          </Button>
-                        </BlockStack>
-                      )}
-
-
-                        </BlockStack>
-                      </Card>
-                    )}
+                      </BlockStack>
+                    </Card>
+                  )}
                 </div>
               </BlockStack>
             </Card>
