@@ -26,6 +26,11 @@ export default function App() {
           href="https://fonts.googleapis.com/css2?family=Unbounded:wght@200..900&display=swap" 
           rel="stylesheet" 
         />
+        {/* All Round Gothic Bold - using similar alternative */}
+        <link
+          href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap"
+          rel="stylesheet"
+        />
         
         {/* Critical performance hints */}
         <meta name="format-detection" content="telephone=no" />

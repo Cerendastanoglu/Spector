@@ -1,8 +1,8 @@
-# Product Management Suite
+# Spector - Product Management Suite
 
 ## Overview
 
-Product Management Suite is a comprehensive Shopify app for managing products, inventory, collections, and bulk operations. Built with Remix, Polaris, and GraphQL, it provides merchants with powerful tools to efficiently manage their entire product catalog.
+Spector is a comprehensive Shopify app for managing products, inventory, collections, and bulk operations. Built with Remix, Polaris, and GraphQL, it provides merchants with powerful tools to efficiently manage their entire product catalog.
 
 ## Features
 

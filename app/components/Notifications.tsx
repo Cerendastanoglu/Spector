@@ -216,6 +216,50 @@ export function Notifications({ isVisible }: NotificationsProps) {
   const [showRuleModal, setShowRuleModal] = useState(false);
   const [editingRule, setEditingRule] = useState<NotificationRule | null>(null);
   
+  // Existing Rules Management
+  const [showExistingRules, setShowExistingRules] = useState(true);
+  const [existingRules, setExistingRules] = useState<NotificationRule[]>([
+    // Mock data - in real app this would come from API
+    {
+      id: '1',
+      name: 'Low Stock Alert - Electronics',
+      description: 'Alert when electronics products fall below 5 units',
+      enabled: true,
+      triggers: [{
+        type: 'inventory',
+        condition: 'below',
+        value: 5,
+        level: 'product'
+      }],
+      targets: {
+        type: 'tags',
+        values: ['electronics']
+      },
+      channels: ['email-1'],
+      schedule: { frequency: 'immediate', timezone: 'UTC' },
+      limits: { maxProducts: 100, currentProducts: 23 }
+    },
+    {
+      id: '2', 
+      name: 'Out of Stock - Featured Products',
+      description: 'Alert when featured products are completely out of stock',
+      enabled: false,
+      triggers: [{
+        type: 'inventory',
+        condition: 'equals',
+        value: 0,
+        level: 'product'
+      }],
+      targets: {
+        type: 'collection',
+        values: ['featured-products']
+      },
+      channels: ['email-1', 'webflow-1'],
+      schedule: { frequency: 'daily', time: '09:00', timezone: 'America/New_York' },
+      limits: { maxProducts: 100, currentProducts: 8 }
+    }
+  ]);
+  
   // Check if setup is complete
   const isSetupComplete = (selectedProducts.length > 0 || selectionMode !== 'specific') && channels.some(c => c.enabled && c.verified);
 
@@ -579,12 +623,14 @@ export function Notifications({ isVisible }: NotificationsProps) {
       id: `rule_${Date.now()}`,
     };
     setRules([...rules, newRule]);
+    setExistingRules([...existingRules, newRule]);
     setShowRuleModal(false);
     setEditingRule(null);
   };
 
   const updateRule = (id: string, updates: Partial<NotificationRule>) => {
     setRules(rules.map(r => r.id === id ? { ...r, ...updates } : r));
+    setExistingRules(existingRules.map(r => r.id === id ? { ...r, ...updates } : r));
   };
 
   const deleteRule = (id: string) => {
@@ -797,7 +843,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
               </InlineStack>
             )}
           </BlockStack>
-        </Card>
+          </Card>
         </div>
       </Grid.Cell>
     </Grid>
@@ -1792,6 +1838,150 @@ export function Notifications({ isVisible }: NotificationsProps) {
             </BlockStack>
           </Card>
         )
+      )}
+
+      {/* Existing Notification Rules Grid */}
+      {isSetupComplete && (
+        <Card>
+          <BlockStack gap="400">
+            <InlineStack align="space-between" blockAlign="center">
+              <BlockStack gap="100">
+                <Text as="h3" variant="headingMd">Existing Notification Rules</Text>
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  Manage your active notification rules and their settings
+                </Text>
+              </BlockStack>
+              <Button
+                variant="primary"
+                icon={PlusIcon}
+                onClick={() => setShowRuleModal(true)}
+              >
+                Add Rule
+              </Button>
+            </InlineStack>
+
+            {existingRules.length === 0 ? (
+              <Box padding="400">
+                <BlockStack gap="200" align="center">
+                  <Icon source={NotificationIcon} tone="subdued" />
+                  <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
+                    No notification rules created yet. Add your first rule to start monitoring.
+                  </Text>
+                </BlockStack>
+              </Box>
+            ) : (
+              <Grid>
+                {existingRules.map((rule) => (
+                  <Grid.Cell key={rule.id} columnSpan={{ xs: 6, sm: 3, md: 4, lg: 6, xl: 4 }}>
+                    <Card>
+                      <BlockStack gap="300">
+                        <InlineStack align="space-between" blockAlign="start">
+                          <BlockStack gap="100">
+                            <InlineStack gap="200" blockAlign="center">
+                              <Text as="h4" variant="headingSm" fontWeight="semibold">
+                                {rule.name}
+                              </Text>
+                              <Badge tone={rule.enabled ? "success" : "critical"}>
+                                {rule.enabled ? "Active" : "Inactive"}
+                              </Badge>
+                            </InlineStack>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              {rule.description}
+                            </Text>
+                          </BlockStack>
+                          <InlineStack gap="100">
+                            <Button
+                              variant="plain"
+                              icon={EditIcon}
+                              onClick={() => {
+                                setEditingRule(rule);
+                                setShowRuleModal(true);
+                              }}
+                              accessibilityLabel={`Edit ${rule.name}`}
+                            />
+                            <Button
+                              variant="plain"
+                              icon={DeleteIcon}
+                              tone="critical"
+                              onClick={() => {
+                                setExistingRules(rules => rules.filter(r => r.id !== rule.id));
+                              }}
+                              accessibilityLabel={`Delete ${rule.name}`}
+                            />
+                          </InlineStack>
+                        </InlineStack>
+
+                        <BlockStack gap="200">
+                          <InlineStack gap="200" wrap={false}>
+                            <Text as="p" variant="bodyXs" tone="subdued">Trigger:</Text>
+                            <Text as="p" variant="bodyXs">
+                              {rule.triggers[0]?.type === 'inventory' ? 'Inventory' : rule.triggers[0]?.type} {rule.triggers[0]?.condition} {rule.triggers[0]?.value}
+                            </Text>
+                          </InlineStack>
+                          
+                          <InlineStack gap="200" wrap={false}>
+                            <Text as="p" variant="bodyXs" tone="subdued">Target:</Text>
+                            <Text as="p" variant="bodyXs">
+                              {rule.targets.type === 'collection' ? 'Collection' : 
+                               rule.targets.type === 'tags' ? 'Tags' : 
+                               rule.targets.type} ({rule.targets.values.join(', ')})
+                            </Text>
+                          </InlineStack>
+
+                          <InlineStack gap="200" wrap={false}>
+                            <Text as="p" variant="bodyXs" tone="subdued">Schedule:</Text>
+                            <Text as="p" variant="bodyXs">
+                              {rule.schedule.frequency === 'immediate' ? 'Immediate' : 
+                               `${rule.schedule.frequency.charAt(0).toUpperCase() + rule.schedule.frequency.slice(1)} at ${rule.schedule.time || 'N/A'}`}
+                            </Text>
+                          </InlineStack>
+
+                          <InlineStack gap="200" wrap={false}>
+                            <Text as="p" variant="bodyXs" tone="subdued">Channels:</Text>
+                            <Text as="p" variant="bodyXs">
+                              {rule.channels.length} channel{rule.channels.length !== 1 ? 's' : ''} configured
+                            </Text>
+                          </InlineStack>
+
+                          <InlineStack gap="200" wrap={false}>
+                            <Text as="p" variant="bodyXs" tone="subdued">Products:</Text>
+                            <Text as="p" variant="bodyXs">
+                              {rule.limits.currentProducts} / {rule.limits.maxProducts} monitored
+                            </Text>
+                          </InlineStack>
+                        </BlockStack>
+
+                        <InlineStack gap="200">
+                          <Button
+                            variant={rule.enabled ? "secondary" : "primary"}
+                            size="slim"
+                            onClick={() => {
+                              setExistingRules(rules => rules.map(r => 
+                                r.id === rule.id ? { ...r, enabled: !r.enabled } : r
+                              ));
+                            }}
+                          >
+                            {rule.enabled ? "Disable" : "Enable"}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="slim"
+                            onClick={() => {
+                              // In real app, this would test the rule
+                              alert(`Testing rule: ${rule.name}`);
+                            }}
+                          >
+                            Test Rule
+                          </Button>
+                        </InlineStack>
+                      </BlockStack>
+                    </Card>
+                  </Grid.Cell>
+                ))}
+              </Grid>
+            )}
+          </BlockStack>
+        </Card>
       )}
 
       {/* Channel Configuration Modal */}

@@ -22,7 +22,7 @@ export default function App() {
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>Welcome to Product Management Suite</h1>
+        <h1 className={styles.heading}>Welcome to Spector</h1>
         <p className={styles.text}>
           Intelligent inventory management for your Shopify store. Track, manage, and optimize your product inventory with advanced analytics and automation.
         </p>

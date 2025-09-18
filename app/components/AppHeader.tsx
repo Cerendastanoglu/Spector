@@ -125,7 +125,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
       }}>
         <img 
           src="/assets/logo.png" 
-          alt="Product Management Suite Logo" 
+          alt="Spector Logo" 
           style={{ 
             width: '80px', 
             height: '80px', 
@@ -171,9 +171,9 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
             fontWeight: '700',
-            fontFamily: 'Unbounded, sans-serif'
+            fontFamily: '"All Round Gothic Bold", "Outfit", "Inter", system-ui, sans-serif'
           }}>
-            Product Management Suite
+            Spector
           </span>
           <span style={{
             marginLeft: '6px',
@@ -191,7 +191,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
             fontWeight: 'medium',
             fontFamily: 'inherit' // Easy to change font family later
           }}>
-            Advanced Product Monitoring
+            Product Management Suite
           </span>
         </Text>
       </BlockStack>
