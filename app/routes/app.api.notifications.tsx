@@ -37,7 +37,10 @@ export const action: ActionFunction = async ({ request }) => {
 
   switch (action) {
     case "mark_read": {
-      // const notificationId = formData.get("notificationId");
+      const notificationId = formData.get("notificationId");
+      if (!notificationId) {
+        return json({ error: "Notification ID is required" }, { status: 400 });
+      }
       // Mock marking notification as read
       return json({ success: true, message: "Notification marked as read" });
     }
@@ -46,14 +49,52 @@ export const action: ActionFunction = async ({ request }) => {
       return json({ success: true, message: "All notifications marked as read" });
     }
     case "delete": {
-      // const notificationId = formData.get("notificationId");
+      const notificationId = formData.get("notificationId");
+      if (!notificationId) {
+        return json({ error: "Notification ID is required" }, { status: 400 });
+      }
       // Mock deleting notification
       return json({ success: true, message: "Notification deleted" });
     }
     case "update_settings": {
-      const settings = JSON.parse(formData.get("settings") as string);
-      // Mock updating notification settings
-      return json({ success: true, message: "Settings updated", settings });
+      try {
+        const settingsData = formData.get("settings");
+        if (!settingsData) {
+          return json({ error: "Settings data is required" }, { status: 400 });
+        }
+        const settings = JSON.parse(settingsData as string);
+        // Mock updating notification settings
+        return json({ success: true, message: "Settings updated", settings });
+      } catch (error) {
+        return json({ error: "Invalid settings format" }, { status: 400 });
+      }
+    }
+    case "get-notification-config": {
+      // Mock getting notification configuration
+      return json({
+        success: true,
+        channels: [],
+        rules: [],
+        selectionMode: 'specific',
+        selectedProducts: []
+      });
+    }
+    case "save-notification-config": {
+      try {
+        const configData = formData.get("config");
+        if (!configData) {
+          return json({ error: "Configuration data is required" }, { status: 400 });
+        }
+        const config = JSON.parse(configData as string);
+        // Mock saving notification configuration
+        return json({ success: true, message: "Configuration saved", config });
+      } catch (error) {
+        return json({ error: "Invalid configuration format" }, { status: 400 });
+      }
+    }
+    case "test-channel": {
+      // Mock testing notification channel
+      return json({ success: true, message: "Channel test successful" });
     }
     default:
       return json({ error: "Invalid action" }, { status: 400 });

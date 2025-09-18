@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useFetcher } from "@remix-run/react";
-// import { ProductExporter } from "../utils/productExporter";
 import { openInNewTab } from "../utils/browserUtils";
 import { ProductConstants } from "../utils/scopedConstants";
 import {
@@ -25,10 +24,13 @@ import {
   FormLayout,
   ChoiceList,
   Icon,
+<<<<<<< Updated upstream
   Collapsible,
   Link,
   Banner,
   Toast,
+=======
+>>>>>>> Stashed changes
   Tabs,
 } from '@shopify/polaris';
 // Import only the icons we actually use
@@ -214,11 +216,36 @@ const ProductImageSlideshow: React.FC<{
 };
 
 export function ProductManagement({ isVisible, initialCategory = 'all' }: ProductManagementProps) {
-  // Default export settings since Settings component was removed
-  // const exportSettings = {
-  //   format: 'csv' as const
-  // };
-  
+  // Add CSS animations
+  useEffect(() => {
+    const styles = document.createElement('style');
+    styles.textContent = `
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes slideIn {
+        from { opacity: 0; transform: translateX(-20px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes scaleIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .grid-item-hover {
+        transition: all 0.2s ease-in-out;
+      }
+      .grid-item-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      }
+    `;
+    document.head.appendChild(styles);
+    return () => {
+      document.head.removeChild(styles);
+    };
+  }, []);
+
   const fetcher = useFetcher<{ products: Product[]; hasNextPage: boolean; endCursor?: string; error?: string }>();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -269,6 +296,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [titleReplaceFrom, setTitleReplaceFrom] = useState('');
   const [titleReplaceTo, setTitleReplaceTo] = useState('');
   
+  // Notification State
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    message: string;
+    error?: boolean;
+  }>({ show: false, message: '' });
+  
   const [descriptionOperation, setDescriptionOperation] = useState<'append' | 'prepend' | 'replace'>('append');
   const [descriptionValue, setDescriptionValue] = useState('');
   const [descriptionReplaceFrom, setDescriptionReplaceFrom] = useState('');
@@ -278,9 +312,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [tagValue, setTagValue] = useState('');
   const [tagRemoveValue, setTagRemoveValue] = useState('');
   
-  // Vendor functionality removed
-  // const [vendorValue, setVendorValue] = useState('');
-  // const [productTypeValue, setProductTypeValue] = useState('');
   const [costValue, setCostValue] = useState('');
   const [weightValue, setWeightValue] = useState('');
   const [originCountry, setOriginCountry] = useState('');
@@ -2491,25 +2522,43 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const renderCardView = () => {
     const paginatedProducts = filteredProducts.slice(productResultsSliderIndex, productResultsSliderIndex + productsPerPage);
     return (
-      <ResourceList
-        items={paginatedProducts}
-        renderItem={(product) => {
-          const inventory = product.totalInventory;
-          return (
-            <ResourceItem
-              id={product.id}
-              media={
-                <Thumbnail
-                  source={product.featuredMedia?.preview?.image?.url || ProductIcon}
-                  alt={product.featuredMedia?.preview?.image?.altText || product.title}
-                />
-              }
-              accessibilityLabel={`View details for ${product.title}`}
-              onClick={() => {
-                // View product details - placeholder for future implementation
-              }}
-            >
-              <BlockStack gap="200">
+      <div style={{ 
+        animation: 'fadeIn 0.3s ease-in-out',
+        transition: 'all 0.2s ease-in-out'
+      }}>
+        <ResourceList
+          items={paginatedProducts}
+          renderItem={(product) => {
+            const inventory = product.totalInventory;
+            const isSelected = getProductSelectionState(product.id) !== 'none';
+            return (
+              <div style={{
+                transition: 'all 0.2s ease-in-out',
+                transform: isSelected ? 'scale(1.02)' : 'scale(1)',
+                boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+                borderRadius: '8px',
+                overflow: 'hidden'
+              }}>
+                <ResourceItem
+                  id={product.id}
+                  media={
+                    <div style={{
+                      transition: 'transform 0.2s ease-in-out',
+                      borderRadius: '6px',
+                      overflow: 'hidden'
+                    }}>
+                      <Thumbnail
+                        source={product.featuredMedia?.preview?.image?.url || ProductIcon}
+                        alt={product.featuredMedia?.preview?.image?.altText || product.title}
+                      />
+                    </div>
+                  }
+                  accessibilityLabel={`View details for ${product.title}`}
+                  onClick={() => {
+                    // View product details - placeholder for future implementation
+                  }}
+                >
+                  <BlockStack gap="200">
                 {/* Main Row: Checkbox, Title, Status, Stock, and Actions */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
@@ -2855,9 +2904,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 )}
               </BlockStack>
             </ResourceItem>
+              </div>
           );
         }}
       />
+      </div>
     );
   };
 
