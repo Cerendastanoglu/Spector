@@ -88,6 +88,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                       }
                     }
                   }
+                  collections(first: 10) {
+                    edges {
+                      node {
+                        id
+                        handle
+                        title
+                      }
+                    }
+                  }
                   variants(first: 10) {
                     edges {
                       node {
@@ -683,6 +692,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             continue;
           } else if (operation === 'remove') {
             // Remove products from each collection
+            console.log(`🗑️ Removing product ${productId} from collections:`, collectionIds);
             for (const collectionId of collectionIds) {
               const removeMutation = `#graphql
                 mutation collectionRemoveProducts($id: ID!, $productIds: [ID!]!) {
@@ -702,6 +712,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 variables: { id: collectionId, productIds: [productId] } 
               });
               const removeJson = await removeResponse.json();
+              
+              console.log(`📤 Collection removal response for ${collectionId}:`, removeJson);
               
               if (removeJson.data?.collectionRemoveProducts?.userErrors?.length > 0) {
                 results.push({

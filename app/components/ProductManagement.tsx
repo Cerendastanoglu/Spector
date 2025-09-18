@@ -496,20 +496,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   // Update products when fetcher data changes
   useEffect(() => {
     if (fetcher.data?.products) {
-      // Add mock collection data and compare prices to products for testing
-      const productsWithCollections = fetcher.data.products.map((product: Product, index: number) => ({
+      // Use real product data from API (including collections)
+      const productsWithMockPricing = fetcher.data.products.map((product: Product, index: number) => ({
         ...product,
-        collections: {
-          edges: [
-            // Assign collections based on product index for testing
-            ...(index % 4 === 0 ? [{ node: { id: 'featured', handle: 'featured', title: 'Featured Products' } }] : []),
-            ...(index % 3 === 0 ? [{ node: { id: 'new-arrivals', handle: 'new-arrivals', title: 'New Arrivals' } }] : []),
-            ...(index % 5 === 0 ? [{ node: { id: 'sale', handle: 'sale', title: 'Sale Items' } }] : []),
-            ...(index % 2 === 0 ? [{ node: { id: 'bestsellers', handle: 'bestsellers', title: 'Best Sellers' } }] : []),
-            ...(index % 6 === 0 ? [{ node: { id: 'electronics', handle: 'electronics', title: 'Electronics' } }] : []),
-            ...(index % 7 === 0 ? [{ node: { id: 'clothing', handle: 'clothing', title: 'Clothing' } }] : []),
-          ]
-        },
+        // Keep real collections data from API, only add mock compare prices for testing
         variants: {
           ...product.variants,
           edges: product.variants.edges.map(edge => ({
@@ -522,7 +512,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           }))
         }
       }));
-      setProducts(productsWithCollections);
+      setProducts(productsWithMockPricing);
       setError(null);
       setIsLoading(false);
     } else if (fetcher.data?.error) {
@@ -1382,8 +1372,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       
       // Update local state to reflect changes
       if (result.success) {
+        console.log('🔄 Collection operation successful, refreshing products...');
         // Fetch updated product data to refresh collections
         await fetchAllProducts();
+        console.log('✅ Products refreshed after collection operation');
       }
       
       const actionText = collectionOperation === 'add' ? 'added to' : 'removed from';
@@ -2367,6 +2359,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   url={shopDomain ? `https://admin.shopify.com/store/${shopDomain}/products/${product.id.split('/').pop()}` : '#'}
                   external
                   removeUnderline
+                  onClick={() => {
+                    console.log('🔗 Product link clicked:', {
+                      shopDomain,
+                      productId: product.id,
+                      finalUrl: shopDomain ? `https://admin.shopify.com/store/${shopDomain}/products/${product.id.split('/').pop()}` : '#'
+                    });
+                  }}
                 >
                   <Text as="span" variant="bodyMd" fontWeight="semibold">
                     {product.title}
