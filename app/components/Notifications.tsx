@@ -42,7 +42,7 @@ import {
   PlayIcon,
   ProductIcon,
 } from "@shopify/polaris-icons";
-import { useState, /* useCallback, */ useEffect } from "react";
+import { useState, useEffect } from "react";
 
 interface NotificationsProps {
   isVisible: boolean;
@@ -153,6 +153,36 @@ interface NotificationRule {
 }
 
 export function Notifications({ isVisible }: NotificationsProps) {
+  // Add CSS animations for smooth transitions
+  useEffect(() => {
+    const styles = document.createElement('style');
+    styles.textContent = `
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes slideIn {
+        from { opacity: 0; transform: translateX(-20px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+      }
+      .step-card-hover {
+        transition: all 0.3s ease-in-out;
+      }
+      .step-card-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      }
+    `;
+    document.head.appendChild(styles);
+    return () => {
+      document.head.removeChild(styles);
+    };
+  }, []);
+
   const [currentStep, setCurrentStep] = useState(0);
   const [isSetupMode, setIsSetupMode] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -161,12 +191,10 @@ export function Notifications({ isVisible }: NotificationsProps) {
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [availableCollections, setAvailableCollections] = useState<Collection[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_availableLocations, setAvailableLocations] = useState<Location[]>([]);
+  const [availableLocations, setAvailableLocations] = useState<Location[]>([]);
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const [selectionMode, setSelectionMode] = useState<'all' | 'category' | 'tags' | 'specific' | 'collection'>('specific');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [selectedLocations, _setSelectedLocations] = useState<string[]>([]);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [productLimit] = useState(150); // Basic Plan limit
@@ -596,53 +624,83 @@ export function Notifications({ isVisible }: NotificationsProps) {
     <Grid>
       {/* Step 1: Product Selection */}
       <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 4, lg: 4, xl: 4 }}>
-        <Card>
-          <BlockStack gap="300">
-            <InlineStack align="space-between" blockAlign="center">
-              <InlineStack gap="200" blockAlign="center">
-                <Box 
-                  background={currentStep >= 0 ? "bg-fill-info" : "bg-fill-disabled"} 
-                  padding="200" 
-                  borderRadius="100"
-                >
-                  <Icon 
-                    source={currentStep >= 0 ? ProductIcon : ProductIcon} 
-                    tone={currentStep >= 0 ? "base" : "subdued"} 
-                  />
-                </Box>
-                <BlockStack gap="050">
-                  <Text as="h3" variant="headingSm" fontWeight="semibold">
-                    Step 1: Products
-                  </Text>
-                  <Text as="p" variant="bodyXs" tone="subdued">
-                    Select inventory to monitor
-                  </Text>
-                </BlockStack>
+        <div 
+          className="step-card-hover"
+          style={{
+            animation: 'fadeIn 0.5s ease-in-out',
+            transition: 'all 0.3s ease-in-out',
+            transform: currentStep === 0 ? 'scale(1.02)' : 'scale(1)',
+            filter: currentStep === 0 ? 'drop-shadow(0 4px 12px rgba(59, 130, 246, 0.15))' : 'none'
+          }}
+        >
+          <Card>
+            <BlockStack gap="300">
+              <InlineStack align="space-between" blockAlign="center">
+                <InlineStack gap="200" blockAlign="center">
+                  <div style={{
+                    transition: 'all 0.3s ease-in-out',
+                    transform: currentStep === 0 ? 'scale(1.1) rotate(5deg)' : 'scale(1)'
+                  }}>
+                    <Box 
+                      background={currentStep >= 0 ? "bg-fill-info" : "bg-fill-disabled"} 
+                      padding="200" 
+                      borderRadius="100"
+                    >
+                      <Icon 
+                        source={ProductIcon} 
+                        tone={currentStep >= 0 ? "base" : "subdued"} 
+                      />
+                    </Box>
+                  </div>
+                  <BlockStack gap="050">
+                    <Text as="h3" variant="headingSm" fontWeight="semibold">
+                      Step 1: Products
+                    </Text>
+                    <Text as="p" variant="bodyXs" tone="subdued">
+                      Select inventory to monitor
+                    </Text>
+                  </BlockStack>
+                </InlineStack>
+                <div style={{
+                  animation: currentStep === 0 ? 'pulse 2s infinite' : 'none'
+                }}>
+                  <Badge tone={currentStep >= 0 ? "info" : "info-strong"}>
+                    {currentStep === 0 ? "Active" : currentStep > 0 ? "Complete" : "Pending"}
+                  </Badge>
+                </div>
               </InlineStack>
-              <Badge tone={currentStep >= 0 ? "info" : "info-strong"}>
-                {currentStep === 0 ? "Active" : currentStep > 0 ? "Complete" : "Pending"}
-              </Badge>
-            </InlineStack>
-            
-            <Text as="p" variant="bodySm" tone="subdued">
-              Choose products by collection, tags, or individually. Set custom thresholds for each product variant.
-            </Text>
-            
-            {currentStep > 0 && selectedProducts.length > 0 && (
-              <InlineStack gap="100" blockAlign="center">
-                <Icon source={CheckIcon} tone="success" />
-                <Text as="p" variant="bodySm" tone="success">
-                  {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} configured
-                </Text>
-              </InlineStack>
-            )}
-          </BlockStack>
-        </Card>
+              
+              <Text as="p" variant="bodySm" tone="subdued">
+                Choose products by collection, tags, or individually. Set custom thresholds for each product variant.
+              </Text>
+              
+              {currentStep > 0 && selectedProducts.length > 0 && (
+                <div style={{ animation: 'slideIn 0.4s ease-in-out' }}>
+                  <InlineStack gap="100" blockAlign="center">
+                    <Icon source={CheckIcon} tone="success" />
+                    <Text as="p" variant="bodySm" tone="success">
+                      {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} configured
+                    </Text>
+                  </InlineStack>
+                </div>
+              )}
+            </BlockStack>
+          </Card>
+        </div>
       </Grid.Cell>
 
       {/* Step 2: Notification Channels */}
       <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 4, lg: 4, xl: 4 }}>
-        <Card>
+        <div 
+          className="step-card-hover"
+          style={{
+            animation: 'fadeIn 0.6s ease-in-out',
+            transition: 'all 0.3s ease-in-out',
+            transform: currentStep === 1 ? 'scale(1.02)' : 'scale(1)',
+            filter: currentStep === 1 ? 'drop-shadow(0 4px 12px rgba(245, 158, 11, 0.15))' : 'none'
+          }}
+        >
+          <Card>
           <BlockStack gap="300">
             <InlineStack align="space-between" blockAlign="center">
               <InlineStack gap="200" blockAlign="center">
@@ -684,11 +742,21 @@ export function Notifications({ isVisible }: NotificationsProps) {
             )}
           </BlockStack>
         </Card>
+        </div>
       </Grid.Cell>
 
       {/* Step 3: Review & Activate */}
       <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 4, lg: 4, xl: 4 }}>
-        <Card>
+        <div 
+          className="step-card-hover"
+          style={{
+            animation: 'fadeIn 0.7s ease-in-out',
+            transition: 'all 0.3s ease-in-out',
+            transform: currentStep === 2 ? 'scale(1.02)' : 'scale(1)',
+            filter: currentStep === 2 ? 'drop-shadow(0 4px 12px rgba(34, 197, 94, 0.15))' : 'none'
+          }}
+        >
+          <Card>
           <BlockStack gap="300">
             <InlineStack align="space-between" blockAlign="center">
               <InlineStack gap="200" blockAlign="center">
@@ -1216,14 +1284,16 @@ export function Notifications({ isVisible }: NotificationsProps) {
           {selectedProducts.length >= productLimit && (
             <Badge tone="warning">Plan Limit Reached</Badge>
           )}
-        </InlineStack>            {selectedProducts.length >= productLimit && (
-              <Banner tone="warning">
-                <Text as="p">
-                  <strong>Product Limit Reached:</strong> You've selected the maximum number of products ({productLimit}) for your current plan. 
-                  Upgrade to monitor more products or manage your selections.
-                </Text>
-              </Banner>
-            )}
+        </InlineStack>
+        
+        {selectedProducts.length >= productLimit && (
+          <Banner tone="warning">
+            <Text as="p">
+              <strong>Product Limit Reached:</strong> You've selected the maximum number of products ({productLimit}) for your current plan. 
+              Upgrade to monitor more products or manage your selections.
+            </Text>
+          </Banner>
+        )}
           </BlockStack>
         )}
 
@@ -1354,9 +1424,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
     </Card>
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _renderRulesSetup = () => (
+  const renderRulesSetup = () => (
     <Card>
       <BlockStack gap="400">
         <InlineStack align="space-between" blockAlign="center">
