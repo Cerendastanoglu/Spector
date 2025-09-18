@@ -239,7 +239,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     `;
     document.head.appendChild(styles);
     return () => {
-      document.head.removeChild(styles);
+      if (styles.parentNode) {
+        styles.parentNode.removeChild(styles);
+      }
     };
   }, []);
 
