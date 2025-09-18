@@ -2038,26 +2038,36 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
   };
 
-  // Load available collections (you'll need to implement this API call)
+  // Load available collections from Shopify API
   const loadCollections = async () => {
     try {
-      console.log('Loading collections...');
-      // Simulate loading collections - replace with actual API call
-      const mockCollections = [
-        { id: 'featured', title: 'Featured Products' },
-        { id: 'new-arrivals', title: 'New Arrivals' },
-        { id: 'sale', title: 'Sale Items' },
-        { id: 'bestsellers', title: 'Best Sellers' },
-        { id: 'seasonal', title: 'Seasonal Collection' },
-        { id: 'electronics', title: 'Electronics' },
-        { id: 'clothing', title: 'Clothing' },
-        { id: 'accessories', title: 'Accessories' }
-      ];
-      setAvailableCollections(mockCollections);
-      console.log('Collections loaded:', mockCollections.length);
+      console.log('Loading collections from Shopify...');
+      
+      const formData = new FormData();
+      formData.append('action', 'fetch-collections');
+      
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.collections) {
+        const collections = result.collections.edges.map((edge: any) => ({
+          id: edge.node.id,
+          title: edge.node.title
+        }));
+        setAvailableCollections(collections);
+        console.log('Collections loaded:', collections.length);
+      } else {
+        throw new Error(result.error || 'Failed to fetch collections');
+      }
     } catch (error) {
       console.error('Failed to load collections:', error);
       setError('Failed to load collections');
+      // Fallback to empty array so the UI doesn't break
+      setAvailableCollections([]);
     }
   };
 

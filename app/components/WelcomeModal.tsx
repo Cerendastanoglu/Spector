@@ -45,7 +45,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     {
       icon: StarIcon,
       title: "Welcome to Spector",
-      subtitle: "Your Advanced Product Monitoring Dashboard",
+      subtitle: "Your Product Management Suite Dashboard",
       content: (
         <BlockStack gap="400">
           <Text as="p" variant="bodyMd">

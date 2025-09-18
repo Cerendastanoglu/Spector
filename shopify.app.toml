@@ -1,8 +1,8 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "035bb80387ae6ea29247c8d0b706f67a"
-name = "Product Management Suite"
-handle = "product-management-suite"
+name = "Spector"
+handle = "spector"
 application_url = "https://miscellaneous-financing-collected-sheer.trycloudflare.com"
 embedded = true
 
