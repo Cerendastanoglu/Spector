@@ -1,8 +1,8 @@
-# Spector - Advanced Product Monitoring
+# Product Management Suite
 
 ## Overview
 
-Spector is an advanced Shopify app for monitoring product inventory and managing out-of-stock situations. Built with Remix, Polaris, and GraphQL, it provides merchants with real-time insights into their product inventory status.
+Product Management Suite is a comprehensive Shopify app for managing products, inventory, collections, and bulk operations. Built with Remix, Polaris, and GraphQL, it provides merchants with powerful tools to efficiently manage their entire product catalog.
 
 ## Features
 

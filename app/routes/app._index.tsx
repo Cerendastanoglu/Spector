@@ -139,7 +139,7 @@ export default function Index() {
                   App Configuration
                 </Text>
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Manage your Spector subscription, billing, and app settings.
+                  Manage your Product Management Suite subscription, billing, and app settings.
                 </Text>
               </BlockStack>
             </Card>

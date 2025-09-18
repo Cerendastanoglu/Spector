@@ -125,7 +125,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
       }}>
         <img 
           src="/assets/logo.png" 
-          alt="Spector Logo" 
+          alt="Product Management Suite Logo" 
           style={{ 
             width: '80px', 
             height: '80px', 
@@ -173,7 +173,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
             fontWeight: '700',
             fontFamily: 'Unbounded, sans-serif'
           }}>
-            Spector
+            Product Management Suite
           </span>
           <span style={{
             marginLeft: '6px',
