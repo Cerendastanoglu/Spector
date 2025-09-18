@@ -27,7 +27,8 @@ import {
   Icon,
   Collapsible,
   Link,
-  // Banner,
+  Banner,
+  Toast,
   Tabs,
 } from '@shopify/polaris';
 // Import only the icons we actually use
@@ -2352,16 +2353,19 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   e.currentTarget.style.transform = 'translateX(0)';
                 }}
               >
-                <Link
-                  url={shopDomain ? `https://admin.shopify.com/store/${shopDomain}/products/${product.id.split('/').pop()}` : '#'}
-                  external
-                  removeUnderline
-
-                >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Text as="span" variant="bodyMd" fontWeight="semibold">
                     {product.title}
                   </Text>
-                </Link>
+                  <Button
+                    variant="plain"
+                    size="micro"
+                    icon={EditIcon}
+                    url={shopDomain ? `https://admin.shopify.com/store/${shopDomain}/products/${product.id.split('/').pop()}` : '#'}
+                    external
+                    accessibilityLabel={`Edit ${product.title}`}
+                  />
+                </div>
               </div>
             </div>
             <div style={{ 
