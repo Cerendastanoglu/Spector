@@ -195,6 +195,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [visibilitySettings, setVisibilitySettings] = useState<string[]>(['online-store']);
   const [publishDate, setPublishDate] = useState('');
 
+  // Bulk Discount Operations State
+  const [discountOperation, setDiscountOperation] = useState<'set' | 'increase' | 'decrease'>('set');
+  const [discountValue, setDiscountValue] = useState('');
+  const [discountPercentage, setDiscountPercentage] = useState('0');
+
   
   // Filter collections based on search query
   const filteredCollections = availableCollections.filter(collection =>
@@ -273,17 +278,26 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
 
   const handleVariantSelection = (productId: string, variantId: string, checked: boolean) => {
     if (checked) {
-      setSelectedVariants(prev => [...prev, variantId]);
-      // Check if all variants are now selected, if so add product to selectedProducts
-      const variantIds = getProductVariantIds(productId);
-      const newSelectedVariants = [...selectedVariants, variantId];
-      if (variantIds.every(id => newSelectedVariants.includes(id))) {
-        setSelectedProducts(prev => [...new Set([...prev, productId])]);
-      }
+      setSelectedVariants(prev => {
+        const newSelectedVariants = [...prev, variantId];
+        
+        // Check if all variants are now selected, if so add product to selectedProducts
+        const variantIds = getProductVariantIds(productId);
+        if (variantIds.length > 0 && variantIds.every(id => newSelectedVariants.includes(id))) {
+          setSelectedProducts(prevProducts => [...new Set([...prevProducts, productId])]);
+        }
+        
+        return newSelectedVariants;
+      });
     } else {
-      setSelectedVariants(prev => prev.filter(id => id !== variantId));
-      // Remove product from selectedProducts since not all variants are selected
-      setSelectedProducts(prev => prev.filter(id => id !== productId));
+      setSelectedVariants(prev => {
+        const newSelectedVariants = prev.filter(id => id !== variantId);
+        
+        // Remove product from selectedProducts since not all variants are selected
+        setSelectedProducts(prevProducts => prevProducts.filter(id => id !== productId));
+        
+        return newSelectedVariants;
+      });
     }
   };
   
@@ -562,8 +576,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
 
   // Enhanced Pricing Operations with Advanced Error Handling
   const handleBulkPricing = async () => {
-    if (selectedProducts.length === 0) {
-      setError("Please select at least one product to update pricing.");
+    if (selectedVariants.length === 0) {
+      setError("Please select at least one variant to update pricing.");
       return;
     }
     
@@ -956,8 +970,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   };
 
   const handleBulkInventoryUpdate = async () => {
-    if (selectedProducts.length === 0) {
-      setError("Please select at least one product to update inventory.");
+    if (selectedVariants.length === 0) {
+      setError("Please select at least one variant to update inventory.");
       return;
     }
     
@@ -2020,6 +2034,56 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     return null;
   }
 
+  // Bulk Discount Handler
+  const handleBulkDiscount = async () => {
+    if (!selectedVariants.length) {
+      setError("Please select at least one variant to apply discounts.");
+      return;
+    }
+
+    // Basic validation
+    if (discountOperation === 'set' && (!discountValue || parseFloat(discountValue) < 0 || parseFloat(discountValue) > 100)) {
+      setError("Please enter a valid discount percentage between 0 and 100.");
+      return;
+    }
+
+    if ((discountOperation === 'increase' || discountOperation === 'decrease') && (!discountPercentage || parseFloat(discountPercentage) <= 0)) {
+      setError("Please enter a valid percentage.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Note: This is a placeholder for discount functionality
+      // In a real implementation, you would:
+      // 1. Determine current discount values for selected variants
+      // 2. Calculate new discount values based on operation
+      // 3. Update products via Shopify Admin API
+      // 4. Handle discount codes, price rules, or compare-at prices
+      
+      console.log('Bulk discount operation:', {
+        operation: discountOperation,
+        value: discountValue,
+        percentage: discountPercentage,
+        selectedVariants: selectedVariants.length
+      });
+
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // For now, show a success message
+      setError("Bulk discount feature is coming soon! This will allow you to apply discounts to selected products.");
+      
+    } catch (error: any) {
+      console.error('Bulk discount error:', error);
+      setError(error.message || 'Failed to apply bulk discounts. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <>
       <style>{`
@@ -2123,7 +2187,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
             </InlineStack>
             <div style={{ 
               display: 'grid', 
-              gridTemplateColumns: 'repeat(7, minmax(85px, 1fr))', 
+              gridTemplateColumns: 'repeat(8, minmax(85px, 1fr))', 
               gap: '8px',
               alignItems: 'center'
             }}>
@@ -2132,9 +2196,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 { id: 1, label: 'Collections', icon: CollectionIcon },
                 { id: 2, label: 'Content', icon: EditIcon },
                 { id: 3, label: 'Inventory', icon: InventoryIcon },
-                { id: 4, label: 'Media', icon: ImageIcon },
-                { id: 5, label: 'SEO', icon: SearchIcon },
-                { id: 6, label: 'Status', icon: StatusIcon },
+                { id: 4, label: 'Discounts', icon: MoneyIcon },
+                { id: 5, label: 'Media', icon: ImageIcon },
+                { id: 6, label: 'SEO', icon: SearchIcon },
+                { id: 7, label: 'Status', icon: StatusIcon },
               ].map(({ id, label, icon }) => (
                 <Button
                   key={id}
@@ -2207,6 +2272,57 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   ) : (
                     <Card background="bg-surface" padding="400">
                       <BlockStack gap="400">
+
+                      {activeBulkTab === 4 && (
+                        <BlockStack gap="400">
+                          <Text as="h5" variant="headingSm">Discount Operations</Text>
+                          <ChoiceList
+                            title="Discount Update Method"
+                            choices={[
+                              { label: 'Set Fixed Discount - Apply same discount to all products', value: 'set' },
+                              { label: 'Increase by Percentage - Add percentage to current discounts', value: 'increase' },
+                              { label: 'Decrease by Percentage - Subtract percentage from current discounts', value: 'decrease' },
+                            ]}
+                            selected={[discountOperation]}
+                            onChange={(value) => setDiscountOperation(value[0] as any)}
+                          />
+                          {discountOperation === 'set' && (
+                            <TextField
+                              label="New Discount (%)"
+                              type="number"
+                              value={discountValue}
+                              onChange={setDiscountValue}
+                              placeholder="0" autoComplete="off"
+                              suffix="%"
+                              helpText="Set the same discount for all selected products"
+                            />
+                          )}
+                          {(discountOperation === 'increase' || discountOperation === 'decrease') && (
+                            <TextField
+                              label={`${discountOperation === 'increase' ? 'Increase' : 'Decrease'} Discount Percentage`}
+                              type="number"
+                              value={discountPercentage}
+                              onChange={setDiscountPercentage}
+                              placeholder="0" autoComplete="off"
+                              suffix="%"
+                              helpText={`${discountOperation === 'increase' ? 'Increase' : 'Decrease'} current discounts by this percentage`}
+                            />
+                          )}
+                          
+                          <Button
+                            variant="primary"
+                            onClick={handleBulkDiscount}
+                            disabled={
+                              selectedVariants.length === 0 ||
+                              (discountOperation === 'set' && (!discountValue || parseFloat(discountValue) < 0 || parseFloat(discountValue) > 100)) ||
+                              ((discountOperation === 'increase' || discountOperation === 'decrease') && (!discountPercentage || parseFloat(discountPercentage) <= 0))
+                            }
+                            loading={isLoading}
+                          >
+                            Apply Discount Changes
+                          </Button>
+                        </BlockStack>
+                      )}
                       {activeBulkTab === 0 && (
                         <BlockStack gap="400">
                           <Text as="h5" variant="headingSm">Pricing Operations</Text>
@@ -2323,7 +2439,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                                 variant="primary"
                                 onClick={handleBulkPricing}
                                 disabled={
-                                  selectedProducts.length === 0 ||
+                                  selectedVariants.length === 0 ||
                                   (priceOperation === 'set' && !priceValue) ||
                                   ((priceOperation === 'increase' || priceOperation === 'decrease') && (!pricePercentage || pricePercentage === '0')) ||
                                   (applyCompareChanges && compareOperation === 'set' && !compareValue) ||
@@ -2332,7 +2448,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                               >
                             Apply Pricing Changes
                               </Button>
-                    </BlockStack>
+                        </BlockStack>
                       )}
 
                       {activeBulkTab === 1 && (
@@ -2698,7 +2814,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                             variant="primary"
                             onClick={handleBulkInventoryUpdate}
                             disabled={
-                              selectedProducts.length === 0 || 
+                              selectedVariants.length === 0 || 
                               (inventoryOperation === 'stock' && !stockQuantity) ||
                               (inventoryOperation === 'sku' && 
                                 ((skuUpdateMethod === 'replace' && (!skuFindText || !skuReplaceText)) ||
