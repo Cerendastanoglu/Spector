@@ -692,7 +692,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             continue;
           } else if (operation === 'remove') {
             // Remove products from each collection
-            console.log(`🗑️ Removing product ${productId} from collections:`, collectionIds);
+            // Removing product from collections
             for (const collectionId of collectionIds) {
               const removeMutation = `#graphql
                 mutation collectionRemoveProducts($id: ID!, $productIds: [ID!]!) {
@@ -713,7 +713,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               });
               const removeJson = await removeResponse.json();
               
-              console.log(`📤 Collection removal response for ${collectionId}:`, removeJson);
+              // Collection removal response processed
               
               if (removeJson.data?.collectionRemoveProducts?.userErrors?.length > 0) {
                 results.push({

@@ -1372,10 +1372,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       
       // Update local state to reflect changes
       if (result.success) {
-        console.log('🔄 Collection operation successful, refreshing products...');
         // Fetch updated product data to refresh collections
         await fetchAllProducts();
-        console.log('✅ Products refreshed after collection operation');
       }
       
       const actionText = collectionOperation === 'add' ? 'added to' : 'removed from';
@@ -1384,12 +1382,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       ).filter(Boolean).join(', ');
       
       if (successful.length > 0) {
-        console.log(`✅ Successfully ${actionText} collections (${collectionNames}) for ${successful.length} products!`);
+        // Success - collection operation completed
       }
       
       if (failed.length > 0) {
-        console.log(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
-        console.log("Failed operations:", failed);
+        // Some operations failed - could show user notification
       }
       
       // Reset collection selections only if completely successful
@@ -2359,13 +2356,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   url={shopDomain ? `https://admin.shopify.com/store/${shopDomain}/products/${product.id.split('/').pop()}` : '#'}
                   external
                   removeUnderline
-                  onClick={() => {
-                    console.log('🔗 Product link clicked:', {
-                      shopDomain,
-                      productId: product.id,
-                      finalUrl: shopDomain ? `https://admin.shopify.com/store/${shopDomain}/products/${product.id.split('/').pop()}` : '#'
-                    });
-                  }}
+
                 >
                   <Text as="span" variant="bodyMd" fontWeight="semibold">
                     {product.title}
