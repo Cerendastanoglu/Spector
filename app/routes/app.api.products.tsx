@@ -645,6 +645,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           
           if (operation === 'add') {
             // Add products to each collection
+            console.log(`➕ Adding product ${productId} to collections:`, collectionIds);
             for (const collectionId of collectionIds) {
               const addMutation = `#graphql
                 mutation collectionAddProducts($id: ID!, $productIds: [ID!]!) {
@@ -672,6 +673,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 variables: { id: collectionId, productIds: [productId] } 
               });
               const addJson = await addResponse.json();
+              console.log(`📤 Collection addition response for ${collectionId}:`, addJson);
               
               if (addJson.data?.collectionAddProducts?.userErrors?.length > 0) {
                 results.push({
@@ -693,6 +695,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           } else if (operation === 'remove') {
             // Remove products from each collection
             // Removing product from collections
+            console.log(`🗑️ Removing product ${productId} from collections:`, collectionIds);
             for (const collectionId of collectionIds) {
               const removeMutation = `#graphql
                 mutation collectionRemoveProducts($id: ID!, $productIds: [ID!]!) {
@@ -714,6 +717,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               const removeJson = await removeResponse.json();
               
               // Collection removal response processed
+              console.log(`📤 Collection removal response for ${collectionId}:`, removeJson);
               
               if (removeJson.data?.collectionRemoveProducts?.userErrors?.length > 0) {
                 results.push({

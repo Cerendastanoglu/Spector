@@ -798,6 +798,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
             )}
           </BlockStack>
         </Card>
+        </div>
       </Grid.Cell>
     </Grid>
   );

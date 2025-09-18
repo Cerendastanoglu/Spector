@@ -1,5 +1,5 @@
 {
-  "name": "spector",
+  "name": "product-management-suite",
   "private": true,
   "scripts": {
     "build": "remix vite:build",

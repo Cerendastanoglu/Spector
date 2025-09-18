@@ -24,13 +24,10 @@ import {
   FormLayout,
   ChoiceList,
   Icon,
-<<<<<<< Updated upstream
   Collapsible,
   Link,
   Banner,
   Toast,
-=======
->>>>>>> Stashed changes
   Tabs,
 } from '@shopify/polaris';
 // Import only the icons we actually use
@@ -1374,12 +1371,15 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       formData.append('action', 'update-collections');
       formData.append('updates', JSON.stringify(updates));
       
+      console.log('🔄 Sending collection operation:', { updates, operation: collectionOperation });
+      
       const response = await fetch('/app/api/products', {
         method: 'POST',
         body: formData
       });
       
       const result = await response.json();
+      console.log('📤 Collection API response:', result);
       
       if (!response.ok) {
         throw new Error(result.error || 'Failed to update collections');
@@ -1414,11 +1414,20 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       ).filter(Boolean).join(', ');
       
       if (successful.length > 0) {
-        // Success - collection operation completed
+        setNotification({
+          show: true,
+          message: `Successfully ${actionText} ${collectionNames} for ${successful.length} product${successful.length > 1 ? 's' : ''}`,
+          error: false
+        });
       }
       
       if (failed.length > 0) {
-        // Some operations failed - could show user notification
+        setNotification({
+          show: true,
+          message: `${successful.length} products updated, ${failed.length} failed. See console for details.`,
+          error: true
+        });
+        console.log("Failed operations:", failed);
       }
       
       // Reset collection selections only if completely successful
@@ -4268,6 +4277,15 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         </div>
       </div>
     </BlockStack>
+    
+    {notification.show && (
+      <Toast
+        content={notification.message}
+        error={notification.error}
+        onDismiss={() => setNotification({ show: false, message: '' })}
+        duration={4000}
+      />
+    )}
     </>
   );
 }
