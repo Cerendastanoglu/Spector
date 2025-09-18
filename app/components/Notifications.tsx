@@ -38,6 +38,9 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   // ArrowRightIcon,
+  CheckIcon,
+  PlayIcon,
+  ProductIcon,
 } from "@shopify/polaris-icons";
 import { useState, /* useCallback, */ useEffect } from "react";
 
@@ -590,77 +593,145 @@ export function Notifications({ isVisible }: NotificationsProps) {
   }, [selectedProducts]);
 
   const renderSetupProgress = () => (
-    <Card>
-      <BlockStack gap="400">
-        <InlineStack align="space-between" blockAlign="center">
-          <Text as="h2" variant="headingMd">
-            Inventory Alert Setup
-          </Text>
-          <Badge tone="info">
-            {Math.round(((currentStep + 1) / steps.length) * 100).toString() + "% Complete"}
-          </Badge>
-        </InlineStack>
-        
-        <ProgressBar progress={(currentStep / (steps.length - 1)) * 100} size="small" />
-        
-        <InlineStack gap="200" align="center" blockAlign="center">
-          <InlineStack gap="150" blockAlign="center">
-            <div style={{ 
-              padding: '6px 12px', 
-              borderRadius: '20px', 
-              backgroundColor: currentStep >= 0 ? '#f6f6f7' : '#fafbfb',
-              border: currentStep === 0 ? '1px solid #8c9196' : '1px solid #e1e3e5',
-              color: currentStep >= 0 ? '#303030' : '#8c9196',
-              fontSize: '13px',
-              fontWeight: currentStep === 0 ? '500' : '400',
-              transition: 'all 0.2s ease'
-            }}>
-              Select Products
-            </div>
-            <div style={{ 
-              width: '20px', 
-              height: '1px', 
-              backgroundColor: currentStep > 0 ? '#8c9196' : '#e1e3e5',
-              transition: 'background-color 0.2s ease'
-            }} />
-          </InlineStack>
-          
-          <InlineStack gap="150" blockAlign="center">
-            <div style={{ 
-              padding: '6px 12px', 
-              borderRadius: '20px', 
-              backgroundColor: currentStep >= 1 ? '#f6f6f7' : '#fafbfb',
-              border: currentStep === 1 ? '1px solid #8c9196' : '1px solid #e1e3e5',
-              color: currentStep >= 1 ? '#303030' : '#8c9196',
-              fontSize: '13px',
-              fontWeight: currentStep === 1 ? '500' : '400',
-              transition: 'all 0.2s ease'
-            }}>
-              Setup Notifications
-            </div>
-            <div style={{ 
-              width: '20px', 
-              height: '1px', 
-              backgroundColor: currentStep > 1 ? '#8c9196' : '#e1e3e5',
-              transition: 'background-color 0.2s ease'
-            }} />
-          </InlineStack>
-          
-          <div style={{ 
-            padding: '6px 12px', 
-            borderRadius: '20px', 
-            backgroundColor: currentStep >= 2 ? '#f6f6f7' : '#fafbfb',
-            border: currentStep === 2 ? '1px solid #8c9196' : '1px solid #e1e3e5',
-            color: currentStep >= 2 ? '#303030' : '#8c9196',
-            fontSize: '13px',
-            fontWeight: currentStep === 2 ? '500' : '400',
-            transition: 'all 0.2s ease'
-          }}>
-            Review & Activate
-          </div>
-        </InlineStack>
-      </BlockStack>
-    </Card>
+    <Grid>
+      {/* Step 1: Product Selection */}
+      <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 4, lg: 4, xl: 4 }}>
+        <Card>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <InlineStack gap="200" blockAlign="center">
+                <Box 
+                  background={currentStep >= 0 ? "bg-fill-info" : "bg-fill-disabled"} 
+                  padding="200" 
+                  borderRadius="100"
+                >
+                  <Icon 
+                    source={currentStep >= 0 ? ProductIcon : ProductIcon} 
+                    tone={currentStep >= 0 ? "base" : "subdued"} 
+                  />
+                </Box>
+                <BlockStack gap="050">
+                  <Text as="h3" variant="headingSm" fontWeight="semibold">
+                    Step 1: Products
+                  </Text>
+                  <Text as="p" variant="bodyXs" tone="subdued">
+                    Select inventory to monitor
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+              <Badge tone={currentStep >= 0 ? "info" : "info-strong"}>
+                {currentStep === 0 ? "Active" : currentStep > 0 ? "Complete" : "Pending"}
+              </Badge>
+            </InlineStack>
+            
+            <Text as="p" variant="bodySm" tone="subdued">
+              Choose products by collection, tags, or individually. Set custom thresholds for each product variant.
+            </Text>
+            
+            {currentStep > 0 && selectedProducts.length > 0 && (
+              <InlineStack gap="100" blockAlign="center">
+                <Icon source={CheckIcon} tone="success" />
+                <Text as="p" variant="bodySm" tone="success">
+                  {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} configured
+                </Text>
+              </InlineStack>
+            )}
+          </BlockStack>
+        </Card>
+      </Grid.Cell>
+
+      {/* Step 2: Notification Channels */}
+      <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 4, lg: 4, xl: 4 }}>
+        <Card>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <InlineStack gap="200" blockAlign="center">
+                <Box 
+                  background={currentStep >= 1 ? "bg-fill-warning" : "bg-fill-disabled"} 
+                  padding="200" 
+                  borderRadius="100"
+                >
+                  <Icon 
+                    source={NotificationIcon} 
+                    tone={currentStep >= 1 ? "base" : "subdued"} 
+                  />
+                </Box>
+                <BlockStack gap="050">
+                  <Text as="h3" variant="headingSm" fontWeight="semibold">
+                    Step 2: Notifications
+                  </Text>
+                  <Text as="p" variant="bodyXs" tone="subdued">
+                    Configure alert channels
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+              <Badge tone={currentStep >= 1 ? "warning" : "info-strong"}>
+                {currentStep === 1 ? "Active" : currentStep > 1 ? "Complete" : "Pending"}
+              </Badge>
+            </InlineStack>
+            
+            <Text as="p" variant="bodySm" tone="subdued">
+              Set up email alerts, Webflow integrations, and test your notification delivery.
+            </Text>
+            
+            {currentStep > 1 && channels.filter(c => c.enabled && c.verified).length > 0 && (
+              <InlineStack gap="100" blockAlign="center">
+                <Icon source={CheckIcon} tone="success" />
+                <Text as="p" variant="bodySm" tone="success">
+                  {channels.filter(c => c.enabled && c.verified).length} channel{channels.filter(c => c.enabled && c.verified).length !== 1 ? 's' : ''} ready
+                </Text>
+              </InlineStack>
+            )}
+          </BlockStack>
+        </Card>
+      </Grid.Cell>
+
+      {/* Step 3: Review & Activate */}
+      <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 4, lg: 4, xl: 4 }}>
+        <Card>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <InlineStack gap="200" blockAlign="center">
+                <Box 
+                  background={currentStep >= 2 ? "bg-fill-success" : "bg-fill-disabled"} 
+                  padding="200" 
+                  borderRadius="100"
+                >
+                  <Icon 
+                    source={currentStep >= 2 ? CheckIcon : PlayIcon} 
+                    tone={currentStep >= 2 ? "base" : "subdued"} 
+                  />
+                </Box>
+                <BlockStack gap="050">
+                  <Text as="h3" variant="headingSm" fontWeight="semibold">
+                    Step 3: Activate
+                  </Text>
+                  <Text as="p" variant="bodyXs" tone="subdued">
+                    Review and launch monitoring
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+              <Badge tone={currentStep >= 2 ? "success" : "info-strong"}>
+                {currentStep === 2 ? "Active" : currentStep > 2 ? "Complete" : "Pending"}
+              </Badge>
+            </InlineStack>
+            
+            <Text as="p" variant="bodySm" tone="subdued">
+              Review configuration, test alerts, and activate real-time inventory monitoring.
+            </Text>
+            
+            {isSetupComplete && (
+              <InlineStack gap="100" blockAlign="center">
+                <Icon source={CheckIcon} tone="success" />
+                <Text as="p" variant="bodySm" tone="success">
+                  Monitoring active
+                </Text>
+              </InlineStack>
+            )}
+          </BlockStack>
+        </Card>
+      </Grid.Cell>
+    </Grid>
   );
 
   const renderProductSelection = () => (
