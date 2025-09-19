@@ -213,42 +213,28 @@ const ProductImageSlideshow: React.FC<{
 };
 
 export function ProductManagement({ isVisible, initialCategory = 'all' }: ProductManagementProps) {
-  // Add CSS animations - Fixed to prevent header interference
+  // Add CSS animations
   useEffect(() => {
     const styles = document.createElement('style');
     styles.textContent = `
       @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(5px); }
+        from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
       @keyframes slideIn {
-        from { opacity: 0; transform: translateX(-10px); }
+        from { opacity: 0; transform: translateX(-20px); }
         to { opacity: 1; transform: translateX(0); }
       }
       @keyframes scaleIn {
-        from { opacity: 0; transform: scale(0.98); }
+        from { opacity: 0; transform: scale(0.95); }
         to { opacity: 1; transform: scale(1); }
       }
       .grid-item-hover {
         transition: all 0.2s ease-in-out;
-        position: relative;
-        z-index: 1;
       }
       .grid-item-hover:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        z-index: 2;
-      }
-      .product-table-container {
-        position: relative;
-        z-index: 0;
-        isolation: isolate;
-      }
-      .product-table-header {
-        position: sticky;
-        top: 0;
-        z-index: 10;
-        background: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       }
     `;
     document.head.appendChild(styles);
@@ -270,7 +256,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [sortField, setSortField] = useState<SortField>('inventory');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   
-  // Main Workflow Tab State (Step 1: Select Products -> Step 2: Bulk Edit)
+  // Main Tab State
   const [activeMainTab, setActiveMainTab] = useState(0);
   
   // Bulk Operations Tab State
@@ -3095,381 +3081,34 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
             </InlineStack>
           </InlineStack>
           
-          {/* Step-based Workflow Tabs */}
+          {/* Main Tabs */}
           <Tabs
             tabs={[
               {
-                id: 'select-products',
-                content: '1. Select Products',
-                disabled: false,
+                id: 'products',
+                content: 'Products',
+                accessibilityLabel: 'Products tab',
               },
               {
-                id: 'bulk-edit',
-                content: '2. Bulk Edit',
-                disabled: selectedVariants.length === 0,
+                id: 'bulk-operations',
+                content: `Bulk Operations${selectedVariants.length > 0 ? ` (${selectedVariants.length})` : ''}`,
+                accessibilityLabel: 'Bulk operations tab',
               },
             ]}
             selected={activeMainTab}
             onSelect={setActiveMainTab}
           />
-          
-          {/* Quick Action Buttons - Only show when in bulk edit mode */}
-          {activeMainTab === 1 && (
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(8, minmax(85px, 1fr))', 
-              gap: '8px',
-              alignItems: 'center'
-            }}>
-              {[
-                { id: 0, label: 'Pricing', icon: MoneyIcon },
-                { id: 1, label: 'Collections', icon: CollectionIcon },
-                { id: 2, label: 'Content', icon: EditIcon },
-                { id: 3, label: 'Inventory', icon: InventoryIcon },
-                { id: 4, label: 'Status', icon: StatusIcon },
-                { id: 5, label: 'Discounts', icon: MoneyIcon },
-                { id: 6, label: 'SEO', icon: SearchIcon },
-              ].map(({ id, label, icon }) => (
-                <Button
-                  key={id}
-                  onClick={() => setActiveBulkTab(id)}
-                  disabled={selectedVariants.length === 0}
-                  variant={activeBulkTab === id ? 'primary' : 'secondary'}
-                  size="slim"
-                  icon={icon}
-                  fullWidth
-                >
-                  {label}
-                </Button>
-              ))}
-            </div>
-          )}
         </BlockStack>
       </Card>
 
-      {/* Conditional Layout Based on Active Tab */}
+      {/* Tab Content */}
       {activeMainTab === 0 ? (
-        /* Step 1: Select Products - Show only product list in full width */
+        // Products Tab - Show just the product list
         <div style={{ 
-          minHeight: 'calc(100vh - 200px)',
-          display: 'flex',
-          flexDirection: 'column'
-        }} className="product-selection-layout">
-          {/* Product selection instructions and filters */}
-          <Card>
-            <BlockStack gap="500">
-              <InlineStack align="space-between" blockAlign="center">
-                <BlockStack gap="200">
-                  <Text as="h4" variant="headingSm">Step 1: Select Products</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Choose the products and variants you want to edit in bulk. Use filters to find specific products.
-                  </Text>
-                </BlockStack>
-                {selectedVariants.length > 0 && (
-                  <InlineStack gap="200">
-                    <Badge tone="success">{`${selectedVariants.length} variants selected`}</Badge>
-                    <Button 
-                      onClick={() => setActiveMainTab(1)} 
-                      variant="primary" 
-                      size="slim"
-                    >
-                      Continue to Bulk Edit →
-                    </Button>
-                  </InlineStack>
-                )}
-              </InlineStack>
-
-              {/* Search and Filter Section */}
-              <BlockStack gap="400">
-                <InlineStack align="space-between" blockAlign="center">
-                  <Text as="p" variant="bodyMd" fontWeight="medium">Filters & Search</Text>
-                  <Button
-                    variant="plain"
-                    size="slim"
-                    onClick={() => {
-                      setSearchQuery('');
-                      setCurrentCategory('all');
-                      setShowDraftProducts(true);
-                      setFilterByCollection('');
-                    }}
-                  >
-                    Clear All
-                  </Button>
-                </InlineStack>
-
-                {/* Search */}
-                <TextField
-                  label=""
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  placeholder="Search by product name, handle, or SKU..."
-                  autoComplete="off"
-                  clearButton
-                  onClearButtonClick={() => setSearchQuery('')}
-                />
-
-                {/* Filter Controls */}
-                <InlineStack gap="300">
-                  <div style={{ flex: 1 }}>
-                    <Select
-                      label="Category"
-                      value={currentCategory}
-                      onChange={(value) => setCurrentCategory(value as InventoryCategory)}
-                      options={ProductConstants.CATEGORY_OPTIONS as any}
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <Select
-                      label="Sort by"
-                      value={`${sortField}-${sortDirection}`}
-                      onChange={(value) => {
-                        const [field, direction] = value.split('-');
-                        setSortField(field as SortField);
-                        setSortDirection(direction as SortDirection);
-                      }}
-                      options={ProductConstants.SORT_OPTIONS as any}
-                    />
-                  </div>
-                </InlineStack>
-
-                <Checkbox
-                  checked={showDraftProducts}
-                  onChange={setShowDraftProducts}
-                  label="Include draft products in results"
-                />
-
-                {/* Statistics */}
-                <InlineStack gap="400" wrap>
-                  <InlineStack gap="200" blockAlign="center">
-                    <Text as="span" variant="bodySm" fontWeight="medium">{filteredProducts.length}</Text>
-                    <Text as="span" variant="bodySm" tone="subdued">Products Found</Text>
-                  </InlineStack>
-                  <InlineStack gap="200" blockAlign="center">
-                    <Text as="span" variant="bodySm" fontWeight="medium">{selectedVariants.length}</Text>
-                    <Text as="span" variant="bodySm" tone="subdued">Variants Selected</Text>
-                  </InlineStack>
-                  <InlineStack gap="200" blockAlign="center">
-                    <Text as="span" variant="bodySm" fontWeight="medium">
-                      {filteredProducts.filter(p => p.status === 'ACTIVE').length}
-                    </Text>
-                    <Text as="span" variant="bodySm" tone="subdued">Active</Text>
-                  </InlineStack>
-                  <InlineStack gap="200" blockAlign="center">
-                    <Text as="span" variant="bodySm" fontWeight="medium">
-                      {filteredProducts.filter(p => p.totalInventory === 0).length}
-                    </Text>
-                    <Text as="span" variant="bodySm" tone="subdued">Out of Stock</Text>
-                  </InlineStack>
-                </InlineStack>
-              </BlockStack>
-            </BlockStack>
-          </Card>
-          
-          {/* Product Table - Full Width */}
-          <div 
-            className="product-table-container"
-            style={{ 
-              minHeight: 'calc(100vh - 400px)',
-              display: 'flex',
-              flexDirection: 'column'
-            }}
-          >
-            <Card>
-              <BlockStack gap="300">
-                {/* Table Header */}
-                <div className="product-table-header">
-                  <InlineStack align="space-between" blockAlign="center">
-                    <Text as="h5" variant="bodyMd" fontWeight="medium">
-                      Product Selection Table
-                    </Text>
-                    <InlineStack gap="300">
-                      <Button
-                        variant="tertiary"
-                        size="slim"
-                        onClick={() => {
-                          const activeProducts = filteredProducts.filter(p => p.status === 'ACTIVE');
-                          const allVariants = activeProducts.flatMap(p => 
-                            p.variants.edges.map(v => v.node.id)
-                          );
-                          setSelectedVariants(allVariants);
-                        }}
-                        disabled={filteredProducts.filter(p => p.status === 'ACTIVE').length === 0}
-                      >
-                        Select All Active
-                      </Button>
-                      <Button
-                        variant="tertiary"
-                        size="slim"
-                        onClick={() => {
-                          const outOfStockProducts = filteredProducts.filter(p => p.totalInventory === 0);
-                          const allVariants = outOfStockProducts.flatMap(p => 
-                            p.variants.edges.map(v => v.node.id)
-                          );
-                          setSelectedVariants(allVariants);
-                        }}
-                        disabled={filteredProducts.filter(p => p.totalInventory === 0).length === 0}
-                      >
-                        Select Out of Stock
-                      </Button>
-                    </InlineStack>
-                  </InlineStack>
-                </div>
-
-                {/* Clean Product Selection Table */}
-                <div style={{ minHeight: '400px', maxHeight: '600px', overflow: 'auto' }}>
-                  {isLoading ? (
-                    <div style={{ textAlign: 'center', padding: '40px' }}>
-                      <Spinner size="large" />
-                      <Text as="p" variant="bodySm" tone="subdued">Loading products...</Text>
-                    </div>
-                  ) : filteredProducts.length === 0 ? (
-                    <EmptyState
-                      heading="No products found"
-                      image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-                      action={{
-                        content: 'Clear filters',
-                        onAction: () => {
-                          setSearchQuery('');
-                          setCurrentCategory('all');
-                          setShowDraftProducts(true);
-                          setFilterByCollection('');
-                        }
-                      }}
-                    >
-                      <p>Try adjusting your search or filter criteria to find products.</p>
-                    </EmptyState>
-                  ) : (
-                    <DataTable
-                      columnContentTypes={['text', 'text', 'numeric', 'text', 'text']}
-                      headings={['', 'Product', 'Inventory', 'Status', 'Variants']}
-                      rows={filteredProducts.slice(0, 50).map(product => {
-                        const isProductSelected = selectedProducts.includes(product.id);
-                        const selectedVariantCount = product.variants.edges.filter(v => 
-                          selectedVariants.includes(v.node.id)
-                        ).length;
-                        
-                        return [
-                          <Checkbox
-                            label=""
-                            checked={isProductSelected}
-                            onChange={(checked) => {
-                              if (checked) {
-                                // Select product and all its variants
-                                setSelectedProducts([...selectedProducts, product.id]);
-                                const newVariants = product.variants.edges.map(v => v.node.id);
-                                setSelectedVariants([...selectedVariants, ...newVariants]);
-                              } else {
-                                // Deselect product and all its variants
-                                setSelectedProducts(selectedProducts.filter(id => id !== product.id));
-                                const variantsToRemove = product.variants.edges.map(v => v.node.id);
-                                setSelectedVariants(selectedVariants.filter(id => !variantsToRemove.includes(id)));
-                              }
-                            }}
-                          />,
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            {product.featuredMedia?.preview?.image && (
-                              <Thumbnail
-                                source={product.featuredMedia.preview.image.url}
-                                alt={product.featuredMedia.preview.image.altText || product.title}
-                                size="small"
-                              />
-                            )}
-                            <div>
-                              <Text as="p" variant="bodyMd" fontWeight="medium">
-                                {product.title}
-                              </Text>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                {product.handle}
-                              </Text>
-                            </div>
-                          </div>,
-                          product.totalInventory,
-                          <Badge tone={product.status === 'ACTIVE' ? 'success' : 'attention'}>
-                            {product.status}
-                          </Badge>,
-                          <div>
-                            <Text as="p" variant="bodySm">
-                              {selectedVariantCount > 0 ? `${selectedVariantCount}/` : ''}{product.variants.edges.length} selected
-                            </Text>
-                            {product.variants.edges.length > 1 && (
-                              <Button
-                                variant="plain"
-                                size="micro"
-                                onClick={() => {
-                                  // Toggle individual variant selection
-                                  const allVariantIds = product.variants.edges.map(v => v.node.id);
-                                  const allSelected = allVariantIds.every(id => selectedVariants.includes(id));
-                                  
-                                  if (allSelected) {
-                                    // Deselect all variants
-                                    setSelectedVariants(selectedVariants.filter(id => !allVariantIds.includes(id)));
-                                    setSelectedProducts(selectedProducts.filter(id => id !== product.id));
-                                  } else {
-                                    // Select all variants
-                                    const newVariants = allVariantIds.filter(id => !selectedVariants.includes(id));
-                                    setSelectedVariants([...selectedVariants, ...newVariants]);
-                                    if (!selectedProducts.includes(product.id)) {
-                                      setSelectedProducts([...selectedProducts, product.id]);
-                                    }
-                                  }
-                                }}
-                              >
-                                {selectedVariantCount === product.variants.edges.length ? 'Deselect All' : 'Select All'}
-                              </Button>
-                            )}
-                          </div>
-                        ];
-                      })}
-                    />
-                  )}
-                  
-                  {/* Pagination for large lists */}
-                  {filteredProducts.length > 50 && (
-                    <div style={{ padding: '16px', textAlign: 'center' }}>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Showing first 50 of {filteredProducts.length} products
-                      </Text>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Use filters to narrow down your selection
-                      </Text>
-                    </div>
-                  )}
-                </div>
-              </BlockStack>
-            </Card>
-          </div>
-        </div>
-      ) : (
-        /* Step 2: Bulk Edit - Show two-column layout */
-        <div style={{ 
-          display: 'flex', 
-          gap: '24px', 
-          minHeight: 'calc(100vh - 200px)',
-          flexDirection: 'row'
-        }} className="product-management-layout">
-          {/* Left Column - Bulk Operations Controls */}
-          <div style={{ 
-            width: '420px', 
-            minWidth: '400px', 
-            flexShrink: 0
-          }} className="bulk-operations-column">
-            <BlockStack gap="400">
-              {/* Back to Selection Button */}
-              <Card>
-                <InlineStack gap="300" blockAlign="center">
-                  <Button 
-                    onClick={() => setActiveMainTab(0)} 
-                    variant="tertiary" 
-                    size="slim"
-                    icon={ChevronLeftIcon}
-                  >
-                    ← Back to Product Selection
-                  </Button>
-                  <Badge tone="success">{`${selectedVariants.length} variants selected`}</Badge>
-                </InlineStack>
-              </Card>
-              
-              {/* Bulk Operations Content */}
+          minHeight: 'calc(100vh - 200px)'
+        }}>
+          <BlockStack gap="400">
+            {/* Smart Filters & Controls - moved from right column */}
             <Card background="bg-surface-secondary" padding="300">
               <BlockStack gap="300">
                 <InlineStack align="space-between" blockAlign="center">
@@ -4382,105 +4021,257 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           flexDirection: 'column'
         }} className="product-results-column">
           <BlockStack gap="400">
-            {/* Selected Products Summary */}
+            {/* Smart Filters & Controls */}
             <Card background="bg-surface-secondary" padding="400">
-              <BlockStack gap="400">
+              <BlockStack gap="500">
                 <InlineStack align="space-between" blockAlign="center">
-                  <Text as="h4" variant="headingSm">Selected Products for Bulk Edit</Text>
-                  <Badge tone="success">{`${selectedVariants.length} variants selected`}</Badge>
-                </InlineStack>
-
-                <Text as="p" variant="bodySm" tone="subdued">
-                  These are the products you selected in Step 1. Use the bulk operations on the left to edit them.
-                </Text>
-                
-                <InlineStack gap="300" wrap>
+                  <Text as="h4" variant="headingSm">Filters & Search</Text>
                   <Button
-                    variant="tertiary"
+                    variant="plain"
                     size="slim"
                     onClick={() => {
-                      setSelectedProducts([]);
-                      setSelectedVariants([]);
-                      setActiveMainTab(0);
+                      setSearchQuery('');
+                      setCurrentCategory('all');
+                      setShowDraftProducts(true);
+                      setFilterByCollection('');
                     }}
                   >
-                    ← Back to Product Selection
-                  </Button>
-                  <Button
-                    variant="tertiary"
-                    size="slim"
-                    onClick={() => {
-                      setSelectedProducts([]);
-                      setSelectedVariants([]);
-                    }}
-                    disabled={selectedProducts.length === 0 && selectedVariants.length === 0}
-                  >
-                    Clear All Selections
+                    Clear All
                   </Button>
                 </InlineStack>
-              </BlockStack>
-            </Card>
 
-            {/* Simple selected products summary for bulk editing */}
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h4" variant="headingSm">Selected Products Overview</Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  You have selected {selectedVariants.length} variants from {selectedProducts.length} products for bulk editing.
-                </Text>
-                
-                {selectedProducts.length > 0 && (
-                  <div style={{ maxHeight: '200px', overflow: 'auto' }}>
-                    <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">SELECTED PRODUCTS:</Text>
-                    <div style={{ marginTop: '8px' }}>
-                      {filteredProducts
-                        .filter(p => selectedProducts.includes(p.id))
-                        .slice(0, 10)
-                        .map(product => {
-                          const selectedVariantCount = product.variants.edges.filter(v => 
-                            selectedVariants.includes(v.node.id)
-                          ).length;
-                          
-                          return (
-                            <div key={product.id} style={{ 
-                              padding: '8px 0', 
-                              borderBottom: '1px solid #e1e3e5',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center'
-                            }}>
-                              <Text as="p" variant="bodySm">{product.title}</Text>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                {selectedVariantCount}/{product.variants.edges.length} variants
-                              </Text>
-                            </div>
-                          );
-                        })}
-                        
-                      {selectedProducts.length > 10 && (
-                        <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-                          ... and {selectedProducts.length - 10} more products
-                        </Text>
-                      )}
+                {/* Search Section */}
+                <BlockStack gap="300">
+                  <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">SEARCH & FILTER</Text>
+                  <TextField
+                    label=""
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    placeholder="Search by product name, handle, or SKU..."
+                    autoComplete="off"
+                    clearButton
+                    onClearButtonClick={() => setSearchQuery('')}
+                  />
+                </BlockStack>
+
+                {/* Filter Controls */}
+                <BlockStack gap="300">
+                  <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">CATEGORY & STATUS</Text>
+                  <InlineStack gap="300">
+                    <div style={{ flex: 1 }}>
+                      <Select
+                        label=""
+                        value={currentCategory}
+                        onChange={(value) => setCurrentCategory(value as InventoryCategory)}
+                        options={ProductConstants.CATEGORY_OPTIONS as any}
+                      />
                     </div>
+                    <div style={{ flex: 1 }}>
+                      <Select
+                        label=""
+                        value={`${sortField}-${sortDirection}`}
+                        onChange={(value) => {
+                          const [field, direction] = value.split('-');
+                          setSortField(field as SortField);
+                          setSortDirection(direction as SortDirection);
+                        }}
+                        options={ProductConstants.SORT_OPTIONS as any}
+                      />
+                    </div>
+                  </InlineStack>
+                  <Checkbox
+                    checked={showDraftProducts}
+                    onChange={setShowDraftProducts}
+                    label="Include draft products in results"
+                  />
+                </BlockStack>
+
+                {/* Statistics Section */}
+                <BlockStack gap="300">
+                  <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">CURRENT VIEW STATISTICS</Text>
+                  <InlineStack gap="400" wrap>
+                    <InlineStack gap="200" blockAlign="center">
+                      <Text as="span" variant="bodySm" fontWeight="medium">{filteredProducts.length}</Text>
+                      <Text as="span" variant="bodySm" tone="subdued">Products Found</Text>
+                    </InlineStack>
+                    <InlineStack gap="200" blockAlign="center">
+                      <Text as="span" variant="bodySm" fontWeight="medium">{selectedVariants.length}</Text>
+                      <Text as="span" variant="bodySm" tone="subdued">Variants Selected</Text>
+                    </InlineStack>
+                    <InlineStack gap="200" blockAlign="center">
+                      <Text as="span" variant="bodySm" fontWeight="medium">
+                        {filteredProducts.filter(p => p.status === 'ACTIVE').length}
+                      </Text>
+                      <Text as="span" variant="bodySm" tone="subdued">Active</Text>
+                    </InlineStack>
+                    <InlineStack gap="200" blockAlign="center">
+                      <Text as="span" variant="bodySm" fontWeight="medium">
+                        {filteredProducts.filter(p => p.totalInventory === 0).length}
+                      </Text>
+                      <Text as="span" variant="bodySm" tone="subdued">Out of Stock</Text>
+                    </InlineStack>
+                  </InlineStack>
+                </BlockStack>
+
+                {/* Quick Actions */}
+                <BlockStack gap="300">
+                  <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">QUICK ACTIONS</Text>
+                  
+                  {/* Collection Filter */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <Select
+                      label=""
+                      placeholder="Filter by collection..."
+                      value={filterByCollection}
+                      onChange={setFilterByCollection}
+                      options={[
+                        { label: 'All Collections', value: '' },
+                        ...availableCollections.map(collection => ({
+                          label: collection.title,
+                          value: collection.id
+                        }))
+                      ]}
+                    />
                   </div>
-                )}
+                  
+                  <InlineStack gap="200" wrap>
+                    <Button
+                      variant="tertiary"
+                      size="slim"
+                      onClick={() => {
+                        const activeProducts = filteredProducts.filter(p => p.status === 'ACTIVE');
+                        activeProducts.forEach(product => handleProductSelection(product.id, true));
+                      }}
+                      disabled={filteredProducts.filter(p => p.status === 'ACTIVE').length === 0}
+                    >
+                      Select All Active
+                    </Button>
+                    <Button
+                      variant="tertiary"
+                      size="slim"
+                      onClick={() => {
+                        const outOfStockProducts = filteredProducts.filter(p => p.totalInventory === 0);
+                        outOfStockProducts.forEach(product => handleProductSelection(product.id, true));
+                      }}
+                      disabled={filteredProducts.filter(p => p.totalInventory === 0).length === 0}
+                    >
+                      Select Out of Stock
+                    </Button>
+                    <Button
+                      variant="tertiary"
+                      size="slim"
+                      onClick={() => {
+                        setSelectedProducts([]);
+                        setSelectedVariants([]);
+                      }}
+                      disabled={selectedProducts.length === 0 && selectedVariants.length === 0}
+                    >
+                      Clear Selection
+                    </Button>
+                  </InlineStack>
+                </BlockStack>
               </BlockStack>
             </Card>
+
+            <Card>
+              <BlockStack gap="400">
+                {isLoading ? (
+            <Box padding="800">
+              <InlineStack align="center" gap="200">
+                <Spinner size="large" />
+                <Text as="p" variant="bodyMd">Loading products...</Text>
+              </InlineStack>
+            </Box>
+          ) : filteredProducts.length === 0 ? (
+            <EmptyState
+              heading="No products match your criteria"
+              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+            >
+              <Text as="p" variant="bodyMd">
+                Try adjusting your filters, search terms, or category selection to find products.
+              </Text>
+              <Box padding="300">
+                <Button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setCurrentCategory('all');
+                    setShowDraftProducts(true);
+                    setFilterByCollection('');
+                  }}
+                  variant="primary"
+                >
+                  Reset Filters
+                </Button>
+              </Box>
+            </EmptyState>
+          ) : (
+            <BlockStack gap="300">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h4" variant="headingMd">
+                  Product Results
+                </Text>
+                <InlineStack gap="300" blockAlign="center">
+                <Text as="p" variant="bodySm" tone="subdued">
+                    Showing {Math.min(productResultsSliderIndex + 1, filteredProducts.length)} - {Math.min(productResultsSliderIndex + productsPerPage, filteredProducts.length)} of {filteredProducts.length} products
+                </Text>
+                  {filteredProducts.length > productsPerPage && (
+                    <InlineStack gap="200" blockAlign="center">
+                      <Button
+                        size="micro"
+                        disabled={productResultsSliderIndex === 0}
+                        onClick={() => setProductResultsSliderIndex(Math.max(0, productResultsSliderIndex - productsPerPage))}
+                        icon={ChevronLeftIcon}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        size="micro"
+                        disabled={productResultsSliderIndex + productsPerPage >= filteredProducts.length}
+                        onClick={() => setProductResultsSliderIndex(Math.min(filteredProducts.length - productsPerPage, productResultsSliderIndex + productsPerPage))}
+                        icon={ChevronRightIcon}
+                      >
+                        Next
+                      </Button>
+                    </InlineStack>
+                  )}
+                </InlineStack>
+              </InlineStack>
+              
+              {/* Select All Checkbox for Product Results */}
+              <InlineStack gap="300" blockAlign="center">
+                <Checkbox
+                  checked={isAllResultsSelected()}
+                  onChange={handleSelectAllResults}
+                  label=""
+                />
+                <Text as="p" variant="bodySm" fontWeight="medium">
+                  Select all {filteredProducts.length} products in results
+                </Text>
+                {selectedProducts.length > 0 && (
+                  <Badge tone="info">
+                    {`${selectedProducts.length} selected`}
+                  </Badge>
+                )}
+              </InlineStack>
+              
+              {renderCardView()}
+            </BlockStack>
+          )}
+        </BlockStack>
+      </Card>
           </BlockStack>
         </div>
-        </div>
-      )}
-      </BlockStack>
-
-      {notification.show && (
-        <Toast
-          content={notification.message}
-          error={notification.error}
-          onDismiss={() => setNotification({ show: false, message: '' })}
-          duration={4000}
-        />
-      )}
+      </div>
+    </BlockStack>
+    
+    {notification.show && (
+      <Toast
+        content={notification.message}
+        error={notification.error}
+        onDismiss={() => setNotification({ show: false, message: '' })}
+        duration={4000}
+      />
+    )}
     </>
   );
 }
