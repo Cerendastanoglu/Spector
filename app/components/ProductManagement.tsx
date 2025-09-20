@@ -13,22 +13,15 @@ import {
   Checkbox,
   TextField,
   Select,
-  Modal,
   Thumbnail,
-  Grid,
   ResourceList,
   ResourceItem,
   Box,
   Spinner,
   EmptyState,
-  FormLayout,
-  ChoiceList,
   Icon,
   Collapsible,
-  Link,
-  Banner,
   Toast,
-  Tabs,
 } from '@shopify/polaris';
 // Import only the icons we actually use
 import { 
@@ -42,9 +35,6 @@ import {
   MoneyIcon,
   CollectionIcon,
   InventoryIcon,
-  DeliveryIcon,
-  ImageIcon,
-  ClockIcon,
   SearchIcon,
   StatusIcon
 } from "@shopify/polaris-icons";
@@ -3777,88 +3767,281 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       <p>Try adjusting your search or filter criteria to find products.</p>
                     </EmptyState>
                   ) : (
-                    <DataTable
-                      columnContentTypes={['text', 'text', 'numeric', 'text', 'text']}
-                      headings={['', 'Product', 'Inventory', 'Status', 'Variants']}
-                      rows={filteredProducts.slice(0, 50).map(product => {
+                    <div style={{ 
+                      border: '1px solid #E1E3E5', 
+                      borderRadius: '8px', 
+                      overflow: 'hidden',
+                      backgroundColor: 'white'
+                    }}>
+                      {/* Table Header */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '50px 2fr 120px 120px 80px 100px 120px',
+                        backgroundColor: '#F6F6F7',
+                        borderBottom: '1px solid #E1E3E5',
+                        padding: '12px 16px',
+                        fontWeight: '600',
+                        fontSize: '13px',
+                        color: '#616161'
+                      }}>
+                        <div></div>
+                        <div>PRODUCT</div>
+                        <div>PRICE</div>
+                        <div>COMPARE PRICE</div>
+                        <div>INVENTORY</div>
+                        <div>STATUS</div>
+                        <div>VARIANTS</div>
+                      </div>
+                      
+                      {/* Table Body */}
+                      {filteredProducts.slice(0, 50).map((product, productIndex) => {
                         const isProductSelected = selectedProducts.includes(product.id);
                         const selectedVariantCount = product.variants.edges.filter(v => 
                           selectedVariants.includes(v.node.id)
                         ).length;
                         
-                        return [
-                          <Checkbox
-                            label=""
-                            checked={isProductSelected}
-                            onChange={(checked) => {
-                              if (checked) {
-                                // Select product and all its variants
-                                setSelectedProducts([...selectedProducts, product.id]);
-                                const newVariants = product.variants.edges.map(v => v.node.id);
-                                setSelectedVariants([...selectedVariants, ...newVariants]);
-                              } else {
-                                // Deselect product and all its variants
-                                setSelectedProducts(selectedProducts.filter(id => id !== product.id));
-                                const variantsToRemove = product.variants.edges.map(v => v.node.id);
-                                setSelectedVariants(selectedVariants.filter(id => !variantsToRemove.includes(id)));
-                              }
-                            }}
-                          />,
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            {product.featuredMedia?.preview?.image && (
-                              <Thumbnail
-                                source={product.featuredMedia.preview.image.url}
-                                alt={product.featuredMedia.preview.image.altText || product.title}
-                                size="small"
-                              />
-                            )}
-                            <div>
-                              <Text as="p" variant="bodyMd" fontWeight="medium">
-                                {product.title}
-                              </Text>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                {product.handle}
-                              </Text>
-                            </div>
-                          </div>,
-                          product.totalInventory,
-                          <Badge tone={product.status === 'ACTIVE' ? 'success' : 'attention'}>
-                            {product.status}
-                          </Badge>,
-                          <div>
-                            <Text as="p" variant="bodySm">
-                              {selectedVariantCount > 0 ? `${selectedVariantCount}/` : ''}{product.variants.edges.length} selected
-                            </Text>
-                            {product.variants.edges.length > 1 && (
-                              <Button
-                                variant="plain"
-                                size="micro"
-                                onClick={() => {
-                                  // Toggle individual variant selection
-                                  const allVariantIds = product.variants.edges.map(v => v.node.id);
-                                  const allSelected = allVariantIds.every(id => selectedVariants.includes(id));
-                                  
-                                  if (allSelected) {
-                                    // Deselect all variants
-                                    setSelectedVariants(selectedVariants.filter(id => !allVariantIds.includes(id)));
-                                    setSelectedProducts(selectedProducts.filter(id => id !== product.id));
-                                  } else {
-                                    // Select all variants
-                                    const newVariants = allVariantIds.filter(id => !selectedVariants.includes(id));
+                        // Calculate price range for display
+                        const prices = product.variants.edges.map(edge => parseFloat(edge.node.price));
+                        const minPrice = Math.min(...prices);
+                        const maxPrice = Math.max(...prices);
+                        const hasMultipleVariants = product.variants.edges.length > 1;
+                        const isExpanded = expandedProducts.has(product.id);
+                        // Only show compare price in table for single variant products
+                        const singleVariantComparePrice = !hasMultipleVariants ? product.variants.edges[0]?.node.compareAtPrice : null;
+                        const hasSingleComparePrice = singleVariantComparePrice && parseFloat(singleVariantComparePrice) > 0;
+                        
+                        return (
+                          <div key={product.id}>
+                            {/* Main Product Row */}
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: '50px 2fr 120px 120px 80px 100px 120px',
+                              alignItems: 'center',
+                              padding: '12px 16px',
+                              borderBottom: '1px solid #F0F0F0',
+                              backgroundColor: isProductSelected ? '#F7F9FD' : 'white',
+                              transition: 'background-color 0.2s ease'
+                            }}>
+                              <Checkbox
+                                label=""
+                                checked={isProductSelected}
+                                onChange={(checked) => {
+                                  if (checked) {
+                                    // Select product and all its variants
+                                    setSelectedProducts([...selectedProducts, product.id]);
+                                    const newVariants = product.variants.edges.map(v => v.node.id);
                                     setSelectedVariants([...selectedVariants, ...newVariants]);
-                                    if (!selectedProducts.includes(product.id)) {
-                                      setSelectedProducts([...selectedProducts, product.id]);
-                                    }
+                                  } else {
+                                    // Deselect product and all its variants
+                                    setSelectedProducts(selectedProducts.filter(id => id !== product.id));
+                                    const variantsToRemove = product.variants.edges.map(v => v.node.id);
+                                    setSelectedVariants(selectedVariants.filter(id => !variantsToRemove.includes(id)));
                                   }
                                 }}
-                              >
-                                {selectedVariantCount === product.variants.edges.length ? 'Deselect All' : 'Select All'}
-                              </Button>
+                              />
+                              
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                {product.featuredMedia?.preview?.image && (
+                                  <Thumbnail
+                                    source={product.featuredMedia.preview.image.url}
+                                    alt={product.featuredMedia.preview.image.altText || product.title}
+                                    size="small"
+                                  />
+                                )}
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Text as="p" variant="bodyMd" fontWeight="medium">
+                                      {product.title}
+                                    </Text>
+                                    {hasMultipleVariants && (
+                                      <Button
+                                        variant="plain"
+                                        size="micro"
+                                        icon={isExpanded ? ChevronUpIcon : ChevronDownIcon}
+                                        onClick={() => {
+                                          const newExpanded = new Set(expandedProducts);
+                                          if (isExpanded) {
+                                            newExpanded.delete(product.id);
+                                          } else {
+                                            newExpanded.add(product.id);
+                                          }
+                                          setExpandedProducts(newExpanded);
+                                        }}
+                                        accessibilityLabel={`${isExpanded ? 'Collapse' : 'Expand'} variants for ${product.title}`}
+                                      />
+                                    )}
+                                  </div>
+                                  <Text as="p" variant="bodySm" tone="subdued">
+                                    {product.handle}
+                                  </Text>
+                                </div>
+                              </div>
+                              
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <Icon source={MoneyIcon} tone="subdued" />
+                                <Text as="span" variant="bodyMd" fontWeight="medium">
+                                  ${minPrice === maxPrice ? minPrice.toFixed(2) : `${minPrice.toFixed(2)} - ${maxPrice.toFixed(2)}`}
+                                </Text>
+                              </div>
+                              
+                              {hasMultipleVariants ? (
+                                <Button
+                                  variant="plain"
+                                  size="micro"
+                                  onClick={() => {
+                                    const newExpanded = new Set(expandedProducts);
+                                    newExpanded.add(product.id);
+                                    setExpandedProducts(newExpanded);
+                                  }}
+                                >
+                                  View Variants
+                                </Button>
+                              ) : hasSingleComparePrice ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <Text as="span" variant="bodySm" tone="subdued">
+                                    <span style={{ textDecoration: 'line-through' }}>
+                                      ${parseFloat(singleVariantComparePrice).toFixed(2)}
+                                    </span>
+                                  </Text>
+                                  <Text as="span" variant="bodySm" tone="success" fontWeight="medium">
+                                    {Math.round(((parseFloat(singleVariantComparePrice) - minPrice) / parseFloat(singleVariantComparePrice)) * 100)}% off
+                                  </Text>
+                                </div>
+                              ) : (
+                                <Text as="span" variant="bodySm" tone="subdued">—</Text>
+                              )}
+                              
+                              <Text as="span" variant="bodyMd">
+                                {product.totalInventory}
+                              </Text>
+                              
+                              <Badge tone={product.status === 'ACTIVE' ? 'success' : 'attention'}>
+                                {product.status}
+                              </Badge>
+                              
+                              <div>
+                                <Text as="p" variant="bodySm">
+                                  {selectedVariantCount > 0 ? `${selectedVariantCount}/` : ''}{product.variants.edges.length} selected
+                                </Text>
+                                {hasMultipleVariants && (
+                                  <Button
+                                    variant="plain"
+                                    size="micro"
+                                    onClick={() => {
+                                      const allVariantIds = product.variants.edges.map(v => v.node.id);
+                                      const allSelected = allVariantIds.every(id => selectedVariants.includes(id));
+                                      
+                                      if (allSelected) {
+                                        setSelectedVariants(selectedVariants.filter(id => !allVariantIds.includes(id)));
+                                        setSelectedProducts(selectedProducts.filter(id => id !== product.id));
+                                      } else {
+                                        const newVariants = allVariantIds.filter(id => !selectedVariants.includes(id));
+                                        setSelectedVariants([...selectedVariants, ...newVariants]);
+                                        if (!selectedProducts.includes(product.id)) {
+                                          setSelectedProducts([...selectedProducts, product.id]);
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    {selectedVariantCount === product.variants.edges.length ? 'Deselect All' : 'Select All'}
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Expanded Variant Rows */}
+                            {isExpanded && hasMultipleVariants && (
+                              <div style={{ 
+                                backgroundColor: '#FAFBFC',
+                                borderBottom: '1px solid #F0F0F0'
+                              }}>
+                                {product.variants.edges.map((variant, variantIndex) => {
+                                  const variantPrice = parseFloat(variant.node.price);
+                                  const variantComparePrice = variant.node.compareAtPrice;
+                                  const hasVariantComparePrice = variantComparePrice && parseFloat(variantComparePrice) > 0;
+                                  const isVariantSelected = selectedVariants.includes(variant.node.id);
+                                  
+                                  return (
+                                    <div key={variant.node.id} style={{
+                                      display: 'grid',
+                                      gridTemplateColumns: '50px 2fr 120px 120px 80px 100px 120px',
+                                      alignItems: 'center',
+                                      padding: '8px 16px 8px 80px',
+                                      backgroundColor: isVariantSelected ? '#F0F7FF' : '#FAFBFC',
+                                      borderTop: variantIndex > 0 ? '1px solid #F0F0F0' : 'none'
+                                    }}>
+                                      <Checkbox
+                                        label=""
+                                        checked={isVariantSelected}
+                                        onChange={(checked) => {
+                                          if (checked) {
+                                            setSelectedVariants([...selectedVariants, variant.node.id]);
+                                            if (!selectedProducts.includes(product.id)) {
+                                              setSelectedProducts([...selectedProducts, product.id]);
+                                            }
+                                          } else {
+                                            setSelectedVariants(selectedVariants.filter(id => id !== variant.node.id));
+                                            // If no variants selected, remove product
+                                            const remainingVariants = product.variants.edges.filter(v => 
+                                              v.node.id !== variant.node.id && selectedVariants.includes(v.node.id)
+                                            );
+                                            if (remainingVariants.length === 0) {
+                                              setSelectedProducts(selectedProducts.filter(id => id !== product.id));
+                                            }
+                                          }
+                                        }}
+                                      />
+                                      
+                                      <div>
+                                        <Text as="p" variant="bodySm" fontWeight="medium">
+                                          {variant.node.title}
+                                        </Text>
+                                        <Text as="p" variant="bodyXs" tone="subdued">
+                                          SKU: {variant.node.sku || 'N/A'}
+                                        </Text>
+                                      </div>
+                                      
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <Text as="span" variant="bodySm" fontWeight="medium">
+                                          ${variantPrice.toFixed(2)}
+                                        </Text>
+                                      </div>
+                                      
+                                      {hasVariantComparePrice ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          <Text as="span" variant="bodyXs" tone="subdued">
+                                            <span style={{ textDecoration: 'line-through' }}>
+                                              ${parseFloat(variantComparePrice).toFixed(2)}
+                                            </span>
+                                          </Text>
+                                          <Text as="span" variant="bodyXs" tone="success" fontWeight="medium">
+                                            {Math.round(((parseFloat(variantComparePrice) - variantPrice) / parseFloat(variantComparePrice)) * 100)}% off
+                                          </Text>
+                                        </div>
+                                      ) : (
+                                        <Text as="span" variant="bodyXs" tone="subdued">—</Text>
+                                      )}
+                                      
+                                      <Text as="span" variant="bodySm">
+                                        {variant.node.inventoryQuantity || 0}
+                                      </Text>
+                                      
+                                      <Text as="span" variant="bodyXs" tone="subdued">
+                                        —
+                                      </Text>
+                                      
+                                      <Text as="span" variant="bodyXs" tone="subdued">
+                                        Variant
+                                      </Text>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             )}
                           </div>
-                        ];
+                        );
                       })}
-                    />
+                    </div>
                   )}
                   
                   {/* Pagination for large lists */}
