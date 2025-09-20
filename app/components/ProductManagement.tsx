@@ -22,6 +22,7 @@ import {
   Icon,
   Collapsible,
   Toast,
+  Frame,
 } from '@shopify/polaris';
 // Import only the icons we actually use
 import { 
@@ -268,16 +269,19 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [bulkOperation, setBulkOperation] = useState<'pricing' | 'collections'>('pricing');
   
   // Enhanced Pricing Operations State
-  const [priceOperation, setPriceOperation] = useState<'set' | 'increase' | 'decrease' | 'round'>('set');
+  const [priceOperation, setPriceOperation] = useState<'set' | 'increase' | 'decrease' | 'round' | 'smart_round' | 'tiered' | 'margin'>('set');
   const [priceValue, setPriceValue] = useState('');
   const [pricePercentage, setPricePercentage] = useState('0');
-  const [roundingRule, setRoundingRule] = useState<'nearest' | 'up' | 'down'>('nearest');
+  const [roundingRule, setRoundingRule] = useState<'nearest' | 'up' | 'down' | 'psychological' | 'premium' | 'clean' | 'half' | 'match' | 'beat_dollar' | 'beat_percent' | 'charm' | 'prestige' | 'anchoring' | 'odd_even'>('nearest');
   const [compareAtPrice, setCompareAtPrice] = useState('');
   const [applyToComparePrice, setApplyToComparePrice] = useState(false);
   
   // Compare Price Operations State
   const [compareOperation, setCompareOperation] = useState<'set' | 'increase' | 'decrease' | 'remove'>('set');
   const [compareValue, setCompareValue] = useState('');
+  
+  // Pricing Category State
+  const [pricingCategory, setPricingCategory] = useState<'price' | 'discount'>('price');
   const [comparePercentage, setComparePercentage] = useState('0');
   const [applyCompareChanges, setApplyCompareChanges] = useState(false);
   
@@ -363,7 +367,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [publishDate, setPublishDate] = useState('');
 
   // Bulk Discount Operations State
-  const [discountOperation, setDiscountOperation] = useState<'set' | 'increase' | 'decrease'>('set');
+  const [discountOperation, setDiscountOperation] = useState<'set' | 'increase' | 'decrease' | 'flash_sale' | 'volume' | 'competitive' | 'psychological' | 'bundle' | 'seasonal' | 'dynamic' | 'simple'>('set');
   const [discountValue, setDiscountValue] = useState('');
   const [discountPercentage, setDiscountPercentage] = useState('0');
 
@@ -471,9 +475,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
   };
   
-  // Slider state for Product Results
-  const [productResultsSliderIndex, setProductResultsSliderIndex] = useState(0);
-  const [productsPerPage] = useState(10); // Number of products to show per page
+  // Show more products per page instead of pagination
+  const [productsPerPage] = useState(50); // Increased from 10 to 50
 
   // Thresholds for inventory categorization (use constants)
   // Removed duplicated constants
@@ -629,9 +632,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
   }, [fetcher.state]);
 
-  // Reset slider when filters change
+  // Filter change handler - no longer need pagination reset
   useEffect(() => {
-    setProductResultsSliderIndex(0);
+    // Filters changed - table will show products automatically without pagination
   }, [
     searchQuery, 
     currentCategory, 
@@ -849,6 +852,221 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   //   setSelectedProducts(checked ? filteredProducts.map(p => p.id) : []);
   // };
 
+  // Smart Pricing Helper Functions
+  const applySmartRounding = (price: number, strategy: string): number => {
+    if (strategy === 'psychological') {
+      // Round to .99 (e.g., 10.32 -> 9.99, 23.45 -> 22.99)
+      return Math.floor(price) + 0.99;
+    } else if (strategy === 'premium') {
+      // Round to .95 (e.g., 10.32 -> 9.95, 23.45 -> 22.95)
+      return Math.floor(price) + 0.95;
+    } else if (strategy === 'clean') {
+      // Round to .00 (e.g., 10.32 -> 10.00, 23.45 -> 23.00)
+      return Math.round(price);
+    } else if (strategy === 'half') {
+      // Round to .50 (e.g., 10.32 -> 10.50, 23.45 -> 23.50)
+      return Math.floor(price) + 0.50;
+    }
+    return price;
+  };
+
+  const applyTieredPricing = (price: number): number => {
+    if (price <= 10) {
+      // $0-$10: Round to .99
+      return Math.max(0.99, Math.floor(price) + 0.99);
+    } else if (price <= 50) {
+      // $10-$50: Round to .95
+      return Math.floor(price) + 0.95;
+    } else if (price <= 100) {
+      // $50-$100: Round to .00
+      return Math.round(price);
+    } else {
+      // $100+: Round to nearest $5
+      return Math.round(price / 5) * 5;
+    }
+  };
+
+  // Advanced Discount System
+  const handleAdvancedDiscount = async () => {
+    if (selectedVariants.length === 0) {
+      setError("Please select at least one variant to apply discount strategy.");
+      return;
+    }
+    
+    setIsLoading(true);
+    clearBulkMessages();
+    
+    try {
+      const failed: string[] = [];
+      const successful: string[] = [];
+      
+      for (let i = 0; i < selectedVariants.length; i++) {
+        const variantId = selectedVariants[i];
+        
+        // Find the product and variant
+        let targetProduct = null;
+        let targetVariant = null;
+        
+        for (const product of products) {
+          const variant = product.variants.edges.find(v => v.node.id === variantId);
+          if (variant) {
+            targetProduct = product;
+            targetVariant = variant.node;
+            break;
+          }
+        }
+        
+        if (!targetProduct || !targetVariant) continue;
+        
+        const currentPrice = parseFloat(targetVariant.price);
+        let newPrice = currentPrice;
+        let newCompareAtPrice = targetVariant.compareAtPrice ? parseFloat(targetVariant.compareAtPrice) : null;
+        
+        // Apply advanced discount strategy
+        switch (discountOperation) {
+          case 'flash_sale':
+            const flashDiscount = parseFloat(discountPercentage) || 0;
+            newCompareAtPrice = currentPrice; // Original price becomes compare-at
+            newPrice = currentPrice * (1 - flashDiscount / 100);
+            break;
+            
+          case 'volume':
+            const inventory = targetVariant.inventoryQuantity || 0;
+            if (inventory >= 50) {
+              // High inventory: 5% discount
+              newPrice = currentPrice * 0.95;
+            } else if (inventory >= 10) {
+              // Medium inventory: no change
+              newPrice = currentPrice;
+            } else if (inventory > 0) {
+              // Low inventory: 10% premium
+              newPrice = currentPrice * 1.10;
+            } else {
+              // Out of stock: set high compare-at for comeback
+              newCompareAtPrice = currentPrice * 1.25;
+            }
+            break;
+            
+          case 'competitive':
+            const competitorPrice = parseFloat(discountValue) || currentPrice;
+            if (roundingRule === 'match') {
+              newPrice = competitorPrice;
+            } else if (roundingRule === 'beat_dollar') {
+              newPrice = Math.max(0.99, competitorPrice - 1.00);
+            } else if (roundingRule === 'beat_percent') {
+              newPrice = competitorPrice * 0.95;
+            } else if (roundingRule === 'premium') {
+              newPrice = competitorPrice * 1.10;
+              newCompareAtPrice = competitorPrice * 1.25; // Show value
+            }
+            break;
+            
+          case 'psychological':
+            if (roundingRule === 'charm') {
+              newPrice = Math.floor(currentPrice) + 0.99;
+            } else if (roundingRule === 'prestige') {
+              newPrice = Math.round(currentPrice);
+            } else if (roundingRule === 'anchoring') {
+              newCompareAtPrice = currentPrice * 1.40; // High anchor
+              newPrice = currentPrice * 0.85; // Good deal
+            } else if (roundingRule === 'odd_even') {
+              // Odd for bargains, even for luxury
+              if (currentPrice < 50) {
+                newPrice = Math.floor(currentPrice) + 0.99; // Odd
+              } else {
+                newPrice = Math.round(currentPrice / 5) * 5; // Even multiples
+              }
+            }
+            break;
+            
+          case 'simple':
+            const simplePercent = parseFloat(discountPercentage) || 0;
+            newPrice = currentPrice * (1 + simplePercent / 100);
+            break;
+            
+          default:
+            newPrice = currentPrice;
+        }
+        
+        // Ensure price is never negative and round to 2 decimals
+        newPrice = Math.max(0.01, Math.round(newPrice * 100) / 100);
+        if (newCompareAtPrice) {
+          newCompareAtPrice = Math.round(newCompareAtPrice * 100) / 100;
+        }
+        
+        // Update variant
+        try {
+          const updateData = {
+            id: variantId,
+            price: newPrice.toFixed(2),
+            ...(newCompareAtPrice && { compareAtPrice: newCompareAtPrice.toFixed(2) })
+          };
+          
+          const response = await fetch('/api/products', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'updateVariant',
+              data: updateData
+            }),
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            successful.push(`${targetProduct.title} - ${targetVariant.title}`);
+            
+            // Update local state
+            setProducts(prevProducts => 
+              prevProducts.map(product => {
+                if (product.id === targetProduct.id) {
+                  return {
+                    ...product,
+                    variants: {
+                      ...product.variants,
+                      edges: product.variants.edges.map(edge => {
+                        if (edge.node.id === variantId) {
+                          return {
+                            ...edge,
+                            node: {
+                              ...edge.node,
+                              price: newPrice.toFixed(2),
+                              compareAtPrice: newCompareAtPrice ? newCompareAtPrice.toFixed(2) : edge.node.compareAtPrice
+                            }
+                          };
+                        }
+                        return edge;
+                      })
+                    }
+                  };
+                }
+                return product;
+              })
+            );
+          } else {
+            failed.push(`${targetProduct.title} - ${targetVariant.title}: ${result.error}`);
+          }
+        } catch (error) {
+          failed.push(`${targetProduct.title} - ${targetVariant.title}: Network error`);
+        }
+      }
+      
+      // Show results
+      if (successful.length > 0) {
+        console.log(`✅ Applied discount strategy to ${successful.length} variants`);
+        // Could show success toast here
+      }
+      if (failed.length > 0) {
+        setError(`❌ Failed to update ${failed.length} variants: ${failed.slice(0, 3).join(', ')}${failed.length > 3 ? '...' : ''}`);
+      }
+      
+    } catch (error) {
+      setError('Failed to apply discount strategy. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Enhanced Pricing Operations with Advanced Error Handling
   const handleBulkPricing = async () => {
     if (selectedVariants.length === 0) {
@@ -874,6 +1092,20 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     
     if (priceOperation === 'decrease' && parseFloat(pricePercentage) >= 100) {
       setError("Decrease percentage must be less than 100%.");
+      return;
+    }
+
+
+
+    // Block margin-based pricing for now
+    if (priceOperation === 'margin') {
+      setError("🚧 Margin-based pricing is coming soon! Please use another pricing method for now.");
+      return;
+    }
+
+    // Validation for new pricing operations
+    if (priceOperation === 'smart_round' && !['psychological', 'premium', 'clean', 'half'].includes(roundingRule)) {
+      setError("Please select a smart rounding strategy.");
       return;
     }
     
@@ -962,6 +1194,12 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
               if (roundingRule === 'up') newPrice = Math.ceil(currentPrice);
               else if (roundingRule === 'down') newPrice = Math.floor(currentPrice);
               else newPrice = Math.round(currentPrice);
+              break;
+            case 'smart_round':
+              newPrice = applySmartRounding(currentPrice, roundingRule);
+              break;
+            case 'tiered':
+              newPrice = applyTieredPricing(currentPrice);
               break;
             default:
               newPrice = currentPrice;
@@ -1196,6 +1434,12 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
               } else {
                 newPrice = Math.round(currentPrice);
               }
+              break;
+            case 'smart_round':
+              newPrice = applySmartRounding(currentPrice, roundingRule);
+              break;
+            case 'tiered':
+              newPrice = applyTieredPricing(currentPrice);
               break;
             default:
               newPrice = currentPrice;
@@ -2473,7 +2717,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   };
 
   const handleSelectAll = (checked: boolean) => {
-    const currentPageProducts = filteredProducts.slice(productResultsSliderIndex, productResultsSliderIndex + productsPerPage);
+    const currentPageProducts = filteredProducts.slice(0, productsPerPage);
     if (checked) {
       const newSelection = [...new Set([...selectedProducts, ...currentPageProducts.map(p => p.id)])];
       setSelectedProducts(newSelection);
@@ -2485,30 +2729,30 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
 
   // Helper functions for product results selection
   const isAllResultsSelected = () => {
-    const visibleProducts = filteredProducts.slice(productResultsSliderIndex, productResultsSliderIndex + productsPerPage);
+    const visibleProducts = filteredProducts.slice(0, productsPerPage);
     return visibleProducts.length > 0 && visibleProducts.every(product => getProductSelectionState(product.id) !== 'none');
   };
 
   const handleSelectAllResults = (checked: boolean) => {
-    const visibleProducts = filteredProducts.slice(productResultsSliderIndex, productResultsSliderIndex + productsPerPage);
+    const visibleProducts = filteredProducts.slice(0, productsPerPage);
     visibleProducts.forEach(product => {
       handleProductSelection(product.id, checked);
     });
   };
 
   const isAllCurrentPageSelected = () => {
-    const currentPageProducts = filteredProducts.slice(productResultsSliderIndex, productResultsSliderIndex + productsPerPage);
+    const currentPageProducts = filteredProducts.slice(0, productsPerPage);
     return currentPageProducts.length > 0 && currentPageProducts.every(product => selectedProducts.includes(product.id));
   };
 
   const isIndeterminate = () => {
-    const currentPageProducts = filteredProducts.slice(productResultsSliderIndex, productResultsSliderIndex + productsPerPage);
+    const currentPageProducts = filteredProducts.slice(0, productsPerPage);
     const selectedCount = currentPageProducts.filter(product => selectedProducts.includes(product.id)).length;
     return selectedCount > 0 && selectedCount < currentPageProducts.length;
   };
 
   const renderTableView = () => {
-    const paginatedProducts = filteredProducts.slice(productResultsSliderIndex, productResultsSliderIndex + productsPerPage);
+    const paginatedProducts = filteredProducts.slice(0, productsPerPage);
 
     const tableHeadings = [
       <div key="select-all" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '300px' }}>
@@ -2530,6 +2774,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       </div>,
       <div key="status" style={{ textAlign: 'center', minWidth: '80px' }}>
         <Text as="span" variant="bodyMd" fontWeight="semibold">Status</Text>
+      </div>,
+      <div key="price" style={{ textAlign: 'center', minWidth: '100px' }}>
+        <Text as="span" variant="bodyMd" fontWeight="semibold">Price</Text>
       </div>,
       <div key="inventory" style={{ textAlign: 'center', minWidth: '100px' }}>
         <Text as="span" variant="bodyMd" fontWeight="semibold">Inventory</Text>
@@ -2706,6 +2953,30 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           {getStatusDot(product.status)}
         </div>,
         
+        // Price column (only for single variant products)
+        <div key={`${productKey}-price`} style={{ textAlign: 'center', padding: '12px 8px' }}>
+          {!hasMultipleVariants && product.variants.edges.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+              <Text as="span" variant="bodySm" fontWeight="medium">
+                {currencySymbol}{parseFloat(product.variants.edges[0].node.price).toFixed(2)}
+              </Text>
+              {product.variants.edges[0].node.compareAtPrice && parseFloat(product.variants.edges[0].node.compareAtPrice) > parseFloat(product.variants.edges[0].node.price) && (
+                <Text as="span" variant="bodySm" tone="subdued" textDecorationLine="line-through">
+                  {currencySymbol}{parseFloat(product.variants.edges[0].node.compareAtPrice).toFixed(2)}
+                </Text>
+              )}
+            </div>
+          ) : hasMultipleVariants ? (
+            <Text as="span" variant="bodySm" tone="subdued">
+              Multiple
+            </Text>
+          ) : (
+            <Text as="span" variant="bodySm" tone="subdued">
+              —
+            </Text>
+          )}
+        </div>,
+        
         // Inventory column with dot
         <div key={`${productKey}-inventory`} style={{ textAlign: 'center', padding: '12px 8px' }}>
           {getInventoryDot(inventory)}
@@ -2866,9 +3137,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   {variant.node.title}
                 </Text>
                 <div style={{ marginTop: '2px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Text as="span" variant="bodyXs" tone="subdued">
-                    SKU: {variant.node.sku || 'N/A'}
-                  </Text>
                   {/* Price for this variant */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Text as="span" variant="bodyXs" fontWeight="medium">
@@ -2938,7 +3206,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   };
 
   const renderCardView = () => {
-    const paginatedProducts = filteredProducts.slice(productResultsSliderIndex, productResultsSliderIndex + productsPerPage);
+    const paginatedProducts = filteredProducts.slice(0, productsPerPage);
     return (
       <div style={{ 
         animation: 'fadeIn 0.3s ease-in-out',
@@ -3693,8 +3961,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 { id: 2, label: 'Content', icon: EditIcon },
                 { id: 3, label: 'Inventory', icon: InventoryIcon },
                 { id: 4, label: 'Status', icon: StatusIcon },
-                { id: 5, label: 'Discounts', icon: MoneyIcon },
-                { id: 6, label: 'SEO', icon: SearchIcon },
+                { id: 5, label: 'SEO', icon: SearchIcon },
               ].map(({ id, label, icon }) => (
                 <Button
                   key={id}
@@ -4216,72 +4483,337 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   <BlockStack gap="400">
                     <Text as="h3" variant="headingSm">Pricing Operations</Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      Update prices for {selectedVariants.length} selected variants.
+                      Update pricing for {selectedVariants.length} selected variants.
                     </Text>
 
-                    <Select
-                      label="Price Update Method"
-                      options={[
-                        { label: 'Set Fixed Price - Apply same price to all variants', value: 'set' },
-                        { label: 'Increase by Percentage - Add percentage to current prices', value: 'increase' },
-                        { label: 'Decrease by Percentage - Subtract percentage from current prices', value: 'decrease' },
-                        { label: 'Round Prices', value: 'round' },
-                      ]}
-                      value={priceOperation}
-                      onChange={(value) => setPriceOperation(value as any)}
-                    />
-                    
-                    {priceOperation === 'set' && (
-                      <TextField
-                        label="New Price"
-                        type="number"
-                        value={priceValue}
-                        onChange={setPriceValue}
-                        placeholder="0.00"
-                        autoComplete="off"
-                        prefix={currencySymbol}
-                        helpText="Set the same price for all selected variants"
-                      />
-                    )}
-                    
-                    {(priceOperation === 'increase' || priceOperation === 'decrease') && (
-                      <TextField
-                        label={`${priceOperation === 'increase' ? 'Increase' : 'Decrease'} Percentage`}
-                        type="number"
-                        value={pricePercentage}
-                        onChange={setPricePercentage}
-                        placeholder="0"
-                        autoComplete="off"
-                        suffix="%"
-                        helpText={`${priceOperation === 'increase' ? 'Increase' : 'Decrease'} current prices by this percentage`}
-                      />
-                    )}
-                    
-                    {priceOperation === 'round' && (
-                      <Select
-                        label="Rounding Rule"
-                        options={[
-                          { label: `Round to nearest ${storeCurrency}`, value: 'nearest' },
-                          { label: `Round up to next ${storeCurrency}`, value: 'up' },
-                          { label: `Round down to previous ${storeCurrency}`, value: 'down' },
-                        ]}
-                        value={roundingRule}
-                        onChange={(value) => setRoundingRule(value as any)}
-                      />
+                    {/* Category Selection */}
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '12px',
+                      padding: '4px',
+                      background: '#f6f6f7',
+                      borderRadius: '8px',
+                      border: '1px solid #e1e3e5'
+                    }}>
+                      <button
+                        onClick={() => setPricingCategory('price')}
+                        style={{
+                          flex: 1,
+                          padding: '8px 16px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: pricingCategory === 'price' ? '#FF204E' : 'transparent',
+                          color: pricingCategory === 'price' ? 'white' : '#303030',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        Price Management
+                      </button>
+                      <button
+                        onClick={() => setPricingCategory('discount')}
+                        style={{
+                          flex: 1,
+                          padding: '8px 16px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: pricingCategory === 'discount' ? '#FF204E' : 'transparent',
+                          color: pricingCategory === 'discount' ? 'white' : '#303030',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        Discount Operations
+                      </button>
+                    </div>
+
+                    {/* Price Management Category */}
+                    {pricingCategory === 'price' && (
+                      <BlockStack gap="400">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Change prices completely or round existing prices.
+                        </Text>
+
+                        <Select
+                          label="Price Update Method"
+                          options={[
+                            { label: 'Set Fixed Price - Apply same price to all variants', value: 'set' },
+                            { label: 'Smart Rounding - Round to psychological prices', value: 'smart_round' },
+                            { label: 'Tiered Pricing - Apply price tiers based on current price', value: 'tiered' },
+                            { label: 'Margin Based - Set price based on cost + margin', value: 'margin' },
+                          ]}
+                          value={priceOperation === 'increase' || priceOperation === 'decrease' || priceOperation === 'round' ? 'set' : priceOperation}
+                          onChange={(value) => setPriceOperation(value as any)}
+                        />
+                        
+                        {priceOperation === 'set' && (
+                          <TextField
+                            label="New Price"
+                            type="number"
+                            value={priceValue}
+                            onChange={setPriceValue}
+                            placeholder="0.00"
+                            autoComplete="off"
+                            prefix={currencySymbol}
+                            helpText="Set the same price for all selected variants"
+                          />
+                        )}
+                        
+                        {priceOperation === 'smart_round' && (
+                          <Select
+                            label="Smart Rounding Strategy"
+                            options={[
+                              { label: 'Psychological (.99) - Round to 9.99, 19.99, etc.', value: 'psychological' },
+                              { label: 'Premium (.95) - Round to 9.95, 19.95, etc.', value: 'premium' },
+                              { label: 'Clean (.00) - Round to 10.00, 20.00, etc.', value: 'clean' },
+                              { label: 'Half (.50) - Round to 9.50, 19.50, etc.', value: 'half' },
+                            ]}
+                            value={roundingRule}
+                            onChange={(value) => setRoundingRule(value as any)}
+                          />
+                        )}
+
+                        {priceOperation === 'tiered' && (
+                          <BlockStack gap="300">
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              Apply different pricing strategies based on current price ranges
+                            </Text>
+                            <div style={{ 
+                              padding: '12px', 
+                              background: '#f6f6f7', 
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              color: '#616161'
+                            }}>
+                              • $0-$10: Round to .99 (e.g., 7.32 → 6.99)<br/>
+                              • $10-$50: Round to .95 (e.g., 23.47 → 22.95)<br/>
+                              • $50-$100: Round to .00 (e.g., 67.83 → 68.00)<br/>
+                              • $100+: Round to nearest $5 (e.g., 143.21 → 145.00)
+                            </div>
+                          </BlockStack>
+                        )}
+
+
+
+                        <Button
+                          variant="primary"
+                          onClick={handleBulkPricing}
+                          disabled={
+                            selectedVariants.length === 0 || 
+                            (priceOperation === 'set' && !priceValue) ||
+                            priceOperation === 'margin'
+                          }
+                          loading={isLoading}
+                        >
+                          {priceOperation === 'margin' ? '🚧 Coming Soon' : 'Apply Price Changes'}
+                        </Button>
+                      </BlockStack>
                     )}
 
-                    <Button
-                      variant="primary"
-                      onClick={handleBulkPricing}
-                      disabled={
-                        selectedVariants.length === 0 || 
-                        (priceOperation === 'set' && !priceValue) ||
-                        ((priceOperation === 'increase' || priceOperation === 'decrease') && !pricePercentage)
-                      }
-                      loading={isLoading}
-                    >
-                      Apply Price Changes
-                    </Button>
+                    {/* Discount Operations Category */}
+                    {pricingCategory === 'discount' && (
+                      <BlockStack gap="400">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Advanced discount strategies with smart automation and dynamic pricing.
+                        </Text>
+
+                        <Select
+                          label="Discount Strategy"
+                          options={[
+                            { label: 'Flash Sale - Time-limited percentage discount', value: 'flash_sale' },
+                            { label: 'Volume Discount - Tiered discounts based on inventory', value: 'volume' },
+                            { label: 'Competitive Pricing - Match or beat competitor prices', value: 'competitive' },
+                            { label: 'Psychological Pricing - Strategic price positioning', value: 'psychological' },
+                            { label: 'Bundle Discount - Cross-product discount strategy', value: 'bundle' },
+                            { label: 'Seasonal Markup - Time-based price adjustments', value: 'seasonal' },
+                            { label: 'Dynamic Margin - Smart margin optimization', value: 'dynamic' },
+                            { label: 'Simple Percentage - Basic percentage increase/decrease', value: 'simple' },
+                          ]}
+                          value={discountOperation}
+                          onChange={(value) => setDiscountOperation(value as any)}
+                        />
+
+                        {/* Flash Sale Strategy */}
+                        {discountOperation === 'flash_sale' && (
+                          <BlockStack gap="300">
+                            <div style={{ 
+                              padding: '12px', 
+                              background: 'linear-gradient(135deg, #FF204E 0%, #A0153E 100%)', 
+                              borderRadius: '8px', 
+                              color: 'white',
+                              textAlign: 'center'
+                            }}>
+                              <Text as="p" variant="bodySm" fontWeight="semibold">⚡ Flash Sale Mode</Text>
+                            </div>
+                            <TextField
+                              label="Flash Sale Discount"
+                              type="number"
+                              value={discountPercentage}
+                              onChange={setDiscountPercentage}
+                              placeholder="25"
+                              autoComplete="off"
+                              suffix="%"
+                              helpText="Discount percentage for flash sale (creates urgency)"
+                            />
+                            <TextField
+                              label="Sale Duration (hours)"
+                              type="number"
+                              value={discountValue}
+                              onChange={setDiscountValue}
+                              placeholder="24"
+                              autoComplete="off"
+                              suffix="hrs"
+                              helpText="How long the sale will last (sets compare at price temporarily)"
+                            />
+                          </BlockStack>
+                        )}
+
+                        {/* Volume Discount Strategy */}
+                        {discountOperation === 'volume' && (
+                          <BlockStack gap="300">
+                            <div style={{ 
+                              padding: '12px', 
+                              background: '#f0f9ff', 
+                              borderRadius: '8px',
+                              border: '1px solid #0ea5e9'
+                            }}>
+                              <Text as="p" variant="bodySm" fontWeight="semibold">📦 Volume-Based Pricing</Text>
+                            </div>
+                            <div style={{ 
+                              padding: '12px', 
+                              background: '#f6f6f7', 
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              color: '#616161'
+                            }}>
+                              • High inventory (50+ units): 5% discount to move stock<br/>
+                              • Medium inventory (10-49 units): Standard pricing<br/>
+                              • Low inventory (1-9 units): 10% premium for scarcity<br/>
+                              • Out of stock: Set high compare-at for comeback pricing
+                            </div>
+                          </BlockStack>
+                        )}
+
+                        {/* Competitive Pricing Strategy */}
+                        {discountOperation === 'competitive' && (
+                          <BlockStack gap="300">
+                            <div style={{ 
+                              padding: '12px', 
+                              background: '#fef3c7', 
+                              borderRadius: '8px',
+                              border: '1px solid #f59e0b'
+                            }}>
+                              <Text as="p" variant="bodySm" fontWeight="semibold">🎯 Competitive Edge Pricing</Text>
+                            </div>
+                            <TextField
+                              label="Competitor Price"
+                              type="number"
+                              value={discountValue}
+                              onChange={setDiscountValue}
+                              placeholder="29.99"
+                              autoComplete="off"
+                              prefix={currencySymbol}
+                              helpText="Enter competitor's price to match or beat"
+                            />
+                            <Select
+                              label="Strategy"
+                              options={[
+                                { label: 'Match Price - Set same price as competitor', value: 'match' },
+                                { label: 'Beat by $1 - Undercut by $1.00', value: 'beat_dollar' },
+                                { label: 'Beat by 5% - Undercut by 5%', value: 'beat_percent' },
+                                { label: 'Premium Position - Price 10% higher with value', value: 'premium' },
+                              ]}
+                              value={roundingRule}
+                              onChange={(value) => setRoundingRule(value as any)}
+                            />
+                          </BlockStack>
+                        )}
+
+                        {/* Psychological Pricing Strategy */}
+                        {discountOperation === 'psychological' && (
+                          <BlockStack gap="300">
+                            <div style={{ 
+                              padding: '12px', 
+                              background: '#f3e8ff', 
+                              borderRadius: '8px',
+                              border: '1px solid #8b5cf6'
+                            }}>
+                              <Text as="p" variant="bodySm" fontWeight="semibold">🧠 Psychological Pricing</Text>
+                            </div>
+                            <Select
+                              label="Psychological Strategy"
+                              options={[
+                                { label: 'Charm Pricing - End in .99 (perceived value)', value: 'charm' },
+                                { label: 'Prestige Pricing - Round numbers (luxury feel)', value: 'prestige' },
+                                { label: 'Anchoring - High compare-at with good "deal"', value: 'anchoring' },
+                                { label: 'Odd-Even - Strategic odd/even number psychology', value: 'odd_even' },
+                              ]}
+                              value={roundingRule}
+                              onChange={(value) => setRoundingRule(value as any)}
+                            />
+                          </BlockStack>
+                        )}
+
+                        {/* Simple Percentage Strategy */}
+                        {discountOperation === 'simple' && (
+                          <TextField
+                            label="Percentage Change"
+                            type="number"
+                            value={discountPercentage}
+                            onChange={setDiscountPercentage}
+                            placeholder="10"
+                            autoComplete="off"
+                            suffix="%"
+                            helpText="Positive for increase, negative for decrease (e.g., -20 for 20% discount)"
+                          />
+                        )}
+
+                        {priceOperation === 'margin' && (
+                          <div style={{ 
+                            padding: '24px', 
+                            background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)', 
+                            borderRadius: '12px',
+                            border: '2px dashed #9ca3af',
+                            textAlign: 'center'
+                          }}>
+                            <div style={{ marginBottom: '12px', fontSize: '32px' }}>🚧</div>
+                            <Text as="h3" variant="headingSm">Margin-Based Pricing</Text>
+                            <div style={{ marginTop: '8px' }}>
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                Advanced cost + margin calculations coming soon!
+                              </Text>
+                            </div>
+                            <div style={{ 
+                              marginTop: '16px',
+                              padding: '12px',
+                              background: '#fff',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              color: '#6b7280'
+                            }}>
+                              Will include: Cost tracking • Dynamic margins • Profit analysis • Bulk cost updates
+                            </div>
+                          </div>
+                        )}
+
+                        <Button
+                          variant="primary"
+                          onClick={handleAdvancedDiscount}
+                          disabled={
+                            selectedVariants.length === 0 || 
+                            (discountOperation === 'competitive' && !discountValue) ||
+                            ((discountOperation === 'flash_sale' || discountOperation === 'simple') && !discountPercentage)
+                          }
+                          loading={isLoading}
+                        >
+                          🚀 Apply Advanced Discount Strategy
+                        </Button>
+                      </BlockStack>
+                    )}
                   </BlockStack>
                 )}
 
@@ -4525,68 +5057,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   </BlockStack>
                 )}
 
-                {/* Discounts Tab */}
-                {activeBulkTab === 5 && (
-                  <BlockStack gap="400">
-                    <Text as="h3" variant="headingSm">Discount Operations</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Apply discounts to {selectedVariants.length} selected variants.
-                    </Text>
 
-                    <Select
-                      label="Discount Operation"
-                      options={[
-                        { label: 'Set Compare At Price', value: 'set' },
-                        { label: 'Increase Compare At Price', value: 'increase' },
-                        { label: 'Decrease Compare At Price', value: 'decrease' },
-                      ]}
-                      value={discountOperation}
-                      onChange={(value) => setDiscountOperation(value as any)}
-                    />
-
-                    {discountOperation === 'set' && (
-                      <TextField
-                        label="Compare At Price"
-                        type="number"
-                        value={discountValue}
-                        onChange={setDiscountValue}
-                        placeholder="0.00"
-                        autoComplete="off"
-                        prefix={currencySymbol}
-                        helpText="Set compare at price for discount display"
-                      />
-                    )}
-
-                    {(discountOperation === 'increase' || discountOperation === 'decrease') && (
-                      <TextField
-                        label={`${discountOperation === 'increase' ? 'Increase' : 'Decrease'} Percentage`}
-                        type="number"
-                        value={discountPercentage}
-                        onChange={setDiscountPercentage}
-                        placeholder="0"
-                        autoComplete="off"
-                        suffix="%"
-                        helpText={`${discountOperation === 'increase' ? 'Increase' : 'Decrease'} compare at prices by this percentage`}
-                      />
-                    )}
-
-                    <Button
-                      variant="primary"
-                      onClick={handleBulkDiscount}
-                      disabled={
-                        selectedVariants.length === 0 || 
-                        (discountOperation === 'set' && !discountValue) ||
-                        ((discountOperation === 'increase' || discountOperation === 'decrease') && !discountPercentage)
-                      }
-                      loading={isLoading}
-                    >
-                      Apply Discount Changes
-                    </Button>
-                  </BlockStack>
-                )}
 
                 {/* SEO Tab */}
-                {activeBulkTab === 6 && (
+                {activeBulkTab === 5 && (
                   <BlockStack gap="400">
                     <Text as="h3" variant="headingSm">SEO Optimization</Text>
                     <Text as="p" variant="bodySm" tone="subdued">
@@ -4628,14 +5102,16 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         </BlockStack>
       )}
 
-      {notification.show && (
-        <Toast
-          content={notification.message}
-          error={notification.error}
-          onDismiss={() => setNotification({ show: false, message: '' })}
-          duration={4000}
-        />
-      )}
+      <Frame>
+        {notification.show && (
+          <Toast
+            content={notification.message}
+            error={notification.error}
+            onDismiss={() => setNotification({ show: false, message: '' })}
+            duration={4000}
+          />
+        )}
+      </Frame>
     </BlockStack>
     </>
   );
