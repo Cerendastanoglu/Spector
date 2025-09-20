@@ -330,6 +330,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [tagValue, setTagValue] = useState('');
   const [tagRemoveValue, setTagRemoveValue] = useState('');
   
+  // Content operation state
+  const [contentOperation, setContentOperation] = useState<'title' | 'description' | 'tags'>('title');
+  
   const [costValue, setCostValue] = useState('');
   const [weightValue, setWeightValue] = useState('');
   const [originCountry, setOriginCountry] = useState('');
@@ -2177,6 +2180,62 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
   };
 
+  // Bulk Status Handler
+  const handleBulkStatus = async () => {
+    if (selectedProducts.length === 0) {
+      setError("Please select at least one product to update status.");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('action', 'update-status');
+      formData.append('productIds', JSON.stringify(selectedProducts));
+      formData.append('status', newProductStatus);
+
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update product status');
+      }
+
+      // Update UI with new status
+      if (result.success) {
+        setProducts(prevProducts =>
+          prevProducts.map(product => {
+            if (selectedProducts.includes(product.id)) {
+              return {
+                ...product,
+                status: newProductStatus
+              };
+            }
+            return product;
+          })
+        );
+
+        setNotification({
+          show: true,
+          message: `Successfully updated status to ${newProductStatus} for ${selectedProducts.length} product${selectedProducts.length > 1 ? 's' : ''}`,
+          error: false
+        });
+      }
+
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      setError(`Failed to update status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Load available collections from Shopify API
   const loadCollections = async () => {
     try {
@@ -2593,11 +2652,19 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <Thumbnail
-              source={product.featuredMedia?.preview?.image?.url || ProductIcon}
-              alt={product.featuredMedia?.preview?.image?.altText || product.title}
-              size="small"
-            />
+            {product.featuredMedia?.preview?.image?.url ? (
+              <img
+                src={product.featuredMedia.preview.image.url}
+                alt={product.featuredMedia?.preview?.image?.altText || product.title}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover'
+                }}
+              />
+            ) : (
+              <Icon source={ProductIcon} tone="subdued" />
+            )}
           </div>
           <div style={{ 
             flex: 1, 
@@ -3420,8 +3487,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 <Text as="span" variant="bodyLg" fontWeight="semibold">
                   Select Products
                 </Text>
-                {selectedVariants.length > 0 && (
-                  <Badge tone="success" size="small">{selectedVariants.length.toString()}</Badge>
+                {selectedProducts.length > 0 && (
+                  <Badge tone="success" size="small">{selectedProducts.length.toString()}</Badge>
                 )}
               </div>
               <Text as="p" variant="bodySm" tone="subdued">
@@ -3470,6 +3537,152 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
               </Text>
             </div>
           </div>
+
+          {/* Selected Products Preview - Lightweight for up to 10K products */}
+          {selectedVariants.length > 0 && (
+            <div style={{
+              padding: '12px 16px',
+              backgroundColor: '#f8fafc',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              marginTop: '16px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Selected Products ({selectedProducts.length} products)
+                </Text>
+                <Button
+                  variant="plain"
+                  size="micro"
+                  onClick={() => {
+                    setSelectedVariants([]);
+                    setSelectedProducts([]);
+                  }}
+                >
+                  Clear all
+                </Button>
+              </div>
+              
+              {/* Lightweight product preview with horizontal slider */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                overflowX: 'auto',
+                overflowY: 'hidden',
+                paddingBottom: '8px',
+                scrollbarWidth: 'thin',
+                scrollbarColor: '#FF204E #f1f5f9'
+              }}>
+                {(() => {
+                  // Get unique products from selected variants (performance optimized)
+                  const selectedProductIds = new Set(
+                    selectedVariants.map(variantId => {
+                      // Find product that contains this variant
+                      return filteredProducts.find(p => 
+                        p.variants.edges.some(v => v.node.id === variantId)
+                      )?.id;
+                    }).filter(Boolean)
+                  );
+                  
+                  const selectedProductsList = Array.from(selectedProductIds)
+                    .map(productId => filteredProducts.find(p => p.id === productId))
+                    .filter((product): product is Product => product !== undefined);
+                  
+                  return (
+                    <>
+                      {selectedProductsList.map((product, index) => {
+                        const hasVariants = product.variants.edges.length > 1;
+                        const selectedVariantCount = product.variants.edges.filter(v => 
+                          selectedVariants.includes(v.node.id)
+                        ).length;
+                        
+                        return (
+                          <div
+                            key={product.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 8px',
+                              backgroundColor: 'white',
+                              borderRadius: '6px',
+                              border: '1px solid #e5e7eb',
+                              fontSize: '12px',
+                              whiteSpace: 'nowrap',
+                              minWidth: 'max-content',
+                              flexShrink: 0,
+                              position: 'relative',
+                              margin: '8px 4px' // Add margin to prevent badge cutting
+                            }}
+                          >
+                            {/* iPhone-style notification badge - only show if product has variants */}
+                            {hasVariants && selectedVariantCount > 0 && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '-6px',
+                                right: '-6px',
+                                width: '16px',
+                                height: '16px',
+                                borderRadius: '50%',
+                                backgroundColor: '#FF204E',
+                                color: 'white',
+                                fontSize: '9px',
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                border: '2px solid white',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                zIndex: 10
+                              }}>
+                                {selectedVariantCount}
+                              </div>
+                            )}
+                            <div style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '4px',
+                              overflow: 'hidden',
+                              backgroundColor: '#f1f5f9',
+                              border: '1px solid #e5e7eb',
+                              flexShrink: 0
+                            }}>
+                              {product.featuredMedia?.preview?.image?.url ? (
+                                <img
+                                  src={product.featuredMedia.preview.image.url}
+                                  alt={product.title}
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover'
+                                  }}
+                                />
+                              ) : (
+                                <div style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: '#f8fafc'
+                                }}>
+                                  <Icon source={ProductIcon} tone="subdued" />
+                                </div>
+                              )}
+                            </div>
+                            <Text as="span" variant="bodyXs" truncate>
+                              {product.title.length > 20 ? product.title.substring(0, 20) + '...' : product.title}
+                            </Text>
+                          </div>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
           
           {/* Bulk Operation Categories - Only show in Step 2 */}
           {activeMainTab === 1 && (
@@ -3973,23 +4186,446 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           </BlockStack>
         </Card>
       ) : (
-        /* Step 2: Bulk Edit - Temporary Placeholder */
-        <Card>
-          <BlockStack gap="400">
-            <Text as="h2" variant="headingMd">Step 2: Bulk Edit</Text>
-            <Text as="p" variant="bodyMd">
-              You have selected {selectedVariants.length} variants from {selectedProducts.length} products.
-            </Text>
-            <Text as="p" variant="bodyMd">Bulk edit functionality coming soon...</Text>
-            <Button 
-              onClick={() => setActiveMainTab(0)} 
-              variant="tertiary" 
-              size="slim"
-            >
-              ← Back to Product Selection
-            </Button>
-          </BlockStack>
-        </Card>
+        /* Step 2: Bulk Edit - Complete Interface */
+        <BlockStack gap="400">
+          {/* Bulk Edit Content */}
+          {selectedVariants.length === 0 ? (
+            <Card>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '16px',
+                padding: '40px 20px',
+                textAlign: 'center'
+              }}>
+                <div style={{ opacity: 0.3 }}>
+                  <Icon source={ProductIcon} />
+                </div>
+                <div>
+                  <Text as="p" variant="headingSm" tone="subdued">Select variants to begin</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">Choose product variants from the list and use the buttons above to perform bulk operations</Text>
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <Card>
+              <BlockStack gap="400">
+                {/* Pricing Tab */}
+                {activeBulkTab === 0 && (
+                  <BlockStack gap="400">
+                    <Text as="h3" variant="headingSm">Pricing Operations</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Update prices for {selectedVariants.length} selected variants.
+                    </Text>
+
+                    <Select
+                      label="Price Update Method"
+                      options={[
+                        { label: 'Set Fixed Price - Apply same price to all variants', value: 'set' },
+                        { label: 'Increase by Percentage - Add percentage to current prices', value: 'increase' },
+                        { label: 'Decrease by Percentage - Subtract percentage from current prices', value: 'decrease' },
+                        { label: 'Round Prices', value: 'round' },
+                      ]}
+                      value={priceOperation}
+                      onChange={(value) => setPriceOperation(value as any)}
+                    />
+                    
+                    {priceOperation === 'set' && (
+                      <TextField
+                        label="New Price"
+                        type="number"
+                        value={priceValue}
+                        onChange={setPriceValue}
+                        placeholder="0.00"
+                        autoComplete="off"
+                        prefix={currencySymbol}
+                        helpText="Set the same price for all selected variants"
+                      />
+                    )}
+                    
+                    {(priceOperation === 'increase' || priceOperation === 'decrease') && (
+                      <TextField
+                        label={`${priceOperation === 'increase' ? 'Increase' : 'Decrease'} Percentage`}
+                        type="number"
+                        value={pricePercentage}
+                        onChange={setPricePercentage}
+                        placeholder="0"
+                        autoComplete="off"
+                        suffix="%"
+                        helpText={`${priceOperation === 'increase' ? 'Increase' : 'Decrease'} current prices by this percentage`}
+                      />
+                    )}
+                    
+                    {priceOperation === 'round' && (
+                      <Select
+                        label="Rounding Rule"
+                        options={[
+                          { label: `Round to nearest ${storeCurrency}`, value: 'nearest' },
+                          { label: `Round up to next ${storeCurrency}`, value: 'up' },
+                          { label: `Round down to previous ${storeCurrency}`, value: 'down' },
+                        ]}
+                        value={roundingRule}
+                        onChange={(value) => setRoundingRule(value as any)}
+                      />
+                    )}
+
+                    <Button
+                      variant="primary"
+                      onClick={handleBulkPricing}
+                      disabled={
+                        selectedVariants.length === 0 || 
+                        (priceOperation === 'set' && !priceValue) ||
+                        ((priceOperation === 'increase' || priceOperation === 'decrease') && !pricePercentage)
+                      }
+                      loading={isLoading}
+                    >
+                      Apply Price Changes
+                    </Button>
+                  </BlockStack>
+                )}
+
+                {/* Collections Tab */}
+                {activeBulkTab === 1 && (
+                  <BlockStack gap="400">
+                    <Text as="h3" variant="headingSm">Collection Management</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Add or remove collections for {selectedProducts.length} selected products.
+                    </Text>
+
+                    <Select
+                      label="Collection Operation"
+                      options={[
+                        { label: 'Add to Collections', value: 'add' },
+                        { label: 'Remove from Collections', value: 'remove' },
+                      ]}
+                      value={collectionOperation}
+                      onChange={(value) => setCollectionOperation(value as any)}
+                    />
+
+                    <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '8px' }}>
+                      {filteredCollections.map((collection) => (
+                        <div key={collection.id} style={{ padding: '4px 0' }}>
+                          <Checkbox
+                            checked={selectedCollections.includes(collection.id)}
+                            onChange={(checked) => {
+                              if (checked) {
+                                setSelectedCollections([...selectedCollections, collection.id]);
+                              } else {
+                                setSelectedCollections(selectedCollections.filter(id => id !== collection.id));
+                              }
+                            }}
+                            label={collection.title}
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <Button
+                      variant="primary"
+                      onClick={handleBulkCollections}
+                      disabled={selectedProducts.length === 0 || selectedCollections.length === 0}
+                      loading={isLoading}
+                    >
+                      Apply Collection Changes
+                    </Button>
+                  </BlockStack>
+                )}
+
+                {/* Content Tab */}
+                {activeBulkTab === 2 && (
+                  <BlockStack gap="400">
+                    <Text as="h3" variant="headingSm">Content Management</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Update titles, descriptions, and tags for {selectedProducts.length} selected products.
+                    </Text>
+
+                    <Select
+                      label="Content Operation"
+                      options={[
+                        { label: 'Update Titles', value: 'title' },
+                        { label: 'Update Descriptions', value: 'description' },
+                        { label: 'Manage Tags', value: 'tags' },
+                      ]}
+                      value={contentOperation}
+                      onChange={(value) => setContentOperation(value as any)}
+                    />
+
+                    {contentOperation === 'title' && (
+                      <>
+                        <Select
+                          label="Title Update Method"
+                          options={[
+                            { label: 'Add Prefix', value: 'prefix' },
+                            { label: 'Add Suffix', value: 'suffix' },
+                            { label: 'Find and Replace', value: 'replace' },
+                          ]}
+                          value={titleOperation}
+                          onChange={(value) => setTitleOperation(value as any)}
+                        />
+                        
+                        {titleOperation === 'replace' ? (
+                          <>
+                            <TextField
+                              label="Find Text"
+                              value={titleReplaceFrom}
+                              onChange={setTitleReplaceFrom}
+                              placeholder="Text to find"
+                              autoComplete="off"
+                            />
+                            <TextField
+                              label="Replace With"
+                              value={titleReplaceTo}
+                              onChange={setTitleReplaceTo}
+                              placeholder="Replacement text"
+                              autoComplete="off"
+                            />
+                          </>
+                        ) : (
+                          <TextField
+                            label={titleOperation === 'prefix' ? 'Prefix Text' : 'Suffix Text'}
+                            value={titleValue}
+                            onChange={setTitleValue}
+                            placeholder={titleOperation === 'prefix' ? 'Text to add at beginning' : 'Text to add at end'}
+                            autoComplete="off"
+                          />
+                        )}
+                      </>
+                    )}
+
+                    {contentOperation === 'tags' && (
+                      <>
+                        <Select
+                          label="Tag Operation"
+                          options={[
+                            { label: 'Add Tags', value: 'add' },
+                            { label: 'Remove Tags', value: 'remove' },
+                          ]}
+                          value={tagOperation}
+                          onChange={(value) => setTagOperation(value as any)}
+                        />
+                        
+                        <TextField
+                          label={tagOperation === 'add' ? 'Tags to Add' : 'Tags to Remove'}
+                          value={tagOperation === 'add' ? tagValue : tagRemoveValue}
+                          onChange={tagOperation === 'add' ? setTagValue : setTagRemoveValue}
+                          placeholder="Enter tags separated by commas"
+                          autoComplete="off"
+                          helpText="Separate multiple tags with commas"
+                        />
+                      </>
+                    )}
+
+                    <Button
+                      variant="primary"
+                      onClick={contentOperation === 'title' ? handleBulkTitleUpdate : handleBulkTags}
+                      disabled={
+                        selectedProducts.length === 0 || 
+                        (contentOperation === 'title' && (
+                          (titleOperation === 'replace' && (!titleReplaceFrom || !titleReplaceTo)) ||
+                          ((titleOperation === 'prefix' || titleOperation === 'suffix') && !titleValue)
+                        )) ||
+                        (contentOperation === 'tags' && (
+                          (tagOperation === 'add' && !tagValue) ||
+                          (tagOperation === 'remove' && !tagRemoveValue)
+                        ))
+                      }
+                      loading={isLoading}
+                    >
+                      Apply Content Changes
+                    </Button>
+                  </BlockStack>
+                )}
+
+                {/* Inventory Tab */}
+                {activeBulkTab === 3 && (
+                  <BlockStack gap="400">
+                    <Text as="h3" variant="headingSm">Inventory Management</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Update inventory settings for {selectedVariants.length} selected variants.
+                    </Text>
+
+                    <Select
+                      label="Inventory Operation"
+                      options={[
+                        { label: 'Update Stock Quantities', value: 'stock' },
+                        { label: 'Update SKUs', value: 'sku' },
+                        { label: 'Update Cost & Weight', value: 'cost' },
+                      ]}
+                      value={inventoryOperation}
+                      onChange={(value) => setInventoryOperation(value as any)}
+                    />
+
+                    {inventoryOperation === 'stock' && (
+                      <>
+                        <Select
+                          label="Stock Update Method"
+                          options={[
+                            { label: 'Set Quantity', value: 'set' },
+                            { label: 'Add to Current', value: 'add' },
+                            { label: 'Subtract from Current', value: 'subtract' },
+                          ]}
+                          value={stockUpdateMethod}
+                          onChange={(value) => setStockUpdateMethod(value as any)}
+                        />
+                        
+                        <TextField
+                          label="Quantity"
+                          type="number"
+                          value={stockQuantity}
+                          onChange={setStockQuantity}
+                          placeholder="0"
+                          autoComplete="off"
+                          helpText={`${stockUpdateMethod === 'set' ? 'Set' : stockUpdateMethod === 'add' ? 'Add' : 'Subtract'} this quantity ${stockUpdateMethod === 'set' ? 'as' : stockUpdateMethod === 'add' ? 'to' : 'from'} the current inventory`}
+                        />
+                      </>
+                    )}
+
+                    <Button
+                      variant="primary"
+                      onClick={handleBulkInventoryUpdate}
+                      disabled={
+                        selectedVariants.length === 0 || 
+                        (inventoryOperation === 'stock' && !stockQuantity)
+                      }
+                      loading={isLoading}
+                    >
+                      Apply Inventory Changes
+                    </Button>
+                  </BlockStack>
+                )}
+
+                {/* Status Tab */}
+                {activeBulkTab === 4 && (
+                  <BlockStack gap="400">
+                    <Text as="h3" variant="headingSm">Status & Visibility</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Manage product status and visibility for {selectedProducts.length} selected products.
+                    </Text>
+
+                    <Select
+                      label="New Product Status"
+                      options={[
+                        { label: 'Active', value: 'ACTIVE' },
+                        { label: 'Draft', value: 'DRAFT' },
+                        { label: 'Archived', value: 'ARCHIVED' },
+                      ]}
+                      value={newProductStatus}
+                      onChange={(value) => setNewProductStatus(value as any)}
+                    />
+
+                    <Button
+                      variant="primary"
+                      onClick={handleBulkStatus}
+                      disabled={selectedProducts.length === 0}
+                      loading={isLoading}
+                    >
+                      Apply Status Changes
+                    </Button>
+                  </BlockStack>
+                )}
+
+                {/* Discounts Tab */}
+                {activeBulkTab === 5 && (
+                  <BlockStack gap="400">
+                    <Text as="h3" variant="headingSm">Discount Operations</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Apply discounts to {selectedVariants.length} selected variants.
+                    </Text>
+
+                    <Select
+                      label="Discount Operation"
+                      options={[
+                        { label: 'Set Compare At Price', value: 'set' },
+                        { label: 'Increase Compare At Price', value: 'increase' },
+                        { label: 'Decrease Compare At Price', value: 'decrease' },
+                      ]}
+                      value={discountOperation}
+                      onChange={(value) => setDiscountOperation(value as any)}
+                    />
+
+                    {discountOperation === 'set' && (
+                      <TextField
+                        label="Compare At Price"
+                        type="number"
+                        value={discountValue}
+                        onChange={setDiscountValue}
+                        placeholder="0.00"
+                        autoComplete="off"
+                        prefix={currencySymbol}
+                        helpText="Set compare at price for discount display"
+                      />
+                    )}
+
+                    {(discountOperation === 'increase' || discountOperation === 'decrease') && (
+                      <TextField
+                        label={`${discountOperation === 'increase' ? 'Increase' : 'Decrease'} Percentage`}
+                        type="number"
+                        value={discountPercentage}
+                        onChange={setDiscountPercentage}
+                        placeholder="0"
+                        autoComplete="off"
+                        suffix="%"
+                        helpText={`${discountOperation === 'increase' ? 'Increase' : 'Decrease'} compare at prices by this percentage`}
+                      />
+                    )}
+
+                    <Button
+                      variant="primary"
+                      onClick={handleBulkDiscount}
+                      disabled={
+                        selectedVariants.length === 0 || 
+                        (discountOperation === 'set' && !discountValue) ||
+                        ((discountOperation === 'increase' || discountOperation === 'decrease') && !discountPercentage)
+                      }
+                      loading={isLoading}
+                    >
+                      Apply Discount Changes
+                    </Button>
+                  </BlockStack>
+                )}
+
+                {/* SEO Tab */}
+                {activeBulkTab === 6 && (
+                  <BlockStack gap="400">
+                    <Text as="h3" variant="headingSm">SEO Optimization</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Update SEO settings for {selectedProducts.length} selected products.
+                    </Text>
+
+                    <TextField
+                      label="SEO Title Template"
+                      value={seoTemplate}
+                      onChange={setSeoTemplate}
+                      placeholder="Use {title} for product title"
+                      autoComplete="off"
+                      helpText="Use {title} as placeholder for product title"
+                    />
+
+                    <TextField
+                      label="Meta Description"
+                      value={metaDescription}
+                      onChange={setMetaDescription}
+                      placeholder="Enter meta description"
+                      autoComplete="off"
+                      multiline={3}
+                      helpText="Meta description for search engines"
+                    />
+
+                    <Button
+                      variant="primary"
+                      onClick={handleBulkSEO}
+                      disabled={selectedProducts.length === 0 || (!seoTemplate && !metaDescription)}
+                      loading={isLoading}
+                    >
+                      Apply SEO Changes
+                    </Button>
+                  </BlockStack>
+                )}
+              </BlockStack>
+            </Card>
+          )}
+        </BlockStack>
       )}
 
       {notification.show && (
