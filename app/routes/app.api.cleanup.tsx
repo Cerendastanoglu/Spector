@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
-import { runScheduledCleanup, getDataUsageStats } from "../utils/dataRetention";
+import { runScheduledCleanup, getDataUsageStats, cleanupExpiredData } from "../utils/dataRetention";
 
 /**
  * Data cleanup API endpoint
@@ -35,7 +35,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (action === 'cleanup') {
       // Run cleanup for specific data type or all
       if (dataType) {
-        const { cleanupExpiredData } = await import("../utils/dataRetention");
         const deletedCount = await cleanupExpiredData(dataType, shop);
         
         return json({

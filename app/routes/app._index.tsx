@@ -10,7 +10,6 @@ import {
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { AppHeader } from "../components/AppHeader";
-import { Dashboard } from "../components/Dashboard";
 import { Notifications } from "../components/Notifications";
 import { WelcomeModal } from "../components/WelcomeModal";
 import { Help } from "../components/Help";
@@ -117,7 +116,7 @@ export default function Index() {
     switch (activeTab) {
       case "dashboard":
         return (
-          <Dashboard
+          <OptimizedComponents.Dashboard
             isVisible={true}
             outOfStockCount={outOfStockCount}
             onNavigate={handleTabChange}
