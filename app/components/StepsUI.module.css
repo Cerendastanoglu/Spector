@@ -1,0 +1,128 @@
+/* Shared Steps UI styling for consistent design across ProductManagement and Notifications */
+
+/* Fade in animation for steps */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Slide in animation for success messages */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Pulse animation for active steps */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Steps container - responsive grid */
+.stepsContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 20px;
+  background-color: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Individual step card styling */
+.stepCard {
+  animation: fadeIn 0.5s ease-in-out;
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+}
+
+.stepCard:hover {
+  transform: scale(1.01);
+}
+
+.stepCard.active {
+  transform: scale(1.02);
+}
+
+/* Removed step card content styles - now using Polaris Card component directly */
+
+/* Removed step header styles - now using Polaris InlineStack/BlockStack */
+
+/* Removed step number styles - now using Polaris Box and Icon components */
+
+/* Icon container for notification-style steps */
+.stepIcon {
+  padding: 8px;
+  border-radius: 50%;
+  transition: all 0.3s ease-in-out;
+}
+
+.stepIcon.active {
+  transform: scale(1.1) rotate(5deg);
+}
+
+/* Badge positioning */
+.stepBadge {
+  animation: none;
+}
+
+.stepBadge.active {
+  animation: pulse 2s infinite;
+}
+
+/* Success indicator */
+.stepSuccess {
+  animation: slideIn 0.4s ease-in-out;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Filter effects for active states */
+.stepCard.activeInfo {
+  filter: drop-shadow(0 4px 12px rgba(59, 130, 246, 0.15));
+}
+
+.stepCard.activeWarning {
+  filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.15));
+}
+
+.stepCard.activeSuccess {
+  filter: drop-shadow(0 4px 12px rgba(34, 197, 94, 0.15));
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .stepsContainer {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+  
+  .stepCardContent {
+    padding: 16px;
+  }
+  
+  .stepNumber {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+}
+
+/* Removed two-column layout - using consistent auto-fit grid for all components */
