@@ -20,7 +20,6 @@ import {
   Tooltip,
   ChoiceList,
   Modal,
-  ProgressBar,
   Grid,
 } from "@shopify/polaris";
 import {
@@ -43,16 +42,11 @@ import {
   ProductIcon,
 } from "@shopify/polaris-icons";
 import { useState, useEffect } from "react";
+import { ProductTable } from "./ProductTable";
+import styles from "./StepsUI.module.css";
 
 interface NotificationsProps {
   isVisible: boolean;
-}
-
-interface Location {
-  id: string;
-  name: string;
-  address: string;
-  fulfillsOnlineOrders: boolean;
 }
 
 interface ProductVariant {
@@ -191,20 +185,18 @@ export function Notifications({ isVisible }: NotificationsProps) {
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [availableCollections, setAvailableCollections] = useState<Collection[]>([]);
-  const [availableLocations, setAvailableLocations] = useState<Location[]>([]);
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const [selectionMode, setSelectionMode] = useState<'all' | 'category' | 'tags' | 'specific' | 'collection'>('specific');
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedLocations] = useState<string[]>([]);
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [productLimit] = useState(150); // Basic Plan limit
   const [showLimitWarning, setShowLimitWarning] = useState(false);
   const [expandedVariants, setExpandedVariants] = useState<string[]>([]); // Track which products have expanded variant config
-  const [variantThresholds, setVariantThresholds] = useState<{[variantId: string]: number}>({}); // Track threshold values for each variant
+  const [variantThresholds] = useState<{[variantId: string]: number}>({}); // Track threshold values for each variant
   const [selectedProductsSliderIndex, setSelectedProductsSliderIndex] = useState(0); // Track slider position for selected products
   const [summarySliderIndex, setSummarySliderIndex] = useState(0); // Track slider position for summary section
-  const [productSelectionSliderIndex, setProductSelectionSliderIndex] = useState(0); // Track slider position for product selection
-  const [productsPerPage] = useState(6); // Number of products to show per page in selection
+
   
   // Step 2: Notification Channels
   const [channels, setChannels] = useState<NotificationChannel[]>([]);
@@ -217,7 +209,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
   const [editingRule, setEditingRule] = useState<NotificationRule | null>(null);
   
   // Existing Rules Management
-  const [showExistingRules, setShowExistingRules] = useState(true);
+
   const [existingRules, setExistingRules] = useState<NotificationRule[]>([
     // Mock data - in real app this would come from API
     {
@@ -319,17 +311,17 @@ export function Notifications({ isVisible }: NotificationsProps) {
         body: formData,
       });
       
-      const data = await response.json();
+      await response.json();
       
-      if (data.locations && data.locations.edges) {
-        const locations = data.locations.edges.map((edge: any) => ({
-          id: edge.node.id,
-          name: edge.node.name,
-          address: edge.node.address?.formatted || edge.node.address?.address1 || '',
-          fulfillsOnlineOrders: edge.node.fulfillsOnlineOrders || false,
-        }));
-        setAvailableLocations(locations);
-      }
+      // if (data.locations && data.locations.edges) {
+      //   const locations = data.locations.edges.map((edge: any) => ({
+      //     id: edge.node.id,
+      //     name: edge.node.name,
+      //     address: edge.node.address?.formatted || edge.node.address?.address1 || '',
+      //     fulfillsOnlineOrders: edge.node.fulfillsOnlineOrders || false,
+      //   }));
+      //   setAvailableLocations(locations);
+      // }
     } catch (error) {
       console.error('Failed to load locations:', error);
     }
@@ -637,6 +629,42 @@ export function Notifications({ isVisible }: NotificationsProps) {
     setRules(rules.filter(r => r.id !== id));
   };
 
+  // Adapter function to convert Notification Product to ProductTable Product format
+  const convertToTableProduct = (product: Product) => {
+    return {
+      id: product.id,
+      title: product.title,
+      handle: product.title.toLowerCase().replace(/\s+/g, '-'),
+      featuredMedia: product.imageUrl ? {
+        preview: {
+          image: {
+            url: product.imageUrl,
+            altText: product.title
+          }
+        }
+      } : undefined,
+      status: 'ACTIVE',
+      totalInventory: product.inventory,
+      tags: product.tags || [],
+      collections: { edges: [] },
+      variants: {
+        edges: product.variants?.map(variant => ({
+          node: {
+            id: variant.id,
+            title: variant.title,
+            inventoryQuantity: variant.inventoryQuantity,
+            price: variant.price,
+            sku: variant.sku,
+            inventoryItem: {
+              id: `${variant.id}_inv`,
+              tracked: true
+            }
+          }
+        })) || []
+      }
+    };
+  };
+
   const filteredProducts = availableProducts.filter(product => {
     // Text search filter
     const matchesSearch = product.title.toLowerCase().includes(productSearchQuery.toLowerCase());
@@ -656,10 +684,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
     return matchesSearch && matchesLocation && matchesTags && matchesCollection;
   });
 
-  // Reset sliders when filters change
-  useEffect(() => {
-    setProductSelectionSliderIndex(0);
-  }, [productSearchQuery, selectionMode, selectedLocations, selectedTags, selectedCollections]);
+  // Reset functionality when filters change - pagination removed, no slider to reset
 
   // Reset summary slider when selected products change
   useEffect(() => {
@@ -667,99 +692,75 @@ export function Notifications({ isVisible }: NotificationsProps) {
   }, [selectedProducts]);
 
   const renderSetupProgress = () => (
-    <Grid>
+    <div className={styles.stepsContainer}>
       {/* Step 1: Product Selection */}
-      <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 4, lg: 4, xl: 4 }}>
-        <div 
-          className="step-card-hover"
-          style={{
-            animation: 'fadeIn 0.5s ease-in-out',
-            transition: 'all 0.3s ease-in-out',
-            transform: currentStep === 0 ? 'scale(1.02)' : 'scale(1)',
-            filter: currentStep === 0 ? 'drop-shadow(0 4px 12px rgba(59, 130, 246, 0.15))' : 'none'
-          }}
-        >
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack align="space-between" blockAlign="center">
-                <InlineStack gap="200" blockAlign="center">
-                  <div style={{
-                    transition: 'all 0.3s ease-in-out',
-                    transform: currentStep === 0 ? 'scale(1.1) rotate(5deg)' : 'scale(1)'
-                  }}>
-                    <Box 
-                      background={currentStep >= 0 ? "bg-fill-info" : "bg-fill-disabled"} 
-                      padding="200" 
-                      borderRadius="100"
-                    >
-                      <Icon 
-                        source={ProductIcon} 
-                        tone={currentStep >= 0 ? "base" : "subdued"} 
-                      />
-                    </Box>
-                  </div>
-                  <BlockStack gap="050">
-                    <Text as="h3" variant="headingSm" fontWeight="semibold">
-                      Step 1: Products
-                    </Text>
-                    <Text as="p" variant="bodyXs" tone="subdued">
-                      Select inventory to monitor
-                    </Text>
-                  </BlockStack>
-                </InlineStack>
-                <div style={{
-                  animation: currentStep === 0 ? 'pulse 2s infinite' : 'none'
-                }}>
-                  <Badge tone={currentStep >= 0 ? "info" : "info-strong"}>
-                    {currentStep === 0 ? "Active" : currentStep > 0 ? "Complete" : "Pending"}
-                  </Badge>
-                </div>
-              </InlineStack>
-              
-              <Text as="p" variant="bodySm" tone="subdued">
-                Choose products by collection, tags, or individually. Set custom thresholds for each product variant.
-              </Text>
-              
-              {currentStep > 0 && selectedProducts.length > 0 && (
-                <div style={{ animation: 'slideIn 0.4s ease-in-out' }}>
-                  <InlineStack gap="100" blockAlign="center">
-                    <Icon source={CheckIcon} tone="success" />
-                    <Text as="p" variant="bodySm" tone="success">
-                      {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} configured
-                    </Text>
-                  </InlineStack>
-                </div>
-              )}
-            </BlockStack>
-          </Card>
-        </div>
-      </Grid.Cell>
-
-      {/* Step 2: Notification Channels */}
-      <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 4, lg: 4, xl: 4 }}>
-        <div 
-          className="step-card-hover"
-          style={{
-            animation: 'fadeIn 0.6s ease-in-out',
-            transition: 'all 0.3s ease-in-out',
-            transform: currentStep === 1 ? 'scale(1.02)' : 'scale(1)',
-            filter: currentStep === 1 ? 'drop-shadow(0 4px 12px rgba(245, 158, 11, 0.15))' : 'none'
-          }}
-        >
-          <Card>
+      <div className={`${styles.stepCard} ${currentStep === 0 ? `${styles.active} ${styles.activeInfo}` : ''}`}>
+        <Card>
           <BlockStack gap="300">
             <InlineStack align="space-between" blockAlign="center">
               <InlineStack gap="200" blockAlign="center">
-                <Box 
-                  background={currentStep >= 1 ? "bg-fill-warning" : "bg-fill-disabled"} 
-                  padding="200" 
-                  borderRadius="100"
-                >
-                  <Icon 
-                    source={NotificationIcon} 
-                    tone={currentStep >= 1 ? "base" : "subdued"} 
-                  />
-                </Box>
+                <div className={`${styles.stepIcon} ${currentStep === 0 ? styles.active : ''}`}>
+                  <Box 
+                    background={currentStep >= 0 ? "bg-fill-info" : "bg-fill-disabled"} 
+                    padding="200" 
+                    borderRadius="100"
+                  >
+                    <Icon 
+                      source={ProductIcon} 
+                      tone={currentStep >= 0 ? "base" : "subdued"} 
+                    />
+                  </Box>
+                </div>
+                <BlockStack gap="050">
+                  <Text as="h3" variant="headingSm" fontWeight="semibold">
+                    Step 1: Products
+                  </Text>
+                  <Text as="p" variant="bodyXs" tone="subdued">
+                    Select inventory to monitor
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+              <div className={`${styles.stepBadge} ${currentStep === 0 ? styles.active : ''}`}>
+                <Badge tone={currentStep >= 0 ? "info" : "info-strong"}>
+                  {currentStep === 0 ? "Active" : currentStep > 0 ? "Complete" : "Pending"}
+                </Badge>
+              </div>
+            </InlineStack>
+            
+            <Text as="p" variant="bodySm" tone="subdued">
+              Choose products by collection, tags, or individually. Set custom thresholds for each product variant.
+            </Text>
+            
+            {currentStep > 0 && selectedProducts.length > 0 && (
+              <div className={styles.stepSuccess}>
+                <Icon source={CheckIcon} tone="success" />
+                <Text as="p" variant="bodySm" tone="success">
+                  {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} configured
+                </Text>
+              </div>
+            )}
+          </BlockStack>
+        </Card>
+      </div>
+
+      {/* Step 2: Notification Channels */}
+      <div className={`${styles.stepCard} ${currentStep === 1 ? `${styles.active} ${styles.activeWarning}` : ''}`}>
+        <Card>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <InlineStack gap="200" blockAlign="center">
+                <div className={`${styles.stepIcon} ${currentStep === 1 ? styles.active : ''}`}>
+                  <Box 
+                    background={currentStep >= 1 ? "bg-fill-warning" : "bg-fill-disabled"} 
+                    padding="200" 
+                    borderRadius="100"
+                  >
+                    <Icon 
+                      source={NotificationIcon} 
+                      tone={currentStep >= 1 ? "base" : "subdued"} 
+                    />
+                  </Box>
+                </div>
                 <BlockStack gap="050">
                   <Text as="h3" variant="headingSm" fontWeight="semibold">
                     Step 2: Notifications
@@ -769,9 +770,11 @@ export function Notifications({ isVisible }: NotificationsProps) {
                   </Text>
                 </BlockStack>
               </InlineStack>
-              <Badge tone={currentStep >= 1 ? "warning" : "info-strong"}>
-                {currentStep === 1 ? "Active" : currentStep > 1 ? "Complete" : "Pending"}
-              </Badge>
+              <div className={`${styles.stepBadge} ${currentStep === 1 ? styles.active : ''}`}>
+                <Badge tone={currentStep >= 1 ? "warning" : "info-strong"}>
+                  {currentStep === 1 ? "Active" : currentStep > 1 ? "Complete" : "Pending"}
+                </Badge>
+              </div>
             </InlineStack>
             
             <Text as="p" variant="bodySm" tone="subdued">
@@ -779,43 +782,35 @@ export function Notifications({ isVisible }: NotificationsProps) {
             </Text>
             
             {currentStep > 1 && channels.filter(c => c.enabled && c.verified).length > 0 && (
-              <InlineStack gap="100" blockAlign="center">
+              <div className={styles.stepSuccess}>
                 <Icon source={CheckIcon} tone="success" />
                 <Text as="p" variant="bodySm" tone="success">
                   {channels.filter(c => c.enabled && c.verified).length} channel{channels.filter(c => c.enabled && c.verified).length !== 1 ? 's' : ''} ready
                 </Text>
-              </InlineStack>
+              </div>
             )}
           </BlockStack>
         </Card>
-        </div>
-      </Grid.Cell>
+      </div>
 
       {/* Step 3: Review & Activate */}
-      <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 4, lg: 4, xl: 4 }}>
-        <div 
-          className="step-card-hover"
-          style={{
-            animation: 'fadeIn 0.7s ease-in-out',
-            transition: 'all 0.3s ease-in-out',
-            transform: currentStep === 2 ? 'scale(1.02)' : 'scale(1)',
-            filter: currentStep === 2 ? 'drop-shadow(0 4px 12px rgba(34, 197, 94, 0.15))' : 'none'
-          }}
-        >
-          <Card>
+      <div className={`${styles.stepCard} ${currentStep === 2 ? `${styles.active} ${styles.activeSuccess}` : ''}`}>
+        <Card>
           <BlockStack gap="300">
             <InlineStack align="space-between" blockAlign="center">
               <InlineStack gap="200" blockAlign="center">
-                <Box 
-                  background={currentStep >= 2 ? "bg-fill-success" : "bg-fill-disabled"} 
-                  padding="200" 
-                  borderRadius="100"
-                >
-                  <Icon 
-                    source={currentStep >= 2 ? CheckIcon : PlayIcon} 
-                    tone={currentStep >= 2 ? "base" : "subdued"} 
-                  />
-                </Box>
+                <div className={`${styles.stepIcon} ${currentStep === 2 ? styles.active : ''}`}>
+                  <Box 
+                    background={currentStep >= 2 ? "bg-fill-success" : "bg-fill-disabled"} 
+                    padding="200" 
+                    borderRadius="100"
+                  >
+                    <Icon 
+                      source={currentStep >= 2 ? CheckIcon : PlayIcon} 
+                      tone={currentStep >= 2 ? "base" : "subdued"} 
+                    />
+                  </Box>
+                </div>
                 <BlockStack gap="050">
                   <Text as="h3" variant="headingSm" fontWeight="semibold">
                     Step 3: Activate
@@ -825,9 +820,11 @@ export function Notifications({ isVisible }: NotificationsProps) {
                   </Text>
                 </BlockStack>
               </InlineStack>
-              <Badge tone={currentStep >= 2 ? "success" : "info-strong"}>
-                {currentStep === 2 ? "Active" : currentStep > 2 ? "Complete" : "Pending"}
-              </Badge>
+              <div className={`${styles.stepBadge} ${currentStep === 2 ? styles.active : ''}`}>
+                <Badge tone={currentStep >= 2 ? "success" : "info-strong"}>
+                  {currentStep === 2 ? "Active" : currentStep > 2 ? "Complete" : "Pending"}
+                </Badge>
+              </div>
             </InlineStack>
             
             <Text as="p" variant="bodySm" tone="subdued">
@@ -835,18 +832,17 @@ export function Notifications({ isVisible }: NotificationsProps) {
             </Text>
             
             {isSetupComplete && (
-              <InlineStack gap="100" blockAlign="center">
+              <div className={styles.stepSuccess}>
                 <Icon source={CheckIcon} tone="success" />
                 <Text as="p" variant="bodySm" tone="success">
                   Monitoring active
                 </Text>
-              </InlineStack>
+              </div>
             )}
           </BlockStack>
-          </Card>
-        </div>
-      </Grid.Cell>
-    </Grid>
+        </Card>
+      </div>
+    </div>
   );
 
   const renderProductSelection = () => (
@@ -990,15 +986,6 @@ export function Notifications({ isVisible }: NotificationsProps) {
 
         {(selectionMode === 'specific' || selectionMode === 'tags' || selectionMode === 'category') && (
           <BlockStack gap="300">
-            <TextField
-              label="Search Products"
-              value={productSearchQuery}
-              onChange={setProductSearchQuery}
-              placeholder="Search by product name..."
-              prefix={<Icon source={SearchIcon} />}
-              autoComplete="false"
-            />
-            
             <Card>
               <BlockStack gap="500">
                 <InlineStack align="space-between" blockAlign="center">
@@ -1014,206 +1001,44 @@ export function Notifications({ isVisible }: NotificationsProps) {
                 </InlineStack>
                 
                 <BlockStack gap="400">
-                  {/* Product Selection Slider Controls */}
-                  {filteredProducts.length > productsPerPage && (
-                    <Card background="bg-surface-secondary" padding="300">
-                      <InlineStack align="space-between" blockAlign="center">
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Showing {Math.min(productSelectionSliderIndex + 1, filteredProducts.length)} - {Math.min(productSelectionSliderIndex + productsPerPage, filteredProducts.length)} of {filteredProducts.length} products
-                        </Text>
-                        <InlineStack gap="200" blockAlign="center">
-                          <Button
-                            size="micro"
-                            disabled={productSelectionSliderIndex === 0}
-                            onClick={() => setProductSelectionSliderIndex(Math.max(0, productSelectionSliderIndex - productsPerPage))}
-                            icon={ChevronLeftIcon}
-                          >
-                            Previous
-                          </Button>
-                          <Button
-                            size="micro"
-                            disabled={productSelectionSliderIndex + productsPerPage >= filteredProducts.length}
-                            onClick={() => setProductSelectionSliderIndex(Math.min(filteredProducts.length - productsPerPage, productSelectionSliderIndex + productsPerPage))}
-                            icon={ChevronRightIcon}
-                          >
-                            Next
-                          </Button>
-                        </InlineStack>
-                      </InlineStack>
-                    </Card>
-                  )}
+                  {/* Search Products - moved from above to replace pagination */}
+                  <Card background="bg-surface-secondary" padding="300">
+                    <TextField
+                      label="Search Products"
+                      value={productSearchQuery}
+                      onChange={setProductSearchQuery}
+                      placeholder="Search by product name..."
+                      prefix={<Icon source={SearchIcon} />}
+                      autoComplete="false"
+                    />
+                  </Card>
                   
-                  {filteredProducts.slice(productSelectionSliderIndex, productSelectionSliderIndex + productsPerPage).map((product) => {
-                    const isProductSelected = selectedProducts.includes(product.id);
-                    const totalVariants = product.variants?.length || 1;
-                    
-                    return (
-                      <Card 
-                        key={product.id} 
-                        background={isProductSelected ? "bg-surface-selected" : "bg-surface"} 
-                        padding="400"
-                      >
-                        <BlockStack gap="400">
-                          {/* Product Header */}
-                          <InlineStack align="space-between" blockAlign="center">
-                            <InlineStack gap="400" blockAlign="center">
-                              <Checkbox
-                                checked={isProductSelected}
-                                onChange={() => {
-                                  if (isProductSelected) {
-                                    setSelectedProducts(selectedProducts.filter(id => id !== product.id));
-                                  } else if (selectedProducts.length < productLimit) {
-                                    setSelectedProducts([...selectedProducts, product.id]);
-                                  } else {
-                                    setShowLimitWarning(true);
-                                  }
-                                }}
-                                label=""
-                              />
-                              {product.imageUrl ? (
-                                <Thumbnail
-                                  source={product.imageUrl}
-                                  alt={product.title}
-                                  size="medium"
-                                />
-                              ) : (
-                                <Avatar name={product.title} size="md" />
-                              )}
-                              <BlockStack gap="200">
-                                <Text as="h5" variant="headingSm">{product.title}</Text>
-                                <InlineStack gap="300" wrap={false}>
-                                  <Badge 
-                                    tone={product.inventory > 10 ? 'success' : product.inventory > 0 ? 'attention' : 'critical'}
-                                    size="small"
-                                  >
-                                    {`${product.inventory} in stock`}
-                                  </Badge>
-                                  <Badge tone="info" size="small">
-                                    {`${totalVariants} variant${totalVariants !== 1 ? 's' : ''}`}
-                                  </Badge>
-                                  <Badge size="small">
-                                    {`$${product.variants?.[0]?.price || '0.00'}`}
-                                  </Badge>
-                                </InlineStack>
-                              </BlockStack>
-                            </InlineStack>
-                            
-                            {isProductSelected && (
-                              <Button 
-                                size="micro"
-                                onClick={() => {
-                                  const isExpanded = expandedVariants.includes(product.id);
-                                  if (isExpanded) {
-                                    setExpandedVariants(expandedVariants.filter(id => id !== product.id));
-                                  } else {
-                                    setExpandedVariants([...expandedVariants, product.id]);
-                                  }
-                                }}
-                                icon={expandedVariants.includes(product.id) ? XCircleIcon : EditIcon}
-                              >
-                                {expandedVariants.includes(product.id) ? 'Hide Variants' : 'Configure Variants'}
-                              </Button>
-                            )}
-                          </InlineStack>
-
-                          {/* Variant Configuration - Show when product is selected and expanded */}
-                          {isProductSelected && expandedVariants.includes(product.id) && (
-                            <Box padding="400" background="bg-surface-secondary" borderRadius="300">
-                              <BlockStack gap="400">
-                                <InlineStack align="space-between" blockAlign="center">
-                                  <BlockStack gap="100">
-                                    <Text as="h5" variant="headingSm">Configure Alert Thresholds</Text>
-                                    <Text as="p" variant="bodySm" tone="subdued">
-                                      Set when you want to be notified for each variant
-                                    </Text>
-                                  </BlockStack>
-                                </InlineStack>
-                                
-                                {product.variants && product.variants.length > 0 ? (
-                                  <Grid>
-                                    {product.variants.map((variant) => (
-                                      <Grid.Cell key={variant.id} columnSpan={{ xs: 6, sm: 6, md: 4, lg: 3, xl: 3 }}>
-                                        <Card background="bg-surface" padding="300">
-                                          <BlockStack gap="300">
-                                            <BlockStack gap="200">
-                                              <Text as="p" variant="bodyMd" fontWeight="medium">
-                                                {variant.title !== 'Default Title' ? variant.title : 'Standard'}
-                                              </Text>
-                                              <InlineStack align="space-between" blockAlign="center">
-                                                <Text as="p" variant="bodySm" tone="subdued">
-                                                  ${variant.price}
-                                                </Text>
-                                                <Badge 
-                                                  tone={variant.inventoryQuantity > 10 ? 'success' : 
-                                                       variant.inventoryQuantity > 0 ? 'attention' : 'critical'}
-                                                  size="small"
-                                                >
-                                                  {`${variant.inventoryQuantity} left`}
-                                                </Badge>
-                                              </InlineStack>
-                                            </BlockStack>
-                                            
-                                            <TextField
-                                              label="Alert when stock reaches"
-                                              type="number"
-                                              value={variantThresholds[variant.id]?.toString() || "5"}
-                                              onChange={(value) => {
-                                                const numValue = parseInt(value) || 5;
-                                                setVariantThresholds(prev => ({
-                                                  ...prev,
-                                                  [variant.id]: numValue
-                                                }));
-                                              }}
-                                              placeholder="5"
-                                              helpText={`Send alert when stock ≤ ${variantThresholds[variant.id] || 5} units`}
-                                              suffix="units"
-                                              autoComplete="off"
-                                            />
-                                          </BlockStack>
-                                        </Card>
-                                      </Grid.Cell>
-                                    ))}
-                                  </Grid>
-                                ) : (
-                                  <Card background="bg-surface" padding="300">
-                                    <BlockStack gap="300">
-                                      <Text as="p" variant="bodyMd" fontWeight="medium">Single Product Configuration</Text>
-                                      <TextField
-                                        label="Alert when stock reaches"
-                                        type="number"
-                                        value={variantThresholds[product.id]?.toString() || "5"}
-                                        onChange={(value) => {
-                                          const numValue = parseInt(value) || 5;
-                                          setVariantThresholds(prev => ({
-                                            ...prev,
-                                            [product.id]: numValue
-                                          }));
-                                        }}
-                                        placeholder="5"
-                                        helpText={`Send alert when stock ≤ ${variantThresholds[product.id] || 5} units`}
-                                        suffix="units"
-                                        autoComplete="off"
-                                      />
-                                    </BlockStack>
-                                  </Card>
-                                )}
-                                
-                                <Box padding="300" background="bg-surface-info" borderRadius="200">
-                                  <InlineStack gap="200" blockAlign="start">
-                                    <Icon source={AlertCircleIcon} tone="info" />
-                                    <Text as="p" variant="bodySm" tone="subdued">
-                                      <strong>Pro tip:</strong> Set thresholds based on your sales velocity. 
-                                      Fast-moving products should have higher alert thresholds.
-                                    </Text>
-                                  </InlineStack>
-                                </Box>
-                              </BlockStack>
-                            </Box>
-                          )}
-                        </BlockStack>
-                      </Card>
-                    );
-                  })}
+                  <ProductTable
+                    products={filteredProducts.map(convertToTableProduct)}
+                    selectedProducts={selectedProducts}
+                    selectedVariants={[]}
+                    expandedProducts={new Set(expandedVariants)}
+                    onProductSelect={(productId: string, selected: boolean) => {
+                      if (selected && selectedProducts.length < productLimit) {
+                        setSelectedProducts([...selectedProducts, productId]);
+                      } else if (!selected) {
+                        setSelectedProducts(selectedProducts.filter(id => id !== productId));
+                      } else {
+                        setShowLimitWarning(true);
+                      }
+                    }}
+                    onVariantSelect={() => { /* Not used in notifications context */ }}
+                    onExpandProduct={(productId: string) => {
+                      const isExpanded = expandedVariants.includes(productId);
+                      if (isExpanded) {
+                        setExpandedVariants(expandedVariants.filter(id => id !== productId));
+                      } else {
+                        setExpandedVariants([...expandedVariants, productId]);
+                      }
+                    }}
+                    onViewProduct={() => { /* Not used in notifications context */ }}
+                    onEditProduct={() => { /* Not used in notifications context */ }}
+                  />
                 </BlockStack>
               </BlockStack>
             </Card>
@@ -1471,7 +1296,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
     </Card>
   );
 
-  const renderRulesSetup = () => (
+  // const renderRulesSetup = () => (
     <Card>
       <BlockStack gap="400">
         <InlineStack align="space-between" blockAlign="center">
@@ -1569,7 +1394,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
         </InlineStack>
       </BlockStack>
     </Card>
-  );
+  // );
 
   const renderSummary = () => {
     const selectedProductsDetails = selectedProducts

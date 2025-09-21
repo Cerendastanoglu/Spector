@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useFetcher } from "@remix-run/react";
 import { openInNewTab } from "../utils/browserUtils";
 import { ProductConstants } from "../utils/scopedConstants";
+import { ProductTable } from "./ProductTable";
+import styles from "./StepsUI.module.css";
 import {
   Card,
   Text,
@@ -9,7 +11,6 @@ import {
   Button,
   InlineStack,
   BlockStack,
-  DataTable,
   Checkbox,
   TextField,
   Select,
@@ -29,8 +30,7 @@ import {
   ProductIcon, 
   EditIcon, 
   ViewIcon, 
-  ChevronLeftIcon, 
-  ChevronRightIcon, 
+  CheckIcon,
   ChevronDownIcon, 
   ChevronUpIcon,
   MoneyIcon,
@@ -101,107 +101,11 @@ interface ProductManagementProps {
 }
 
 type InventoryCategory = 'all' | 'out-of-stock' | 'critical' | 'low-stock' | 'in-stock';
-type ViewMode = 'table' | 'cards';
+
 type SortField = 'title' | 'inventory' | 'status' | 'updated' | 'created' | 'price' | 'variants';
 type SortDirection = 'asc' | 'desc';
 
-// Product Image Slideshow Component
-const ProductImageSlideshow: React.FC<{ 
-  product: Product; 
-  size?: 'small' | 'medium' | 'large' 
-}> = ({ product, size = 'small' }) => {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  
-  // Get all available images
-  const images = React.useMemo(() => {
-    const mediaImages = product.media?.edges
-      ?.map(edge => edge.node.image)
-      .filter(img => img && img.url) || [];
-    
-    const featuredImage = product.featuredMedia?.preview?.image;
-    
-    // Combine images, ensuring featured image is first if it exists and isn't already in media
-    const allImages = [];
-    if (featuredImage) {
-      allImages.push(featuredImage);
-    }
-    
-    // Add media images that aren't the same as featured image
-    mediaImages.forEach(img => {
-      if (img && (!featuredImage || img.url !== featuredImage.url)) {
-        allImages.push(img);
-      }
-    });
-    
-    return allImages;
-  }, [product.featuredMedia, product.media]);
-  
-  // Reset current index when product changes
-  React.useEffect(() => {
-    setCurrentImageIndex(0);
-  }, [product.id]);
-  
-  if (images.length === 0) {
-    return (
-      <Thumbnail
-        source={ProductIcon}
-        alt={product.title}
-        size={size}
-      />
-    );
-  }
-  
-  if (images.length === 1) {
-    return (
-      <Thumbnail
-        source={images[0].url}
-        alt={images[0].altText || product.title}
-        size={size}
-      />
-    );
-  }
-  
-  return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
-      <Thumbnail
-        source={images[currentImageIndex]?.url || ProductIcon}
-        alt={images[currentImageIndex]?.altText || product.title}
-        size={size}
-      />
-      {images.length > 1 && (
-        <div style={{
-          position: 'absolute',
-          bottom: '-8px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          gap: '4px',
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          padding: '2px 6px',
-          borderRadius: '8px',
-          backdropFilter: 'blur(4px)'
-        }}>
-          {images.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentImageIndex(index)}
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                border: 'none',
-                backgroundColor: index === currentImageIndex ? '#fff' : 'rgba(255, 255, 255, 0.4)',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s ease'
-              }}
-              aria-label={`View image ${index + 1} of ${images.length}`}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
+
 
 export function ProductManagement({ isVisible, initialCategory = 'all' }: ProductManagementProps) {
   // Add CSS animations - Fixed to prevent header interference
@@ -256,7 +160,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<string[]>([]);
   const [currentCategory, setCurrentCategory] = useState<InventoryCategory>(initialCategory);
-  const [viewMode, setViewMode] = useState<ViewMode>('table');
+
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('inventory');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -266,18 +170,18 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   
   // Bulk Operations Tab State
   const [activeBulkTab, setActiveBulkTab] = useState(0);
-  const [bulkOperation, setBulkOperation] = useState<'pricing' | 'collections'>('pricing');
+
   
   // Enhanced Pricing Operations State
   const [priceOperation, setPriceOperation] = useState<'set' | 'increase' | 'decrease' | 'round' | 'smart_round' | 'tiered' | 'margin'>('set');
   const [priceValue, setPriceValue] = useState('');
   const [pricePercentage, setPricePercentage] = useState('0');
   const [roundingRule, setRoundingRule] = useState<'nearest' | 'up' | 'down' | 'psychological' | 'premium' | 'clean' | 'half' | 'match' | 'beat_dollar' | 'beat_percent' | 'charm' | 'prestige' | 'anchoring' | 'odd_even'>('nearest');
-  const [compareAtPrice, setCompareAtPrice] = useState('');
-  const [applyToComparePrice, setApplyToComparePrice] = useState(false);
+
   
   // Compare Price Operations State
-  const [compareOperation, setCompareOperation] = useState<'set' | 'increase' | 'decrease' | 'remove'>('set');
+  const [, setCompareAtPrice] = useState('');
+  const [compareOperation] = useState<'set' | 'increase' | 'decrease' | 'remove'>('set');
   const [compareValue, setCompareValue] = useState('');
   
   // Pricing Category State
@@ -289,15 +193,15 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [collectionOperation, setCollectionOperation] = useState<'add' | 'remove'>('add');
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [availableCollections, setAvailableCollections] = useState<{id: string, title: string}[]>([]);
-  const [collectionSearchQuery, setCollectionSearchQuery] = useState('');
-  const [showCurrentCollections, setShowCurrentCollections] = useState(false);
+  const [collectionSearchQuery] = useState('');
+
   
   // Collection Filter State
   const [filterByCollection, setFilterByCollection] = useState<string>('');
   
   // Advanced Filter States
-  const [filterByVendor, setFilterByVendor] = useState<string>('');
-  const [filterByProductType, setFilterByProductType] = useState<string>('');
+  const [filterByVendor] = useState<string>('');
+  const [filterByProductType] = useState<string>('');
   const [filterByTags, setFilterByTags] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<{ min: string; max: string }>({ min: '', max: '' });
   const [inventoryRange, setInventoryRange] = useState<{ min: string; max: string }>({ min: '', max: '' });
@@ -308,9 +212,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [collections, setCollections] = useState<{id: string, title: string}[]>([]);
   
   // Currency State
-  const [storeCurrency, setStoreCurrency] = useState<string>('USD');
+  const [, setStoreCurrency] = useState<string>('USD');
   const [currencySymbol, setCurrencySymbol] = useState<string>('$');
-  const [shopDomain, setShopDomain] = useState<string>('');
+  const [, setShopDomain] = useState<string>('');
   
   // New Bulk Operations State
   const [titleOperation, setTitleOperation] = useState<'prefix' | 'suffix' | 'replace'>('prefix');
@@ -325,7 +229,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     error?: boolean;
   }>({ show: false, message: '' });
   
-  const [descriptionOperation, setDescriptionOperation] = useState<'append' | 'prepend' | 'replace'>('append');
+  const [descriptionOperation] = useState<'append' | 'prepend' | 'replace'>('append');
   const [descriptionValue, setDescriptionValue] = useState('');
   const [descriptionReplaceFrom, setDescriptionReplaceFrom] = useState('');
   const [descriptionReplaceTo, setDescriptionReplaceTo] = useState('');
@@ -345,26 +249,18 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [inventoryOperation, setInventoryOperation] = useState<'stock' | 'sku' | 'cost'>('stock');
   const [stockUpdateMethod, setStockUpdateMethod] = useState<'set' | 'add' | 'subtract'>('set');
   const [stockQuantity, setStockQuantity] = useState('');
-  const [skuUpdateMethod, setSkuUpdateMethod] = useState<'prefix' | 'suffix' | 'replace' | 'generate'>('prefix');
+  const [skuUpdateMethod] = useState<'prefix' | 'suffix' | 'replace' | 'generate'>('prefix');
   const [skuValue, setSkuValue] = useState('');
   const [skuFindText, setSkuFindText] = useState('');
   const [skuReplaceText, setSkuReplaceText] = useState('');
   const [skuPattern, setSkuPattern] = useState('');
-  const [trackInventory, setTrackInventory] = useState(true);
+  const [trackInventory] = useState(true);
   
   // SEO & Metadata State
-  const [seoOperation, setSeoOperation] = useState<'seo-title' | 'meta-desc' | 'handles'>('seo-title');
-  const [seoTitleTemplate, setSeoTitleTemplate] = useState('');
-  const [metaDescTemplate, setMetaDescTemplate] = useState('');
-  const [handleUpdateMethod, setHandleUpdateMethod] = useState<'auto' | 'prefix' | 'suffix'>('auto');
-  const [handlePrefix, setHandlePrefix] = useState('');
-  const [handleSuffix, setHandleSuffix] = useState('');
+
   
   // Status & Visibility State
-  const [statusOperation, setStatusOperation] = useState<'status' | 'visibility' | 'publish-date'>('status');
   const [newProductStatus, setNewProductStatus] = useState<'ACTIVE' | 'DRAFT' | 'ARCHIVED'>('ACTIVE');
-  const [visibilitySettings, setVisibilitySettings] = useState<string[]>(['online-store']);
-  const [publishDate, setPublishDate] = useState('');
 
   // Bulk Discount Operations State
   const [discountOperation, setDiscountOperation] = useState<'set' | 'increase' | 'decrease' | 'flash_sale' | 'volume' | 'competitive' | 'psychological' | 'bundle' | 'seasonal' | 'dynamic' | 'simple'>('set');
@@ -385,8 +281,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [seasonalPricing, setSeasonalPricing] = useState('');
   
   // Enhanced Error and success states for bulk operations
-  const [bulkRetryCount, setBulkRetryCount] = useState(0);
-  const [bulkIsRetrying, setBulkIsRetrying] = useState(false);
+
+
   
   const [showDraftProducts, setShowDraftProducts] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -401,7 +297,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
   
   // Bulk operations modal state
-  const [showBulkModal, setShowBulkModal] = useState(false);
+
   
   // Helper function to toggle product expansion
   const toggleProductExpansion = (productId: string) => {
@@ -420,10 +316,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     return product ? product.variants.edges.map(v => v.node.id) : [];
   };
 
-  const getSelectedVariantsForProduct = (productId: string): string[] => {
-    const variantIds = getProductVariantIds(productId);
-    return selectedVariants.filter(variantId => variantIds.includes(variantId));
-  };
+
 
   const getProductSelectionState = (productId: string): 'none' | 'some' | 'all' => {
     const variantIds = getProductVariantIds(productId);
@@ -804,49 +697,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     // Clear bulk messages functionality
   };
 
-  const handleBulkOperationError = (error: any, operation: string, canRetry = true) => {
-    console.error(`Bulk ${operation} failed:`, error);
-    
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    const isNetworkError = errorMessage.toLowerCase().includes('network') || 
-                          errorMessage.toLowerCase().includes('fetch') ||
-                          errorMessage.toLowerCase().includes('timeout');
-    
-    if (isNetworkError && canRetry && bulkRetryCount < 3) {
-      setError(`${operation} failed due to network issues. Retrying... (Attempt ${bulkRetryCount + 1}/3)`);
-      return { shouldRetry: true, isNetworkError: true };
-    }
-    
-    setError(`Failed to ${operation.toLowerCase()}: ${errorMessage}${canRetry ? ' Click retry to try again.' : ''}`);
-    return { shouldRetry: false, isNetworkError };
-  };
 
-  const retryBulkOperation = async (operationFunction: () => Promise<void>, operationName: string) => {
-    setBulkIsRetrying(true);
-    setBulkRetryCount(prev => prev + 1);
-    
-    try {
-      await operationFunction();
-      setBulkRetryCount(0);
-    } catch (error) {
-      handleBulkOperationError(error, operationName, bulkRetryCount < 2);
-    } finally {
-      setBulkIsRetrying(false);
-    }
-  };
 
-  const simulateApiCall = async (operation: string, delay = 1500): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        // Simulate occasional failures for testing error handling
-        if (Math.random() < 0.1) { // 10% chance of failure
-          reject(new Error(`Simulated ${operation} API failure - network timeout`));
-        } else {
-          resolve();
-        }
-      }, delay);
-    });
-  };
+
 
   // const handleSelectAll = (checked: boolean) => {
   //   setSelectedProducts(checked ? filteredProducts.map(p => p.id) : []);
@@ -924,13 +777,14 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         
         // Apply advanced discount strategy
         switch (discountOperation) {
-          case 'flash_sale':
+          case 'flash_sale': {
             const flashDiscount = parseFloat(discountPercentage) || 0;
             newCompareAtPrice = currentPrice; // Original price becomes compare-at
             newPrice = currentPrice * (1 - flashDiscount / 100);
             break;
+          }
             
-          case 'volume':
+          case 'volume': {
             const inventory = targetVariant.inventoryQuantity || 0;
             if (inventory >= 50) {
               // High inventory: 5% discount
@@ -946,8 +800,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
               newCompareAtPrice = currentPrice * 1.25;
             }
             break;
+          }
             
-          case 'competitive':
+          case 'competitive': {
             const competitorPrice = parseFloat(discountValue) || currentPrice;
             if (roundingRule === 'match') {
               newPrice = competitorPrice;
@@ -960,6 +815,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
               newCompareAtPrice = competitorPrice * 1.25; // Show value
             }
             break;
+          }
             
           case 'psychological':
             if (roundingRule === 'charm') {
@@ -979,10 +835,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
             }
             break;
             
-          case 'simple':
+          case 'simple': {
             const simplePercent = parseFloat(discountPercentage) || 0;
             newPrice = currentPrice * (1 + simplePercent / 100);
             break;
+          }
             
           default:
             newPrice = currentPrice;
@@ -1179,16 +1036,18 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
             case 'set':
               newPrice = parseFloat(priceValue) || 0;
               break;
-            case 'increase':
+            case 'increase': {
               const increasePercent = parseFloat(pricePercentage) || 0;
               newPrice = currentPrice * (1 + increasePercent / 100);
               console.log(`Increase: ${currentPrice} * (1 + ${increasePercent}/100) = ${newPrice}`);
               break;
-            case 'decrease':
+            }
+            case 'decrease': {
               const decreasePercent = parseFloat(pricePercentage) || 0;
               newPrice = currentPrice * (1 - decreasePercent / 100);
               console.log(`Decrease: ${currentPrice} * (1 - ${decreasePercent}/100) = ${newPrice}`);
               break;
+            }
             case 'round':
               newPrice = currentPrice;
               if (roundingRule === 'up') newPrice = Math.ceil(currentPrice);
@@ -1418,14 +1277,16 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
             case 'set':
               newPrice = parseFloat(priceValue);
               break;
-            case 'increase':
+            case 'increase': {
               const increasePercent = parseFloat(pricePercentage) || 0;
               newPrice = currentPrice * (1 + increasePercent / 100);
               break;
-            case 'decrease':
+            }
+            case 'decrease': {
               const decreasePercent = parseFloat(pricePercentage) || 0;
               newPrice = currentPrice * (1 - decreasePercent / 100);
               break;
+            }
             case 'round':
               if (roundingRule === 'up') {
                 newPrice = Math.ceil(currentPrice);
@@ -2716,494 +2577,12 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     return 'success';
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    const currentPageProducts = filteredProducts.slice(0, productsPerPage);
-    if (checked) {
-      const newSelection = [...new Set([...selectedProducts, ...currentPageProducts.map(p => p.id)])];
-      setSelectedProducts(newSelection);
-    } else {
-      const currentPageIds = currentPageProducts.map(p => p.id);
-      setSelectedProducts(selectedProducts.filter(id => !currentPageIds.includes(id)));
-    }
-  };
+
 
   // Helper functions for product results selection
-  const isAllResultsSelected = () => {
-    const visibleProducts = filteredProducts.slice(0, productsPerPage);
-    return visibleProducts.length > 0 && visibleProducts.every(product => getProductSelectionState(product.id) !== 'none');
-  };
 
-  const handleSelectAllResults = (checked: boolean) => {
-    const visibleProducts = filteredProducts.slice(0, productsPerPage);
-    visibleProducts.forEach(product => {
-      handleProductSelection(product.id, checked);
-    });
-  };
 
-  const isAllCurrentPageSelected = () => {
-    const currentPageProducts = filteredProducts.slice(0, productsPerPage);
-    return currentPageProducts.length > 0 && currentPageProducts.every(product => selectedProducts.includes(product.id));
-  };
 
-  const isIndeterminate = () => {
-    const currentPageProducts = filteredProducts.slice(0, productsPerPage);
-    const selectedCount = currentPageProducts.filter(product => selectedProducts.includes(product.id)).length;
-    return selectedCount > 0 && selectedCount < currentPageProducts.length;
-  };
-
-  const renderTableView = () => {
-    const paginatedProducts = filteredProducts.slice(0, productsPerPage);
-
-    const tableHeadings = [
-      <div key="select-all" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '300px' }}>
-        <Checkbox
-          checked={
-            paginatedProducts.length > 0 && 
-            paginatedProducts.every(product => getProductSelectionState(product.id) !== 'none')
-          }
-          onChange={(checked) => {
-            paginatedProducts.forEach(product => {
-              handleBulkSelect(product.id, checked);
-            });
-          }}
-          label=""
-        />
-        <Text as="span" variant="bodyMd" fontWeight="semibold">
-          Product
-        </Text>
-      </div>,
-      <div key="status" style={{ textAlign: 'center', minWidth: '80px' }}>
-        <Text as="span" variant="bodyMd" fontWeight="semibold">Status</Text>
-      </div>,
-      <div key="price" style={{ textAlign: 'center', minWidth: '100px' }}>
-        <Text as="span" variant="bodyMd" fontWeight="semibold">Price</Text>
-      </div>,
-      <div key="inventory" style={{ textAlign: 'center', minWidth: '100px' }}>
-        <Text as="span" variant="bodyMd" fontWeight="semibold">Inventory</Text>
-      </div>,
-      <div key="variants" style={{ textAlign: 'center', minWidth: '80px' }}>
-        <Text as="span" variant="bodyMd" fontWeight="semibold">Variants</Text>
-      </div>,
-      <div key="actions" style={{ textAlign: 'center', minWidth: '120px' }}>
-        <Text as="span" variant="bodyMd" fontWeight="semibold">Actions</Text>
-      </div>
-    ];
-
-    const rows: any[] = [];
-    
-    paginatedProducts.forEach((product, index) => {
-      const productKey = `product-${product.id}-${index}`;
-      const inventory = product.totalInventory;
-      const hasMultipleVariants = product.variants.edges.length > 1;
-      const isExpanded = expandedProducts.has(product.id);
-
-      // Status dot component
-      const getStatusDot = (status: string) => {
-        const colors = {
-          ACTIVE: '#22c55e',
-          DRAFT: '#f59e0b', 
-          ARCHIVED: '#6b7280'
-        };
-        return (
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            gap: '8px'
-          }}>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: colors[status as keyof typeof colors] || '#6b7280',
-              boxShadow: `0 0 0 2px ${colors[status as keyof typeof colors] || '#6b7280'}20`
-            }} />
-            <Text as="span" variant="bodySm" tone="subdued">
-              {status.charAt(0) + status.slice(1).toLowerCase()}
-            </Text>
-          </div>
-        );
-      };
-
-      // Inventory dot component
-      const getInventoryDot = (inventory: number) => {
-        const getColor = () => {
-          if (inventory === 0) return '#ef4444';
-          if (inventory < 10) return '#f59e0b';
-          if (inventory < 50) return '#3b82f6';
-          return '#22c55e';
-        };
-        
-        return (
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            gap: '8px'
-          }}>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: getColor(),
-              boxShadow: `0 0 0 2px ${getColor()}20`
-            }} />
-            <Text as="span" variant="bodySm">
-              {inventory} units
-            </Text>
-          </div>
-        );
-      };
-
-      // Main product row
-      const productRow = [
-        // Product info cell with image, title, and handle
-        <div key={`${productKey}-product`} style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '12px',
-          minWidth: '300px',
-          padding: '12px 8px'
-        }}>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Checkbox
-              checked={getProductSelectionState(product.id) !== 'none'}
-              onChange={(checked) => handleBulkSelect(product.id, checked)}
-              label=""
-            />
-            {getProductSelectionState(product.id) === 'some' && (
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '10px',
-                transform: 'translateY(-50%)',
-                width: '6px',
-                height: '2px',
-                backgroundColor: '#3b82f6',
-                borderRadius: '1px',
-                pointerEvents: 'none',
-                zIndex: 1
-              }} />
-            )}
-          </div>
-          <div style={{ 
-            position: 'relative',
-            width: '48px', 
-            height: '48px', 
-            flexShrink: 0,
-            borderRadius: '8px',
-            overflow: 'hidden',
-            border: '1px solid #e5e7eb',
-            backgroundColor: '#f9fafb',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            {product.featuredMedia?.preview?.image?.url ? (
-              <img
-                src={product.featuredMedia.preview.image.url}
-                alt={product.featuredMedia?.preview?.image?.altText || product.title}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover'
-                }}
-              />
-            ) : (
-              <Icon source={ProductIcon} tone="subdued" />
-            )}
-          </div>
-          <div style={{ 
-            flex: 1, 
-            minWidth: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '4px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Text as="span" variant="bodyMd" fontWeight="semibold" truncate>
-                {product.title}
-              </Text>
-              {hasMultipleVariants && (
-                <Button
-                  variant="plain"
-                  size="micro"
-                  icon={isExpanded ? ChevronUpIcon : ChevronDownIcon}
-                  onClick={() => {
-                    const newExpanded = new Set(expandedProducts);
-                    if (isExpanded) {
-                      newExpanded.delete(product.id);
-                    } else {
-                      newExpanded.add(product.id);
-                    }
-                    setExpandedProducts(newExpanded);
-                  }}
-                  accessibilityLabel={`${isExpanded ? 'Collapse' : 'Expand'} variants for ${product.title}`}
-                />
-              )}
-            </div>
-            <Text as="span" variant="bodySm" tone="subdued" truncate>
-              {product.handle}
-            </Text>
-          </div>
-        </div>,
-        
-        // Status column with dot
-        <div key={`${productKey}-status`} style={{ textAlign: 'center', padding: '12px 8px' }}>
-          {getStatusDot(product.status)}
-        </div>,
-        
-        // Price column (only for single variant products)
-        <div key={`${productKey}-price`} style={{ textAlign: 'center', padding: '12px 8px' }}>
-          {!hasMultipleVariants && product.variants.edges.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-              <Text as="span" variant="bodySm" fontWeight="medium">
-                {currencySymbol}{parseFloat(product.variants.edges[0].node.price).toFixed(2)}
-              </Text>
-              {product.variants.edges[0].node.compareAtPrice && parseFloat(product.variants.edges[0].node.compareAtPrice) > parseFloat(product.variants.edges[0].node.price) && (
-                <Text as="span" variant="bodySm" tone="subdued" textDecorationLine="line-through">
-                  {currencySymbol}{parseFloat(product.variants.edges[0].node.compareAtPrice).toFixed(2)}
-                </Text>
-              )}
-            </div>
-          ) : hasMultipleVariants ? (
-            <Text as="span" variant="bodySm" tone="subdued">
-              Multiple
-            </Text>
-          ) : (
-            <Text as="span" variant="bodySm" tone="subdued">
-              —
-            </Text>
-          )}
-        </div>,
-        
-        // Inventory column with dot
-        <div key={`${productKey}-inventory`} style={{ textAlign: 'center', padding: '12px 8px' }}>
-          {getInventoryDot(inventory)}
-        </div>,
-
-        // Variants column
-        <div key={`${productKey}-variants`} style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          gap: '8px',
-          padding: '12px 8px'
-        }}>
-          <Text as="span" variant="bodySm" fontWeight="medium">
-            {product.variants.edges.length}
-          </Text>
-        </div>,
-        
-        // Actions column
-        <div key={`${productKey}-actions`} style={{ textAlign: 'center', padding: '12px 8px' }}>
-          <InlineStack gap="200" align="center">
-            <Button
-              icon={ViewIcon}
-              variant="plain"
-              onClick={() => navigateToProduct(product, 'storefront')}
-              accessibilityLabel={`${product.status === 'ACTIVE' ? 'View live' : 'View admin'} ${product.title}`}
-            />
-            <Button
-              icon={EditIcon}
-              variant="plain"
-              onClick={() => navigateToProduct(product, 'admin')}
-              accessibilityLabel={`Edit ${product.title}`}
-            />
-          </InlineStack>
-        </div>
-      ];
-
-      rows.push(productRow);
-
-      // Add expanded variant rows if product is expanded
-      if (isExpanded && hasMultipleVariants) {
-        product.variants.edges.forEach((variant, variantIndex) => {
-          const variantInventory = variant.node.inventoryQuantity || 0;
-          
-          // Status dot for variant
-          const getVariantStatusDot = (inventory: number) => {
-            const color = inventory > 0 ? '#22c55e' : '#ef4444';
-            return (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                gap: '8px'
-              }}>
-                <div style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  backgroundColor: color,
-                  boxShadow: `0 0 0 2px ${color}20`
-                }} />
-                <Text as="span" variant="bodyXs" tone="subdued">
-                  {inventory > 0 ? 'In Stock' : 'Out of Stock'}
-                </Text>
-              </div>
-            );
-          };
-
-          // Inventory dot for variant
-          const getVariantInventoryDot = (inventory: number) => {
-            const getColor = () => {
-              if (inventory === 0) return '#ef4444';
-              if (inventory < 5) return '#f59e0b';
-              if (inventory < 20) return '#3b82f6';
-              return '#22c55e';
-            };
-            
-            return (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                gap: '8px'
-              }}>
-                <div style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  backgroundColor: getColor(),
-                  boxShadow: `0 0 0 2px ${getColor()}20`
-                }} />
-                <Text as="span" variant="bodyXs">
-                  {inventory}
-                </Text>
-              </div>
-            );
-          };
-
-          const isVariantSelected = selectedVariants.includes(variant.node.id);
-          
-          const variantRow = [
-            // Product column - indented variant info with checkbox
-            <div key={`${productKey}-variant-${variantIndex}`} style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '12px',
-              minWidth: '300px',
-              padding: '8px 8px',
-              paddingLeft: '16px', // Less indent to make room for checkbox
-              backgroundColor: isVariantSelected ? '#f0f9ff' : '#f8fafc',
-              borderLeft: '3px solid #e2e8f0',
-              margin: '1px 0'
-            }}>
-              <Checkbox
-                checked={isVariantSelected}
-                onChange={(checked) => {
-                  if (checked) {
-                    setSelectedVariants([...selectedVariants, variant.node.id]);
-                    // Also select the parent product if not already selected
-                    if (!selectedProducts.includes(product.id)) {
-                      setSelectedProducts([...selectedProducts, product.id]);
-                    }
-                  } else {
-                    setSelectedVariants(selectedVariants.filter(id => id !== variant.node.id));
-                    // Check if no more variants from this product are selected
-                    const remainingVariants = product.variants.edges.filter(v => 
-                      v.node.id !== variant.node.id && selectedVariants.includes(v.node.id)
-                    );
-                    if (remainingVariants.length === 0) {
-                      setSelectedProducts(selectedProducts.filter(id => id !== product.id));
-                    }
-                  }
-                }}
-                label=""
-              />
-              <div style={{ 
-                width: '20px', 
-                height: '20px', 
-                flexShrink: 0,
-                borderRadius: '4px',
-                overflow: 'hidden',
-                border: '1px solid #e5e7eb',
-                backgroundColor: '#fff'
-              }}>
-                <div style={{ 
-                  width: '100%', 
-                  height: '100%', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  backgroundColor: '#f1f5f9'
-                }}>
-                  <Icon source={ProductIcon} tone="subdued" />
-                </div>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <Text as="span" variant="bodyXs" fontWeight="medium" truncate>
-                  {variant.node.title}
-                </Text>
-                <div style={{ marginTop: '2px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  {/* Price for this variant */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Text as="span" variant="bodyXs" fontWeight="medium">
-                      ${parseFloat(variant.node.price).toFixed(2)}
-                    </Text>
-                    {variant.node.compareAtPrice && parseFloat(variant.node.compareAtPrice) > parseFloat(variant.node.price) && (
-                      <>
-                        <Text as="span" variant="bodyXs" tone="subdued">
-                          <span style={{ textDecoration: 'line-through' }}>
-                            ${parseFloat(variant.node.compareAtPrice).toFixed(2)}
-                          </span>
-                        </Text>
-                        <Text as="span" variant="bodyXs" tone="success">
-                          (${(parseFloat(variant.node.compareAtPrice) - parseFloat(variant.node.price)).toFixed(2)} off)
-                        </Text>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>,
-            
-            // Status - variant availability based on inventory
-            <div key={`${productKey}-variant-${variantIndex}-status`} style={{ textAlign: 'center', padding: '8px' }}>
-              {getVariantStatusDot(variantInventory)}
-            </div>,
-            
-            // Inventory - variant specific
-            <div key={`${productKey}-variant-${variantIndex}-inventory`} style={{ textAlign: 'center', padding: '8px' }}>
-              {getVariantInventoryDot(variantInventory)}
-            </div>,
-            
-            // Variant number
-            <div key={`${productKey}-variant-${variantIndex}-details`} style={{ textAlign: 'center', padding: '8px' }}>
-              <Text as="span" variant="bodyXs" tone="subdued">
-                #{variantIndex + 1}
-              </Text>
-            </div>,
-            
-            // Actions - variant specific (empty for now)
-            <div key={`${productKey}-variant-${variantIndex}-actions`} style={{ textAlign: 'center', padding: '8px' }}>
-              <Text as="span" variant="bodyXs" tone="subdued">
-                —
-              </Text>
-            </div>
-          ];
-          rows.push(variantRow);
-        });
-      }
-    });
-
-    return (
-      <div style={{ 
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
-        overflow: 'hidden',
-        backgroundColor: '#fff'
-      }}>
-        <DataTable
-          columnContentTypes={['text', 'text', 'text', 'text', 'text']}
-          headings={tableHeadings as any}
-          rows={rows}
-          verticalAlign="middle"
-        />
-      </div>
-    );
-  };
 
   const renderCardView = () => {
     const paginatedProducts = filteredProducts.slice(0, productsPerPage);
@@ -3714,95 +3093,115 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           {/* Header */}
           <Text as="h2" variant="headingMd">Product Management</Text>
           
-          {/* Modern Step Navigation */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '16px',
-            padding: '20px',
-            backgroundColor: '#f8fafc',
-            borderRadius: '12px',
-            border: '1px solid #e2e8f0'
-          }}>
-            {/* Step 1 Card */}
-            <div
+          {/* Modern Step Navigation - Individual Boxes */}
+          <div className={styles.stepsContainer}>
+            {/* Step 1: Select Products */}
+            <div 
+              className={`${styles.stepCard} ${activeMainTab === 0 ? `${styles.active} ${styles.activeInfo}` : ''}`}
               onClick={() => setActiveMainTab(0)}
-              style={{
-                padding: '20px',
-                backgroundColor: activeMainTab === 0 ? '#ffffff' : '#f1f5f9',
-                borderRadius: '8px',
-                border: activeMainTab === 0 ? '2px solid #FF204E' : '1px solid #e2e8f0',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: activeMainTab === 0 ? '0 4px 12px rgba(255, 32, 78, 0.15)' : 'none'
-              }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  backgroundColor: activeMainTab === 0 ? '#FF204E' : '#A0153E99', // 99 adds opacity for greyed out effect
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontWeight: '600',
-                  fontSize: '16px'
-                }}>
-                  1
-                </div>
-                <Text as="span" variant="bodyLg" fontWeight="semibold">
-                  Select Products
-                </Text>
-                {selectedProducts.length > 0 && (
-                  <Badge tone="success" size="small">{selectedProducts.length.toString()}</Badge>
-                )}
-              </div>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Choose products and variants to edit in bulk
-              </Text>
+              <Card>
+                <BlockStack gap="300">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <InlineStack gap="200" blockAlign="center">
+                      <div className={`${styles.stepIcon} ${activeMainTab === 0 ? styles.active : ''}`}>
+                        <Box 
+                          background={activeMainTab >= 0 ? "bg-fill-info" : "bg-fill-disabled"} 
+                          padding="200" 
+                          borderRadius="100"
+                        >
+                          <Icon 
+                            source={ProductIcon} 
+                            tone={activeMainTab >= 0 ? "base" : "subdued"} 
+                          />
+                        </Box>
+                      </div>
+                      <BlockStack gap="050">
+                        <Text as="h3" variant="headingSm" fontWeight="semibold">
+                          Step 1: Select Products
+                        </Text>
+                        <Text as="p" variant="bodyXs" tone="subdued">
+                          Choose products and variants
+                        </Text>
+                      </BlockStack>
+                    </InlineStack>
+                    <div className={`${styles.stepBadge} ${activeMainTab === 0 ? styles.active : ''}`}>
+                      <Badge tone={selectedProducts.length > 0 ? "info" : "info-strong"}>
+                        {activeMainTab === 0 ? "Active" : selectedProducts.length > 0 ? "Complete" : "Pending"}
+                      </Badge>
+                    </div>
+                  </InlineStack>
+                  
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Choose products and variants to edit in bulk operations
+                  </Text>
+                  
+                  {selectedProducts.length > 0 && (
+                    <div className={styles.stepSuccess}>
+                      <Icon source={CheckIcon} tone="success" />
+                      <Text as="p" variant="bodySm" tone="success">
+                        {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} selected
+                      </Text>
+                    </div>
+                  )}
+                </BlockStack>
+              </Card>
             </div>
 
-            {/* Step 2 Card */}
-            <div
+            {/* Step 2: Bulk Edit */}
+            <div 
+              className={`${styles.stepCard} ${activeMainTab === 1 ? `${styles.active} ${styles.activeWarning}` : ''}`}
               onClick={() => selectedVariants.length > 0 && setActiveMainTab(1)}
-              style={{
-                padding: '20px',
-                backgroundColor: activeMainTab === 1 ? '#ffffff' : (selectedVariants.length === 0 ? '#f8fafc' : '#f1f5f9'),
-                borderRadius: '8px',
-                border: activeMainTab === 1 ? '2px solid #FF204E' : '1px solid #e2e8f0',
-                cursor: selectedVariants.length > 0 ? 'pointer' : 'not-allowed',
-                transition: 'all 0.2s ease',
-                boxShadow: activeMainTab === 1 ? '0 4px 12px rgba(255, 32, 78, 0.15)' : 'none',
-                opacity: selectedVariants.length === 0 ? 0.6 : 1
-              }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  backgroundColor: activeMainTab === 1 ? '#FF204E' : (selectedVariants.length === 0 ? '#A0153E33' : '#A0153E99'), // 33 for very faded, 99 for greyed
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontWeight: '600',
-                  fontSize: '16px'
-                }}>
-                  2
-                </div>
-                <Text as="span" variant="bodyLg" fontWeight="semibold" tone={selectedVariants.length === 0 ? 'subdued' : undefined}>
-                  Bulk Edit
-                </Text>
-              </div>
-              <Text as="p" variant="bodySm" tone="subdued">
-                {selectedVariants.length === 0 
-                  ? 'Select products first to enable bulk editing'
-                  : 'Apply changes to your selected items'
-                }
-              </Text>
+              <Card>
+                <BlockStack gap="300">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <InlineStack gap="200" blockAlign="center">
+                      <div className={`${styles.stepIcon} ${activeMainTab === 1 ? styles.active : ''}`}>
+                        <Box 
+                          background={activeMainTab >= 1 && selectedVariants.length > 0 ? "bg-fill-warning" : "bg-fill-disabled"} 
+                          padding="200" 
+                          borderRadius="100"
+                        >
+                          <Icon 
+                            source={EditIcon} 
+                            tone={activeMainTab >= 1 && selectedVariants.length > 0 ? "base" : "subdued"} 
+                          />
+                        </Box>
+                      </div>
+                      <BlockStack gap="050">
+                        <Text as="h3" variant="headingSm" fontWeight="semibold" tone={selectedVariants.length === 0 ? 'subdued' : undefined}>
+                          Step 2: Bulk Edit
+                        </Text>
+                        <Text as="p" variant="bodyXs" tone="subdued">
+                          Apply changes to selections
+                        </Text>
+                      </BlockStack>
+                    </InlineStack>
+                    <div className={`${styles.stepBadge} ${activeMainTab === 1 ? styles.active : ''}`}>
+                      <Badge tone={selectedVariants.length > 0 ? "warning" : "info-strong"}>
+                        {activeMainTab === 1 ? "Active" : selectedVariants.length > 0 ? "Complete" : "Pending"}
+                      </Badge>
+                    </div>
+                  </InlineStack>
+                  
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {selectedVariants.length === 0 
+                      ? 'Select products first to enable bulk editing'
+                      : 'Apply changes to your selected items'
+                    }
+                  </Text>
+                  
+                  {selectedVariants.length > 0 && (
+                    <div className={styles.stepSuccess}>
+                      <Icon source={CheckIcon} tone="success" />
+                      <Text as="p" variant="bodySm" tone="success">
+                        {selectedVariants.length} variant{selectedVariants.length !== 1 ? 's' : ''} ready for editing
+                      </Text>
+                    </div>
+                  )}
+                </BlockStack>
+              </Card>
             </div>
           </div>
 
@@ -3859,7 +3258,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   
                   return (
                     <>
-                      {selectedProductsList.map((product, index) => {
+                      {selectedProductsList.map((product, _index) => {
                         const hasVariants = product.variants.edges.length > 1;
                         const selectedVariantCount = product.variants.edges.filter(v => 
                           selectedVariants.includes(v.node.id)
@@ -4446,7 +3845,26 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       <p>Try adjusting your search or filter criteria to find products.</p>
                     </EmptyState>
                   ) : (
-                    renderTableView()
+                    <ProductTable
+                      products={filteredProducts.slice(0, productsPerPage)}
+                      selectedProducts={selectedProducts}
+                      selectedVariants={selectedVariants}
+                      expandedProducts={expandedProducts}
+                      onProductSelect={handleProductSelection}
+                      onVariantSelect={(variantId, checked) => {
+                        const product = filteredProducts.find(p => 
+                          p.variants.edges.some(v => v.node.id === variantId)
+                        );
+                        if (product) {
+                          handleVariantSelection(product.id, variantId, checked);
+                        }
+                      }}
+                      onExpandProduct={toggleProductExpansion}
+                      onViewProduct={(product) => navigateToProduct(product, 'storefront')}
+                      onEditProduct={(product) => navigateToProduct(product, 'admin')}
+                      shopCurrency="$"
+                      showVariantSelection={true}
+                    />
                   )}
                 </div>
             </BlockStack>
