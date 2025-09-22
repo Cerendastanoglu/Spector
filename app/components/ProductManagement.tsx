@@ -30,14 +30,18 @@ import {
   ProductIcon, 
   EditIcon, 
   ViewIcon, 
-  CheckIcon,
   ChevronDownIcon, 
   ChevronUpIcon,
   MoneyIcon,
   CollectionIcon,
   InventoryIcon,
   SearchIcon,
-  StatusIcon
+  PlusIcon,
+  MinusIcon,
+  PackageIcon,
+  CalculatorIcon,
+  LocationIcon,
+  HashtagIcon
 } from "@shopify/polaris-icons";
 
 interface Product {
@@ -171,9 +175,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   // Bulk Operations Tab State
   const [activeBulkTab, setActiveBulkTab] = useState(0);
 
+  // Bulk Operation Completion Tracking
+  const [hasBulkOperationsCompleted, setHasBulkOperationsCompleted] = useState(false);
   
   // Enhanced Pricing Operations State
-  const [priceOperation, setPriceOperation] = useState<'set' | 'increase' | 'decrease' | 'round' | 'smart_round' | 'tiered' | 'margin'>('set');
+  const [priceOperation, setPriceOperation] = useState<'set' | 'increase' | 'decrease' | 'round' | 'smart_round'>('set');
   const [priceValue, setPriceValue] = useState('');
   const [pricePercentage, setPricePercentage] = useState('0');
   const [roundingRule, setRoundingRule] = useState<'nearest' | 'up' | 'down' | 'psychological' | 'premium' | 'clean' | 'half' | 'match' | 'beat_dollar' | 'beat_percent' | 'charm' | 'prestige' | 'anchoring' | 'odd_even'>('nearest');
@@ -184,8 +190,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [compareOperation] = useState<'set' | 'increase' | 'decrease' | 'remove'>('set');
   const [compareValue, setCompareValue] = useState('');
   
-  // Pricing Category State
-  const [pricingCategory, setPricingCategory] = useState<'price' | 'discount'>('price');
+  // Pricing Category State  
   const [comparePercentage, setComparePercentage] = useState('0');
   const [applyCompareChanges, setApplyCompareChanges] = useState(false);
   
@@ -239,7 +244,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [tagRemoveValue, setTagRemoveValue] = useState('');
   
   // Content operation state
-  const [contentOperation, setContentOperation] = useState<'title' | 'description' | 'tags'>('title');
+  const [contentOperation, setContentOperation] = useState<'title' | 'description' | 'images'>('title');
   
   const [costValue, setCostValue] = useState('');
   const [weightValue, setWeightValue] = useState('');
@@ -261,11 +266,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   
   // Status & Visibility State
   const [newProductStatus, setNewProductStatus] = useState<'ACTIVE' | 'DRAFT' | 'ARCHIVED'>('ACTIVE');
-
-  // Bulk Discount Operations State
-  const [discountOperation, setDiscountOperation] = useState<'set' | 'increase' | 'decrease' | 'flash_sale' | 'volume' | 'competitive' | 'psychological' | 'bundle' | 'seasonal' | 'dynamic' | 'simple'>('set');
-  const [discountValue, setDiscountValue] = useState('');
-  const [discountPercentage, setDiscountPercentage] = useState('0');
 
   
   // Filter collections based on search query
@@ -723,206 +723,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     return price;
   };
 
-  const applyTieredPricing = (price: number): number => {
-    if (price <= 10) {
-      // $0-$10: Round to .99
-      return Math.max(0.99, Math.floor(price) + 0.99);
-    } else if (price <= 50) {
-      // $10-$50: Round to .95
-      return Math.floor(price) + 0.95;
-    } else if (price <= 100) {
-      // $50-$100: Round to .00
-      return Math.round(price);
-    } else {
-      // $100+: Round to nearest $5
-      return Math.round(price / 5) * 5;
-    }
-  };
 
-  // Advanced Discount System
-  const handleAdvancedDiscount = async () => {
-    if (selectedVariants.length === 0) {
-      setError("Please select at least one variant to apply discount strategy.");
-      return;
-    }
-    
-    setIsLoading(true);
-    clearBulkMessages();
-    
-    try {
-      const failed: string[] = [];
-      const successful: string[] = [];
-      
-      for (let i = 0; i < selectedVariants.length; i++) {
-        const variantId = selectedVariants[i];
-        
-        // Find the product and variant
-        let targetProduct = null;
-        let targetVariant = null;
-        
-        for (const product of products) {
-          const variant = product.variants.edges.find(v => v.node.id === variantId);
-          if (variant) {
-            targetProduct = product;
-            targetVariant = variant.node;
-            break;
-          }
-        }
-        
-        if (!targetProduct || !targetVariant) continue;
-        
-        const currentPrice = parseFloat(targetVariant.price);
-        let newPrice = currentPrice;
-        let newCompareAtPrice = targetVariant.compareAtPrice ? parseFloat(targetVariant.compareAtPrice) : null;
-        
-        // Apply advanced discount strategy
-        switch (discountOperation) {
-          case 'flash_sale': {
-            const flashDiscount = parseFloat(discountPercentage) || 0;
-            newCompareAtPrice = currentPrice; // Original price becomes compare-at
-            newPrice = currentPrice * (1 - flashDiscount / 100);
-            break;
-          }
-            
-          case 'volume': {
-            const inventory = targetVariant.inventoryQuantity || 0;
-            if (inventory >= 50) {
-              // High inventory: 5% discount
-              newPrice = currentPrice * 0.95;
-            } else if (inventory >= 10) {
-              // Medium inventory: no change
-              newPrice = currentPrice;
-            } else if (inventory > 0) {
-              // Low inventory: 10% premium
-              newPrice = currentPrice * 1.10;
-            } else {
-              // Out of stock: set high compare-at for comeback
-              newCompareAtPrice = currentPrice * 1.25;
-            }
-            break;
-          }
-            
-          case 'competitive': {
-            const competitorPrice = parseFloat(discountValue) || currentPrice;
-            if (roundingRule === 'match') {
-              newPrice = competitorPrice;
-            } else if (roundingRule === 'beat_dollar') {
-              newPrice = Math.max(0.99, competitorPrice - 1.00);
-            } else if (roundingRule === 'beat_percent') {
-              newPrice = competitorPrice * 0.95;
-            } else if (roundingRule === 'premium') {
-              newPrice = competitorPrice * 1.10;
-              newCompareAtPrice = competitorPrice * 1.25; // Show value
-            }
-            break;
-          }
-            
-          case 'psychological':
-            if (roundingRule === 'charm') {
-              newPrice = Math.floor(currentPrice) + 0.99;
-            } else if (roundingRule === 'prestige') {
-              newPrice = Math.round(currentPrice);
-            } else if (roundingRule === 'anchoring') {
-              newCompareAtPrice = currentPrice * 1.40; // High anchor
-              newPrice = currentPrice * 0.85; // Good deal
-            } else if (roundingRule === 'odd_even') {
-              // Odd for bargains, even for luxury
-              if (currentPrice < 50) {
-                newPrice = Math.floor(currentPrice) + 0.99; // Odd
-              } else {
-                newPrice = Math.round(currentPrice / 5) * 5; // Even multiples
-              }
-            }
-            break;
-            
-          case 'simple': {
-            const simplePercent = parseFloat(discountPercentage) || 0;
-            newPrice = currentPrice * (1 + simplePercent / 100);
-            break;
-          }
-            
-          default:
-            newPrice = currentPrice;
-        }
-        
-        // Ensure price is never negative and round to 2 decimals
-        newPrice = Math.max(0.01, Math.round(newPrice * 100) / 100);
-        if (newCompareAtPrice) {
-          newCompareAtPrice = Math.round(newCompareAtPrice * 100) / 100;
-        }
-        
-        // Update variant
-        try {
-          const updateData = {
-            id: variantId,
-            price: newPrice.toFixed(2),
-            ...(newCompareAtPrice && { compareAtPrice: newCompareAtPrice.toFixed(2) })
-          };
-          
-          const response = await fetch('/api/products', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'updateVariant',
-              data: updateData
-            }),
-          });
-          
-          const result = await response.json();
-          
-          if (result.success) {
-            successful.push(`${targetProduct.title} - ${targetVariant.title}`);
-            
-            // Update local state
-            setProducts(prevProducts => 
-              prevProducts.map(product => {
-                if (product.id === targetProduct.id) {
-                  return {
-                    ...product,
-                    variants: {
-                      ...product.variants,
-                      edges: product.variants.edges.map(edge => {
-                        if (edge.node.id === variantId) {
-                          return {
-                            ...edge,
-                            node: {
-                              ...edge.node,
-                              price: newPrice.toFixed(2),
-                              compareAtPrice: newCompareAtPrice ? newCompareAtPrice.toFixed(2) : edge.node.compareAtPrice
-                            }
-                          };
-                        }
-                        return edge;
-                      })
-                    }
-                  };
-                }
-                return product;
-              })
-            );
-          } else {
-            failed.push(`${targetProduct.title} - ${targetVariant.title}: ${result.error}`);
-          }
-        } catch (error) {
-          failed.push(`${targetProduct.title} - ${targetVariant.title}: Network error`);
-        }
-      }
-      
-      // Show results
-      if (successful.length > 0) {
-        console.log(`✅ Applied discount strategy to ${successful.length} variants`);
-        // Could show success toast here
-      }
-      if (failed.length > 0) {
-        setError(`❌ Failed to update ${failed.length} variants: ${failed.slice(0, 3).join(', ')}${failed.length > 3 ? '...' : ''}`);
-      }
-      
-    } catch (error) {
-      setError('Failed to apply discount strategy. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
+
 
   // Enhanced Pricing Operations with Advanced Error Handling
   const handleBulkPricing = async () => {
@@ -954,11 +757,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
 
 
 
-    // Block margin-based pricing for now
-    if (priceOperation === 'margin') {
-      setError("🚧 Margin-based pricing is coming soon! Please use another pricing method for now.");
-      return;
-    }
 
     // Validation for new pricing operations
     if (priceOperation === 'smart_round' && !['psychological', 'premium', 'clean', 'half'].includes(roundingRule)) {
@@ -1056,9 +854,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
               break;
             case 'smart_round':
               newPrice = applySmartRounding(currentPrice, roundingRule);
-              break;
-            case 'tiered':
-              newPrice = applyTieredPricing(currentPrice);
               break;
             default:
               newPrice = currentPrice;
@@ -1184,6 +979,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       
       // Reset form only if completely successful (keep products selected for additional operations)
       if (failed.length === 0) {
+        setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
         setPriceValue('');
         setPricePercentage('0');
         setCompareAtPrice('');
@@ -1299,9 +1095,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
             case 'smart_round':
               newPrice = applySmartRounding(currentPrice, roundingRule);
               break;
-            case 'tiered':
-              newPrice = applyTieredPricing(currentPrice);
-              break;
             default:
               newPrice = currentPrice;
           }
@@ -1396,6 +1189,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       
       // Reset form only if completely successful
       if (failed.length === 0) {
+        setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
         setPriceValue('');
         setPricePercentage('0');
       }
@@ -1573,6 +1367,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       
       // Reset form only if completely successful
       if (failed.length === 0) {
+        setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
         setCompareAtPrice('');
         setCompareValue('');
         setComparePercentage('0');
@@ -1679,6 +1474,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       
       // Reset collection selections only if completely successful
       if (failed.length === 0) {
+        setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
         setSelectedCollections([]);
       }
       
@@ -1781,6 +1577,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       
       // Clear form only if completely successful
       if (failed.length === 0) {
+        setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
         setTagValue('');
         setTagRemoveValue('');
       }
@@ -1889,6 +1686,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       
       // Clear form only if completely successful
       if (failed.length === 0) {
+        setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
         setTitleValue('');
         setTitleReplaceFrom('');
         setTitleReplaceTo('');
@@ -1988,6 +1786,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       
       // Clear form only if completely successful
       if (failed.length === 0) {
+        setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
         setDescriptionValue('');
         setDescriptionReplaceFrom('');
         setDescriptionReplaceTo('');
@@ -2067,6 +1866,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         
         // Clear form only if completely successful
         if (failed.length === 0) {
+          setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
           setStockQuantity('');
         }
         
@@ -2982,54 +2782,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   }
 
   // Bulk Discount Handler
-  const handleBulkDiscount = async () => {
-    if (!selectedVariants.length) {
-      setError("Please select at least one variant to apply discounts.");
-      return;
-    }
 
-    // Basic validation
-    if (discountOperation === 'set' && (!discountValue || parseFloat(discountValue) < 0 || parseFloat(discountValue) > 100)) {
-      setError("Please enter a valid discount percentage between 0 and 100.");
-      return;
-    }
-
-    if ((discountOperation === 'increase' || discountOperation === 'decrease') && (!discountPercentage || parseFloat(discountPercentage) <= 0)) {
-      setError("Please enter a valid percentage.");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Note: This is a placeholder for discount functionality
-      // In a real implementation, you would:
-      // 1. Determine current discount values for selected variants
-      // 2. Calculate new discount values based on operation
-      // 3. Update products via Shopify Admin API
-      // 4. Handle discount codes, price rules, or compare-at prices
-      
-      console.log('Bulk discount operation:', {
-        operation: discountOperation,
-        value: discountValue,
-        percentage: discountPercentage,
-        selectedVariants: selectedVariants.length
-      });
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // For now, show a success message
-      setError("Bulk discount feature is coming soon! This will allow you to apply discounts to selected products.");
-      
-    } catch (error: any) {
-      console.error('Bulk discount error:', error);
-      setError(error.message || 'Failed to apply bulk discounts. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <>
@@ -3088,13 +2841,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       )}
 
       {/* Product Management Header */}
-      <Card>
-        <BlockStack gap="400">
-          {/* Header */}
-          <Text as="h2" variant="headingMd">Product Management</Text>
-          
-          {/* Modern Step Navigation - Individual Boxes */}
-          <div className={styles.stepsContainer}>
+      <BlockStack gap="400">
+        {/* Modern Step Navigation - Individual Boxes */}
+        <div className={styles.stepsContainer}>
             {/* Step 1: Select Products */}
             <div 
               className={`${styles.stepCard} ${activeMainTab === 0 ? `${styles.active} ${styles.activeInfo}` : ''}`}
@@ -3112,24 +2861,24 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                         >
                           <Icon 
                             source={ProductIcon} 
-                            tone={activeMainTab >= 0 ? "base" : "subdued"} 
+                            tone={activeMainTab >= 0 ? undefined : "subdued"} 
                           />
                         </Box>
                       </div>
                       <BlockStack gap="050">
-                        <Text as="h3" variant="headingSm" fontWeight="semibold">
-                          Step 1: Select Products
-                        </Text>
+                        <InlineStack gap="200" blockAlign="center">
+                          <Text as="h3" variant="headingSm" fontWeight="semibold">
+                            Step 1: Select Products
+                          </Text>
+                          <div className={`${styles.stepProgress} ${activeMainTab === 0 ? styles.current : (selectedProducts.length > 0 && hasBulkOperationsCompleted) ? styles.completed : styles.pending}`}>
+                            {activeMainTab === 0 ? "Current" : (selectedProducts.length > 0 && hasBulkOperationsCompleted) ? "✓ Done" : "1 of 2"}
+                          </div>
+                        </InlineStack>
                         <Text as="p" variant="bodyXs" tone="subdued">
                           Choose products and variants
                         </Text>
                       </BlockStack>
                     </InlineStack>
-                    <div className={`${styles.stepBadge} ${activeMainTab === 0 ? styles.active : ''}`}>
-                      <Badge tone={selectedProducts.length > 0 ? "info" : "info-strong"}>
-                        {activeMainTab === 0 ? "Active" : selectedProducts.length > 0 ? "Complete" : "Pending"}
-                      </Badge>
-                    </div>
                   </InlineStack>
                   
                   <Text as="p" variant="bodySm" tone="subdued">
@@ -3138,8 +2887,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   
                   {selectedProducts.length > 0 && (
                     <div className={styles.stepSuccess}>
-                      <Icon source={CheckIcon} tone="success" />
-                      <Text as="p" variant="bodySm" tone="success">
+                      <Text as="p" variant="bodySm" tone="base" fontWeight="medium">
                         {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} selected
                       </Text>
                     </div>
@@ -3150,7 +2898,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
 
             {/* Step 2: Bulk Edit */}
             <div 
-              className={`${styles.stepCard} ${activeMainTab === 1 ? `${styles.active} ${styles.activeWarning}` : ''}`}
+              className={`${styles.stepCard} ${activeMainTab === 1 ? `${styles.active} ${styles.activeInfo}` : ''}`}
               onClick={() => selectedVariants.length > 0 && setActiveMainTab(1)}
             >
               <Card>
@@ -3159,30 +2907,30 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                     <InlineStack gap="200" blockAlign="center">
                       <div className={`${styles.stepIcon} ${activeMainTab === 1 ? styles.active : ''}`}>
                         <Box 
-                          background={activeMainTab >= 1 && selectedVariants.length > 0 ? "bg-fill-warning" : "bg-fill-disabled"} 
+                          background={activeMainTab >= 1 && selectedVariants.length > 0 ? "bg-fill-info" : "bg-fill-disabled"} 
                           padding="200" 
                           borderRadius="100"
                         >
                           <Icon 
                             source={EditIcon} 
-                            tone={activeMainTab >= 1 && selectedVariants.length > 0 ? "base" : "subdued"} 
+                            tone={activeMainTab >= 1 && selectedVariants.length > 0 ? undefined : "subdued"} 
                           />
                         </Box>
                       </div>
                       <BlockStack gap="050">
-                        <Text as="h3" variant="headingSm" fontWeight="semibold" tone={selectedVariants.length === 0 ? 'subdued' : undefined}>
-                          Step 2: Bulk Edit
-                        </Text>
+                        <InlineStack gap="200" blockAlign="center">
+                          <Text as="h3" variant="headingSm" fontWeight="semibold" tone={selectedVariants.length === 0 ? 'subdued' : undefined}>
+                            Step 2: Bulk Edit
+                          </Text>
+                          <div className={`${styles.stepProgress} ${activeMainTab === 1 ? styles.current : hasBulkOperationsCompleted ? styles.completed : styles.pending}`}>
+                            {activeMainTab === 1 ? "Current" : hasBulkOperationsCompleted ? "✓ Done" : "2 of 2"}
+                          </div>
+                        </InlineStack>
                         <Text as="p" variant="bodyXs" tone="subdued">
                           Apply changes to selections
                         </Text>
                       </BlockStack>
                     </InlineStack>
-                    <div className={`${styles.stepBadge} ${activeMainTab === 1 ? styles.active : ''}`}>
-                      <Badge tone={selectedVariants.length > 0 ? "warning" : "info-strong"}>
-                        {activeMainTab === 1 ? "Active" : selectedVariants.length > 0 ? "Complete" : "Pending"}
-                      </Badge>
-                    </div>
                   </InlineStack>
                   
                   <Text as="p" variant="bodySm" tone="subdued">
@@ -3194,8 +2942,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   
                   {selectedVariants.length > 0 && (
                     <div className={styles.stepSuccess}>
-                      <Icon source={CheckIcon} tone="success" />
-                      <Text as="p" variant="bodySm" tone="success">
+                      <Text as="p" variant="bodySm" tone="base" fontWeight="medium">
                         {selectedVariants.length} variant{selectedVariants.length !== 1 ? 's' : ''} ready for editing
                       </Text>
                     </div>
@@ -3216,7 +2963,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                 <Text as="span" variant="bodySm" fontWeight="semibold">
-                  Selected Products ({selectedProducts.length} products)
+                  Selected Products ({selectedProducts.length} {selectedProducts.length === 1 ? 'product' : 'products'})
                 </Text>
                 <Button
                   variant="plain"
@@ -3224,6 +2971,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                   onClick={() => {
                     setSelectedVariants([]);
                     setSelectedProducts([]);
+                    setHasBulkOperationsCompleted(false); // Reset completion state
                   }}
                 >
                   Clear all
@@ -3353,30 +3101,35 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           
           {/* Bulk Operation Categories - Only show in Step 2 */}
           {activeMainTab === 1 && (
-            <InlineStack gap="200" wrap>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+              gap: '12px',
+              width: '100%'
+            }}>
               {[
                 { id: 0, label: 'Pricing', icon: MoneyIcon },
                 { id: 1, label: 'Collections', icon: CollectionIcon },
-                { id: 2, label: 'Content', icon: EditIcon },
-                { id: 3, label: 'Inventory', icon: InventoryIcon },
-                { id: 4, label: 'Status', icon: StatusIcon },
-                { id: 5, label: 'SEO', icon: SearchIcon },
+                { id: 2, label: 'Tags', icon: HashtagIcon },
+                { id: 3, label: 'Content', icon: EditIcon },
+                { id: 4, label: 'Inventory', icon: InventoryIcon },
+                { id: 5, label: 'Variants', icon: ProductIcon },
               ].map(({ id, label, icon }) => (
                 <Button
                   key={id}
                   variant={activeBulkTab === id ? "primary" : "secondary"}
                   onClick={() => setActiveBulkTab(id)}
                   disabled={selectedVariants.length === 0}
-                  size="slim"
+                  size="large"
                   icon={icon}
+                  fullWidth
                 >
                   {label}
                 </Button>
               ))}
-            </InlineStack>
+            </div>
           )}
-        </BlockStack>
-      </Card>
+      </BlockStack>
 
       {/* Step Content */}
       {activeMainTab === 0 ? (
@@ -3784,6 +3537,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                         onClick={() => {
                           setSelectedVariants([]);
                           setSelectedProducts([]);
+                          setHasBulkOperationsCompleted(false); // Reset completion state
                         }}
                         disabled={selectedVariants.length === 0}
                         tone="critical"
@@ -3899,74 +3653,56 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 {/* Pricing Tab */}
                 {activeBulkTab === 0 && (
                   <BlockStack gap="400">
-                    <Text as="h3" variant="headingSm">Pricing Operations</Text>
+                    <InlineStack gap="200" blockAlign="center">
+                      <Text as="h3" variant="headingSm">Pricing Operations</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Change prices completely or round existing prices.
+                      </Text>
+                    </InlineStack>
                     <Text as="p" variant="bodySm" tone="subdued">
                       Update pricing for {selectedVariants.length} selected variants.
                     </Text>
 
-                    {/* Category Selection */}
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: '12px',
-                      padding: '4px',
-                      background: '#f6f6f7',
-                      borderRadius: '8px',
-                      border: '1px solid #e1e3e5'
-                    }}>
-                      <button
-                        onClick={() => setPricingCategory('price')}
-                        style={{
-                          flex: 1,
-                          padding: '8px 16px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: pricingCategory === 'price' ? '#FF204E' : 'transparent',
-                          color: pricingCategory === 'price' ? 'white' : '#303030',
-                          fontSize: '14px',
-                          fontWeight: '500',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        Price Management
-                      </button>
-                      <button
-                        onClick={() => setPricingCategory('discount')}
-                        style={{
-                          flex: 1,
-                          padding: '8px 16px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: pricingCategory === 'discount' ? '#FF204E' : 'transparent',
-                          color: pricingCategory === 'discount' ? 'white' : '#303030',
-                          fontSize: '14px',
-                          fontWeight: '500',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        Discount Operations
-                      </button>
-                    </div>
-
                     {/* Price Management Category */}
-                    {pricingCategory === 'price' && (
-                      <BlockStack gap="400">
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Change prices completely or round existing prices.
-                        </Text>
+                    <BlockStack gap="400">
 
-                        <Select
-                          label="Price Update Method"
-                          options={[
-                            { label: 'Set Fixed Price - Apply same price to all variants', value: 'set' },
-                            { label: 'Smart Rounding - Round to psychological prices', value: 'smart_round' },
-                            { label: 'Tiered Pricing - Apply price tiers based on current price', value: 'tiered' },
-                            { label: 'Margin Based - Set price based on cost + margin', value: 'margin' },
-                          ]}
-                          value={priceOperation === 'increase' || priceOperation === 'decrease' || priceOperation === 'round' ? 'set' : priceOperation}
-                          onChange={(value) => setPriceOperation(value as any)}
-                        />
+                        <Text as="p" variant="bodyMd" fontWeight="medium">Price Update Method</Text>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
+                          <Button
+                            variant={priceOperation === 'set' ? 'primary' : 'secondary'}
+                            onClick={() => setPriceOperation('set')}
+                            size="medium"
+                          >
+                            Set Fixed Price
+                          </Button>
+                          <Button
+                            variant={priceOperation === 'smart_round' ? 'primary' : 'secondary'}
+                            onClick={() => setPriceOperation('smart_round')}
+                            size="medium"
+                          >
+                            Smart Rounding
+                          </Button>
+                          <Button
+                            variant={priceOperation === 'increase' ? 'primary' : 'secondary'}
+                            onClick={() => setPriceOperation('increase')}
+                            size="medium"
+                          >
+                            Increase by %
+                          </Button>
+                          <Button
+                            variant={priceOperation === 'decrease' ? 'primary' : 'secondary'}
+                            onClick={() => setPriceOperation('decrease')}
+                            size="medium"
+                          >
+                            Decrease by %
+                          </Button>
+                        </div>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {priceOperation === 'set' && 'Apply same price to all variants'}
+                          {priceOperation === 'smart_round' && 'Round to psychological prices'}
+                          {priceOperation === 'increase' && 'Increase current prices by percentage'}
+                          {priceOperation === 'decrease' && 'Decrease current prices by percentage'}
+                        </Text>
                         
                         {priceOperation === 'set' && (
                           <TextField
@@ -3995,24 +3731,17 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                           />
                         )}
 
-                        {priceOperation === 'tiered' && (
-                          <BlockStack gap="300">
-                            <Text as="p" variant="bodySm" tone="subdued">
-                              Apply different pricing strategies based on current price ranges
-                            </Text>
-                            <div style={{ 
-                              padding: '12px', 
-                              background: '#f6f6f7', 
-                              borderRadius: '8px',
-                              fontSize: '12px',
-                              color: '#616161'
-                            }}>
-                              • $0-$10: Round to .99 (e.g., 7.32 → 6.99)<br/>
-                              • $10-$50: Round to .95 (e.g., 23.47 → 22.95)<br/>
-                              • $50-$100: Round to .00 (e.g., 67.83 → 68.00)<br/>
-                              • $100+: Round to nearest $5 (e.g., 143.21 → 145.00)
-                            </div>
-                          </BlockStack>
+                        {(priceOperation === 'increase' || priceOperation === 'decrease') && (
+                          <TextField
+                            label={`${priceOperation === 'increase' ? 'Increase' : 'Decrease'} Percentage`}
+                            type="number"
+                            value={pricePercentage}
+                            onChange={setPricePercentage}
+                            placeholder="10"
+                            autoComplete="off"
+                            suffix="%"
+                            helpText={`${priceOperation === 'increase' ? 'Increase' : 'Decrease'} current prices by this percentage`}
+                          />
                         )}
 
 
@@ -4023,299 +3752,276 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                           disabled={
                             selectedVariants.length === 0 || 
                             (priceOperation === 'set' && !priceValue) ||
-                            priceOperation === 'margin'
+                            ((priceOperation === 'increase' || priceOperation === 'decrease') && !pricePercentage)
                           }
                           loading={isLoading}
                         >
-                          {priceOperation === 'margin' ? '🚧 Coming Soon' : 'Apply Price Changes'}
+                          Apply Price Changes
                         </Button>
                       </BlockStack>
-                    )}
 
-                    {/* Discount Operations Category */}
-                    {pricingCategory === 'discount' && (
-                      <BlockStack gap="400">
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Advanced discount strategies with smart automation and dynamic pricing.
-                        </Text>
 
-                        <Select
-                          label="Discount Strategy"
-                          options={[
-                            { label: 'Flash Sale - Time-limited percentage discount', value: 'flash_sale' },
-                            { label: 'Volume Discount - Tiered discounts based on inventory', value: 'volume' },
-                            { label: 'Competitive Pricing - Match or beat competitor prices', value: 'competitive' },
-                            { label: 'Psychological Pricing - Strategic price positioning', value: 'psychological' },
-                            { label: 'Bundle Discount - Cross-product discount strategy', value: 'bundle' },
-                            { label: 'Seasonal Markup - Time-based price adjustments', value: 'seasonal' },
-                            { label: 'Dynamic Margin - Smart margin optimization', value: 'dynamic' },
-                            { label: 'Simple Percentage - Basic percentage increase/decrease', value: 'simple' },
-                          ]}
-                          value={discountOperation}
-                          onChange={(value) => setDiscountOperation(value as any)}
-                        />
-
-                        {/* Flash Sale Strategy */}
-                        {discountOperation === 'flash_sale' && (
-                          <BlockStack gap="300">
-                            <div style={{ 
-                              padding: '12px', 
-                              background: 'linear-gradient(135deg, #FF204E 0%, #A0153E 100%)', 
-                              borderRadius: '8px', 
-                              color: 'white',
-                              textAlign: 'center'
-                            }}>
-                              <Text as="p" variant="bodySm" fontWeight="semibold">⚡ Flash Sale Mode</Text>
-                            </div>
-                            <TextField
-                              label="Flash Sale Discount"
-                              type="number"
-                              value={discountPercentage}
-                              onChange={setDiscountPercentage}
-                              placeholder="25"
-                              autoComplete="off"
-                              suffix="%"
-                              helpText="Discount percentage for flash sale (creates urgency)"
-                            />
-                            <TextField
-                              label="Sale Duration (hours)"
-                              type="number"
-                              value={discountValue}
-                              onChange={setDiscountValue}
-                              placeholder="24"
-                              autoComplete="off"
-                              suffix="hrs"
-                              helpText="How long the sale will last (sets compare at price temporarily)"
-                            />
-                          </BlockStack>
-                        )}
-
-                        {/* Volume Discount Strategy */}
-                        {discountOperation === 'volume' && (
-                          <BlockStack gap="300">
-                            <div style={{ 
-                              padding: '12px', 
-                              background: '#f0f9ff', 
-                              borderRadius: '8px',
-                              border: '1px solid #0ea5e9'
-                            }}>
-                              <Text as="p" variant="bodySm" fontWeight="semibold">📦 Volume-Based Pricing</Text>
-                            </div>
-                            <div style={{ 
-                              padding: '12px', 
-                              background: '#f6f6f7', 
-                              borderRadius: '8px',
-                              fontSize: '12px',
-                              color: '#616161'
-                            }}>
-                              • High inventory (50+ units): 5% discount to move stock<br/>
-                              • Medium inventory (10-49 units): Standard pricing<br/>
-                              • Low inventory (1-9 units): 10% premium for scarcity<br/>
-                              • Out of stock: Set high compare-at for comeback pricing
-                            </div>
-                          </BlockStack>
-                        )}
-
-                        {/* Competitive Pricing Strategy */}
-                        {discountOperation === 'competitive' && (
-                          <BlockStack gap="300">
-                            <div style={{ 
-                              padding: '12px', 
-                              background: '#fef3c7', 
-                              borderRadius: '8px',
-                              border: '1px solid #f59e0b'
-                            }}>
-                              <Text as="p" variant="bodySm" fontWeight="semibold">🎯 Competitive Edge Pricing</Text>
-                            </div>
-                            <TextField
-                              label="Competitor Price"
-                              type="number"
-                              value={discountValue}
-                              onChange={setDiscountValue}
-                              placeholder="29.99"
-                              autoComplete="off"
-                              prefix={currencySymbol}
-                              helpText="Enter competitor's price to match or beat"
-                            />
-                            <Select
-                              label="Strategy"
-                              options={[
-                                { label: 'Match Price - Set same price as competitor', value: 'match' },
-                                { label: 'Beat by $1 - Undercut by $1.00', value: 'beat_dollar' },
-                                { label: 'Beat by 5% - Undercut by 5%', value: 'beat_percent' },
-                                { label: 'Premium Position - Price 10% higher with value', value: 'premium' },
-                              ]}
-                              value={roundingRule}
-                              onChange={(value) => setRoundingRule(value as any)}
-                            />
-                          </BlockStack>
-                        )}
-
-                        {/* Psychological Pricing Strategy */}
-                        {discountOperation === 'psychological' && (
-                          <BlockStack gap="300">
-                            <div style={{ 
-                              padding: '12px', 
-                              background: '#f3e8ff', 
-                              borderRadius: '8px',
-                              border: '1px solid #8b5cf6'
-                            }}>
-                              <Text as="p" variant="bodySm" fontWeight="semibold">🧠 Psychological Pricing</Text>
-                            </div>
-                            <Select
-                              label="Psychological Strategy"
-                              options={[
-                                { label: 'Charm Pricing - End in .99 (perceived value)', value: 'charm' },
-                                { label: 'Prestige Pricing - Round numbers (luxury feel)', value: 'prestige' },
-                                { label: 'Anchoring - High compare-at with good "deal"', value: 'anchoring' },
-                                { label: 'Odd-Even - Strategic odd/even number psychology', value: 'odd_even' },
-                              ]}
-                              value={roundingRule}
-                              onChange={(value) => setRoundingRule(value as any)}
-                            />
-                          </BlockStack>
-                        )}
-
-                        {/* Simple Percentage Strategy */}
-                        {discountOperation === 'simple' && (
-                          <TextField
-                            label="Percentage Change"
-                            type="number"
-                            value={discountPercentage}
-                            onChange={setDiscountPercentage}
-                            placeholder="10"
-                            autoComplete="off"
-                            suffix="%"
-                            helpText="Positive for increase, negative for decrease (e.g., -20 for 20% discount)"
-                          />
-                        )}
-
-                        {priceOperation === 'margin' && (
-                          <div style={{ 
-                            padding: '24px', 
-                            background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)', 
-                            borderRadius: '12px',
-                            border: '2px dashed #9ca3af',
-                            textAlign: 'center'
-                          }}>
-                            <div style={{ marginBottom: '12px', fontSize: '32px' }}>🚧</div>
-                            <Text as="h3" variant="headingSm">Margin-Based Pricing</Text>
-                            <div style={{ marginTop: '8px' }}>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                Advanced cost + margin calculations coming soon!
-                              </Text>
-                            </div>
-                            <div style={{ 
-                              marginTop: '16px',
-                              padding: '12px',
-                              background: '#fff',
-                              borderRadius: '8px',
-                              fontSize: '12px',
-                              color: '#6b7280'
-                            }}>
-                              Will include: Cost tracking • Dynamic margins • Profit analysis • Bulk cost updates
-                            </div>
-                          </div>
-                        )}
-
-                        <Button
-                          variant="primary"
-                          onClick={handleAdvancedDiscount}
-                          disabled={
-                            selectedVariants.length === 0 || 
-                            (discountOperation === 'competitive' && !discountValue) ||
-                            ((discountOperation === 'flash_sale' || discountOperation === 'simple') && !discountPercentage)
-                          }
-                          loading={isLoading}
-                        >
-                          🚀 Apply Advanced Discount Strategy
-                        </Button>
-                      </BlockStack>
-                    )}
                   </BlockStack>
                 )}
 
                 {/* Collections Tab */}
-                {activeBulkTab === 1 && (
+                {activeBulkTab === 1 && (() => {
+                  // Get current collections for selected products
+                  const selectedProductsData = products.filter(p => selectedProducts.includes(p.id));
+                  const currentCollections = new Set<string>();
+                  selectedProductsData.forEach(product => {
+                    product.collections?.edges.forEach(edge => {
+                      currentCollections.add(edge.node.id);
+                    });
+                  });
+                  
+                  return (
+                    <BlockStack gap="400">
+                      <Text as="h3" variant="headingSm">Collection Management</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Manage collections for {selectedProducts.length} selected {selectedProducts.length === 1 ? 'product' : 'products'}.
+                      </Text>
+
+
+
+                      <div>
+                        <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
+                          Collection Operation
+                        </Text>
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', 
+                          gap: '8px', 
+                          marginTop: '8px' 
+                        }}>
+                          <Button
+                            variant={collectionOperation === 'add' ? 'primary' : 'secondary'}
+                            onClick={() => setCollectionOperation('add')}
+                            size="large"
+                            icon={PlusIcon}
+                          >
+                            Add to Collections
+                          </Button>
+                          <Button
+                            variant={collectionOperation === 'remove' ? 'primary' : 'secondary'}
+                            onClick={() => setCollectionOperation('remove')}
+                            size="large"
+                            icon={MinusIcon}
+                          >
+                            Remove from Collections
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
+                          Available Collections
+                        </Text>
+                        <div style={{ 
+                          maxHeight: '250px', 
+                          overflowY: 'auto', 
+                          border: '1px solid #e1e3e5', 
+                          borderRadius: '8px', 
+                          marginTop: '8px'
+                        }}>
+                          {filteredCollections.map((collection) => {
+                            const isInCurrent = currentCollections.has(collection.id);
+                            const isSelected = selectedCollections.includes(collection.id);
+                            
+                            return (
+                              <div 
+                                key={collection.id} 
+                                style={{ 
+                                  padding: '12px',
+                                  borderBottom: '1px solid #f1f2f3',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  backgroundColor: isSelected ? '#f0f8ff' : 'transparent'
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedCollections([...selectedCollections, collection.id]);
+                                      } else {
+                                        setSelectedCollections(selectedCollections.filter(id => id !== collection.id));
+                                      }
+                                    }}
+                                    label=""
+                                  />
+                                  <div>
+                                    <Text as="p" variant="bodyMd">
+                                      {collection.title}
+                                    </Text>
+                                    {isInCurrent && (
+                                      <Text as="p" variant="bodySm" tone="subdued">
+                                        Currently assigned
+                                      </Text>
+                                    )}
+                                  </div>
+                                </div>
+                                {isInCurrent && (
+                                  <div style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    backgroundColor: '#008060'
+                                  }} />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="primary"
+                        onClick={handleBulkCollections}
+                        disabled={selectedProducts.length === 0 || selectedCollections.length === 0}
+                        loading={isLoading}
+                        size="large"
+                      >
+                        {collectionOperation === 'add' ? 'Add Selected Collections' : 'Remove Selected Collections'}
+                      </Button>
+                    </BlockStack>
+                  );
+                })()}
+
+                {/* Tags Tab */}
+                {activeBulkTab === 2 && (
                   <BlockStack gap="400">
-                    <Text as="h3" variant="headingSm">Collection Management</Text>
+                    <Text as="h3" variant="headingSm">Tag Management</Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      Add or remove collections for {selectedProducts.length} selected products.
+                      Manage tags for {selectedProducts.length} selected {selectedProducts.length === 1 ? 'product' : 'products'}.
                     </Text>
 
-                    <Select
-                      label="Collection Operation"
-                      options={[
-                        { label: 'Add to Collections', value: 'add' },
-                        { label: 'Remove from Collections', value: 'remove' },
-                      ]}
-                      value={collectionOperation}
-                      onChange={(value) => setCollectionOperation(value as any)}
-                    />
-
-                    <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '8px' }}>
-                      {filteredCollections.map((collection) => (
-                        <div key={collection.id} style={{ padding: '4px 0' }}>
-                          <Checkbox
-                            checked={selectedCollections.includes(collection.id)}
-                            onChange={(checked) => {
-                              if (checked) {
-                                setSelectedCollections([...selectedCollections, collection.id]);
-                              } else {
-                                setSelectedCollections(selectedCollections.filter(id => id !== collection.id));
-                              }
-                            }}
-                            label={collection.title}
-                          />
-                        </div>
-                      ))}
+                    <div>
+                      <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
+                        Tag Operations
+                      </Text>
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+                        gap: '8px', 
+                        marginTop: '8px' 
+                      }}>
+                        <Button
+                          variant={tagOperation === 'add' ? 'primary' : 'secondary'}
+                          onClick={() => setTagOperation('add')}
+                          size="large"
+                          icon={PlusIcon}
+                        >
+                          Add Tags
+                        </Button>
+                        <Button
+                          variant={tagOperation === 'remove' ? 'primary' : 'secondary'}
+                          onClick={() => setTagOperation('remove')}
+                          size="large"
+                          icon={MinusIcon}
+                        >
+                          Remove Tags
+                        </Button>
+                      </div>
                     </div>
+                    
+                    <TextField
+                      label={tagOperation === 'add' ? 'Tags to Add' : 'Tags to Remove'}
+                      value={tagOperation === 'add' ? tagValue : tagRemoveValue}
+                      onChange={tagOperation === 'add' ? setTagValue : setTagRemoveValue}
+                      placeholder="Enter tags separated by commas"
+                      autoComplete="off"
+                      helpText="Separate multiple tags with commas (e.g., sale, summer, featured)"
+                    />
 
                     <Button
                       variant="primary"
-                      onClick={handleBulkCollections}
-                      disabled={selectedProducts.length === 0 || selectedCollections.length === 0}
+                      onClick={handleBulkTags}
+                      disabled={
+                        selectedProducts.length === 0 || 
+                        (tagOperation === 'add' && !tagValue) ||
+                        (tagOperation === 'remove' && !tagRemoveValue)
+                      }
                       loading={isLoading}
+                      size="large"
                     >
-                      Apply Collection Changes
+                      {tagOperation === 'add' ? 'Add Tags to Products' : 'Remove Tags from Products'}
                     </Button>
                   </BlockStack>
                 )}
 
                 {/* Content Tab */}
-                {activeBulkTab === 2 && (
+                {activeBulkTab === 3 && (
                   <BlockStack gap="400">
                     <Text as="h3" variant="headingSm">Content Management</Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      Update titles, descriptions, and tags for {selectedProducts.length} selected products.
+                      Update content for {selectedProducts.length} selected {selectedProducts.length === 1 ? 'product' : 'products'}.
                     </Text>
 
-                    <Select
-                      label="Content Operation"
-                      options={[
-                        { label: 'Update Titles', value: 'title' },
-                        { label: 'Update Descriptions', value: 'description' },
-                        { label: 'Manage Tags', value: 'tags' },
-                      ]}
-                      value={contentOperation}
-                      onChange={(value) => setContentOperation(value as any)}
-                    />
+                    {/* Content Sub-tabs */}
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(2, 1fr)', 
+                      gap: '8px', 
+                      borderBottom: '1px solid #e1e3e5',
+                      marginBottom: '20px'
+                    }}>
+                      {[
+                        { id: 'title', label: 'Title & Description' },
+                        { id: 'images', label: 'Images' }
+                      ].map(({ id, label }) => (
+                        <Button
+                          key={id}
+                          variant={contentOperation === id ? 'primary' : 'tertiary'}
+                          onClick={() => setContentOperation(id as any)}
+                          size="medium"
+                        >
+                          {label}
+                        </Button>
+                      ))}
+                    </div>
 
+                    {/* Title & Description Management */}
                     {contentOperation === 'title' && (
-                      <>
-                        <Select
-                          label="Title Update Method"
-                          options={[
-                            { label: 'Add Prefix', value: 'prefix' },
-                            { label: 'Add Suffix', value: 'suffix' },
-                            { label: 'Find and Replace', value: 'replace' },
-                          ]}
-                          value={titleOperation}
-                          onChange={(value) => setTitleOperation(value as any)}
-                        />
+                      <BlockStack gap="400">
+                        <div>
+                          <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
+                            Title Update Method
+                          </Text>
+                          <div style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+                            gap: '8px', 
+                            marginTop: '8px' 
+                          }}>
+                            <Button
+                              variant={titleOperation === 'prefix' ? 'primary' : 'secondary'}
+                              onClick={() => setTitleOperation('prefix')}
+                              size="large"
+                            >
+                              Add Prefix
+                            </Button>
+                            <Button
+                              variant={titleOperation === 'suffix' ? 'primary' : 'secondary'}
+                              onClick={() => setTitleOperation('suffix')}
+                              size="large"
+                            >
+                              Add Suffix
+                            </Button>
+                            <Button
+                              variant={titleOperation === 'replace' ? 'primary' : 'secondary'}
+                              onClick={() => setTitleOperation('replace')}
+                              size="large"
+                            >
+                              Find & Replace
+                            </Button>
+                          </div>
+                        </div>
                         
                         {titleOperation === 'replace' ? (
-                          <>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                             <TextField
                               label="Find Text"
                               value={titleReplaceFrom}
@@ -4330,190 +4036,341 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                               placeholder="Replacement text"
                               autoComplete="off"
                             />
-                          </>
+                          </div>
                         ) : (
                           <TextField
                             label={titleOperation === 'prefix' ? 'Prefix Text' : 'Suffix Text'}
                             value={titleValue}
                             onChange={setTitleValue}
-                            placeholder={titleOperation === 'prefix' ? 'Text to add at beginning' : 'Text to add at end'}
+                            placeholder={
+                              titleOperation === 'prefix' 
+                                ? 'Text to add at beginning (e.g., "NEW - ")' 
+                                : 'Text to add at end (e.g., " - ON SALE")'
+                            }
                             autoComplete="off"
                           />
                         )}
-                      </>
+
+                        <Button
+                          variant="primary"
+                          onClick={handleBulkTitleUpdate}
+                          disabled={
+                            selectedProducts.length === 0 || 
+                            (titleOperation === 'replace' && (!titleReplaceFrom || !titleReplaceTo)) ||
+                            ((titleOperation === 'prefix' || titleOperation === 'suffix') && !titleValue)
+                          }
+                          loading={isLoading}
+                          size="large"
+                        >
+                          Update Product Titles
+                        </Button>
+                      </BlockStack>
                     )}
 
-                    {contentOperation === 'tags' && (
-                      <>
-                        <Select
-                          label="Tag Operation"
-                          options={[
-                            { label: 'Add Tags', value: 'add' },
-                            { label: 'Remove Tags', value: 'remove' },
-                          ]}
-                          value={tagOperation}
-                          onChange={(value) => setTagOperation(value as any)}
-                        />
-                        
-                        <TextField
-                          label={tagOperation === 'add' ? 'Tags to Add' : 'Tags to Remove'}
-                          value={tagOperation === 'add' ? tagValue : tagRemoveValue}
-                          onChange={tagOperation === 'add' ? setTagValue : setTagRemoveValue}
-                          placeholder="Enter tags separated by commas"
-                          autoComplete="off"
-                          helpText="Separate multiple tags with commas"
-                        />
-                      </>
+                    {/* Images Management */}
+                    {contentOperation === 'images' && (
+                      <BlockStack gap="400">
+                        <div style={{
+                          padding: '40px',
+                          textAlign: 'center',
+                          backgroundColor: '#f6f6f7',
+                          borderRadius: '12px',
+                          border: '2px dashed #c9cccf'
+                        }}>
+                          <div style={{ marginBottom: '16px' }}>
+                            <Icon source={ViewIcon} tone="subdued" />
+                          </div>
+                          <Text as="h4" variant="headingMd">
+                            Image Management
+                          </Text>
+                          <div style={{ marginTop: '8px' }}>
+                            <Text as="p" variant="bodyMd" tone="subdued">
+                              Bulk image operations coming soon! You can currently manage images individually in each product.
+                            </Text>
+                          </div>
+                          <div style={{ marginTop: '20px' }}>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              Planned features:
+                            </Text>
+                            <ul style={{ 
+                              textAlign: 'left', 
+                              marginTop: '8px', 
+                              paddingLeft: '20px',
+                              color: '#6b7280'
+                            }}>
+                              <li>Bulk alt text updates</li>
+                              <li>Image replacement</li>
+                              <li>Bulk image uploads</li>
+                              <li>Image optimization</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </BlockStack>
                     )}
-
-                    <Button
-                      variant="primary"
-                      onClick={contentOperation === 'title' ? handleBulkTitleUpdate : handleBulkTags}
-                      disabled={
-                        selectedProducts.length === 0 || 
-                        (contentOperation === 'title' && (
-                          (titleOperation === 'replace' && (!titleReplaceFrom || !titleReplaceTo)) ||
-                          ((titleOperation === 'prefix' || titleOperation === 'suffix') && !titleValue)
-                        )) ||
-                        (contentOperation === 'tags' && (
-                          (tagOperation === 'add' && !tagValue) ||
-                          (tagOperation === 'remove' && !tagRemoveValue)
-                        ))
-                      }
-                      loading={isLoading}
-                    >
-                      Apply Content Changes
-                    </Button>
                   </BlockStack>
                 )}
 
                 {/* Inventory Tab */}
-                {activeBulkTab === 3 && (
+                {activeBulkTab === 4 && (
                   <BlockStack gap="400">
                     <Text as="h3" variant="headingSm">Inventory Management</Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      Update inventory settings for {selectedVariants.length} selected variants.
+                      Manage inventory for {selectedVariants.length} selected variant{selectedVariants.length === 1 ? '' : 's'} across {selectedProducts.length} product{selectedProducts.length === 1 ? '' : 's'}.
                     </Text>
 
-                    <Select
-                      label="Inventory Operation"
-                      options={[
-                        { label: 'Update Stock Quantities', value: 'stock' },
-                        { label: 'Update SKUs', value: 'sku' },
-                        { label: 'Update Cost & Weight', value: 'cost' },
-                      ]}
-                      value={inventoryOperation}
-                      onChange={(value) => setInventoryOperation(value as any)}
-                    />
+                    {/* Inventory Operation Buttons */}
+                    <div>
+                      <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
+                        Inventory Operations
+                      </Text>
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+                        gap: '8px', 
+                        marginTop: '8px' 
+                      }}>
+                        <Button
+                          variant={inventoryOperation === 'stock' ? 'primary' : 'secondary'}
+                          onClick={() => setInventoryOperation('stock')}
+                          size="large"
+                          icon={PackageIcon}
+                        >
+                          Stock Quantities
+                        </Button>
+                        <Button
+                          variant={inventoryOperation === 'sku' ? 'primary' : 'secondary'}
+                          onClick={() => setInventoryOperation('sku')}
+                          size="large"
+                          icon={CalculatorIcon}
+                        >
+                          SKU Management
+                        </Button>
+                        <Button
+                          variant={inventoryOperation === 'cost' ? 'primary' : 'secondary'}
+                          onClick={() => setInventoryOperation('cost')}
+                          size="large"
+                          icon={LocationIcon}
+                        >
+                          Cost & Weight
+                        </Button>
+                      </div>
+                    </div>
 
+                    {/* Stock Management Interface */}
                     {inventoryOperation === 'stock' && (
-                      <>
-                        <Select
-                          label="Stock Update Method"
-                          options={[
-                            { label: 'Set Quantity', value: 'set' },
-                            { label: 'Add to Current', value: 'add' },
-                            { label: 'Subtract from Current', value: 'subtract' },
-                          ]}
-                          value={stockUpdateMethod}
-                          onChange={(value) => setStockUpdateMethod(value as any)}
-                        />
+                      <BlockStack gap="400">
+                        <div>
+                          <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
+                            Update Method
+                          </Text>
+                          <div style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', 
+                            gap: '8px', 
+                            marginTop: '8px' 
+                          }}>
+                            <Button
+                              variant={stockUpdateMethod === 'set' ? 'primary' : 'secondary'}
+                              onClick={() => setStockUpdateMethod('set')}
+                              size="large"
+                            >
+                              Set Exact Amount
+                            </Button>
+                            <Button
+                              variant={stockUpdateMethod === 'add' ? 'primary' : 'secondary'}
+                              onClick={() => setStockUpdateMethod('add')}
+                              size="large"
+                              icon={PlusIcon}
+                            >
+                              Add to Current
+                            </Button>
+                            <Button
+                              variant={stockUpdateMethod === 'subtract' ? 'primary' : 'secondary'}
+                              onClick={() => setStockUpdateMethod('subtract')}
+                              size="large"
+                              icon={MinusIcon}
+                            >
+                              Subtract from Current
+                            </Button>
+                          </div>
+                        </div>
                         
-                        <TextField
-                          label="Quantity"
-                          type="number"
-                          value={stockQuantity}
-                          onChange={setStockQuantity}
-                          placeholder="0"
-                          autoComplete="off"
-                          helpText={`${stockUpdateMethod === 'set' ? 'Set' : stockUpdateMethod === 'add' ? 'Add' : 'Subtract'} this quantity ${stockUpdateMethod === 'set' ? 'as' : stockUpdateMethod === 'add' ? 'to' : 'from'} the current inventory`}
-                        />
-                      </>
+                        <div style={{ maxWidth: '300px' }}>
+                          <TextField
+                            label="Quantity"
+                            type="number"
+                            value={stockQuantity}
+                            onChange={setStockQuantity}
+                            placeholder="0"
+                            autoComplete="off"
+                            helpText={`${stockUpdateMethod === 'set' ? 'Set inventory to' : stockUpdateMethod === 'add' ? 'Add to current inventory:' : 'Subtract from current inventory:'} this amount`}
+                          />
+                        </div>
+
+                        <Button
+                          variant="primary"
+                          onClick={handleBulkInventoryUpdate}
+                          disabled={
+                            selectedVariants.length === 0 || 
+                            !stockQuantity || 
+                            stockQuantity === '0'
+                          }
+                          loading={isLoading}
+                          size="large"
+                        >
+{`Update ${selectedVariants.length} Variant${selectedVariants.length === 1 ? '' : 's'} Stock`}
+                        </Button>
+                      </BlockStack>
                     )}
 
-                    <Button
-                      variant="primary"
-                      onClick={handleBulkInventoryUpdate}
-                      disabled={
-                        selectedVariants.length === 0 || 
-                        (inventoryOperation === 'stock' && !stockQuantity)
-                      }
-                      loading={isLoading}
-                    >
-                      Apply Inventory Changes
-                    </Button>
+                    {/* SKU Management Interface */}
+                    {inventoryOperation === 'sku' && (
+                      <div style={{
+                        padding: '24px',
+                        backgroundColor: '#f6f6f7',
+                        borderRadius: '8px',
+                        textAlign: 'center'
+                      }}>
+                        <Text as="h4" variant="headingMd">
+                          SKU Management
+                        </Text>
+                        <div style={{ marginTop: '8px' }}>
+                          <Text as="p" variant="bodyMd" tone="subdued">
+                            SKU bulk operations are coming soon! For now, manage SKUs individually in each product variant.
+                          </Text>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Cost & Weight Interface */}
+                    {inventoryOperation === 'cost' && (
+                      <div style={{
+                        padding: '24px',
+                        backgroundColor: '#f6f6f7',
+                        borderRadius: '8px',
+                        textAlign: 'center'
+                      }}>
+                        <Text as="h4" variant="headingMd">
+                          Cost & Weight Management
+                        </Text>
+                        <div style={{ marginTop: '8px' }}>
+                          <Text as="p" variant="bodyMd" tone="subdued">
+                            Bulk cost and weight updates coming soon! This will include shipping weight, cost per item, and origin country.
+                          </Text>
+                        </div>
+                      </div>
+                    )}
                   </BlockStack>
                 )}
 
-                {/* Status Tab */}
-                {activeBulkTab === 4 && (
-                  <BlockStack gap="400">
-                    <Text as="h3" variant="headingSm">Status & Visibility</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Manage product status and visibility for {selectedProducts.length} selected products.
-                    </Text>
-
-                    <Select
-                      label="New Product Status"
-                      options={[
-                        { label: 'Active', value: 'ACTIVE' },
-                        { label: 'Draft', value: 'DRAFT' },
-                        { label: 'Archived', value: 'ARCHIVED' },
-                      ]}
-                      value={newProductStatus}
-                      onChange={(value) => setNewProductStatus(value as any)}
-                    />
-
-                    <Button
-                      variant="primary"
-                      onClick={handleBulkStatus}
-                      disabled={selectedProducts.length === 0}
-                      loading={isLoading}
-                    >
-                      Apply Status Changes
-                    </Button>
-                  </BlockStack>
-                )}
-
-
-
-                {/* SEO Tab */}
+                {/* Variants Tab */}
                 {activeBulkTab === 5 && (
                   <BlockStack gap="400">
-                    <Text as="h3" variant="headingSm">SEO Optimization</Text>
+                    <Text as="h3" variant="headingSm">Variant Management</Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      Update SEO settings for {selectedProducts.length} selected products.
+                      Manage variants across {selectedProducts.length} selected product{selectedProducts.length === 1 ? '' : 's'}. This helps with common variant operations that are tedious to do one-by-one.
                     </Text>
 
-                    <TextField
-                      label="SEO Title Template"
-                      value={seoTemplate}
-                      onChange={setSeoTemplate}
-                      placeholder="Use {title} for product title"
-                      autoComplete="off"
-                      helpText="Use {title} as placeholder for product title"
-                    />
+                    {/* Variant Operations */}
+                    <div>
+                      <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
+                        Variant Operations
+                      </Text>
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
+                        gap: '8px', 
+                        marginTop: '8px' 
+                      }}>
+                        <Button
+                          variant="secondary"
+                          size="large"
+                          icon={PlusIcon}
+                        >
+                          Add Variant Options
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="large"
+                          icon={EditIcon}
+                        >
+                          Update Variant Titles
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="large"
+                          icon={MinusIcon}
+                        >
+                          Remove Variants
+                        </Button>
+                      </div>
+                    </div>
 
-                    <TextField
-                      label="Meta Description"
-                      value={metaDescription}
-                      onChange={setMetaDescription}
-                      placeholder="Enter meta description"
-                      autoComplete="off"
-                      multiline={3}
-                      helpText="Meta description for search engines"
-                    />
+                    {/* Variant Insights */}
+                    <div style={{
+                      padding: '20px',
+                      backgroundColor: '#f6f6f7',
+                      borderRadius: '8px',
+                      border: '1px solid #e1e3e5'
+                    }}>
+                      <Text as="h4" variant="headingSm">
+                        Variant Overview
+                      </Text>
+                      <div style={{ marginTop: '12px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                          <div>
+                            <Text as="p" variant="bodyMd" fontWeight="medium">
+                              Total Variants: {selectedVariants.length}
+                            </Text>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              Across {selectedProducts.length} products
+                            </Text>
+                          </div>
+                          <div>
+                            <Text as="p" variant="bodyMd" fontWeight="medium">
+                              Common Pain Points
+                            </Text>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              • Adding size/color options to multiple products<br/>
+                              • Standardizing variant names<br/>
+                              • Removing discontinued variants
+                            </Text>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
-                    <Button
-                      variant="primary"
-                      onClick={handleBulkSEO}
-                      disabled={selectedProducts.length === 0 || (!seoTemplate && !metaDescription)}
-                      loading={isLoading}
-                    >
-                      Apply SEO Changes
-                    </Button>
+                    {/* Coming Soon */}
+                    <div style={{
+                      padding: '24px',
+                      backgroundColor: '#fff9e6',
+                      borderRadius: '8px',
+                      border: '1px solid #ffd666',
+                      textAlign: 'center'
+                    }}>
+                      <Text as="h4" variant="headingMd">
+                        Advanced Variant Management Coming Soon
+                      </Text>
+                      <div style={{ marginTop: '12px' }}>
+                        <Text as="p" variant="bodyMd" tone="subdued">
+                          This feature will help you efficiently manage variants across multiple products - a major time-saver for store owners with complex product catalogs.
+                        </Text>
+                      </div>
+                      <div style={{ marginTop: '16px' }}>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          <strong>Planned features:</strong><br/>
+                          • Bulk add variant options (Size: S, M, L, XL)<br/>
+                          • Standardize variant naming across products<br/>
+                          • Mass remove specific variants<br/>
+                          • Copy variant structure between products<br/>
+                          • Variant pricing synchronization
+                        </Text>
+                      </div>
+                    </div>
                   </BlockStack>
                 )}
+
+
               </BlockStack>
             </Card>
           )}

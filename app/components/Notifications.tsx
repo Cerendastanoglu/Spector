@@ -196,6 +196,10 @@ export function Notifications({ isVisible }: NotificationsProps) {
   const [variantThresholds] = useState<{[variantId: string]: number}>({}); // Track threshold values for each variant
   const [selectedProductsSliderIndex, setSelectedProductsSliderIndex] = useState(0); // Track slider position for selected products
   const [summarySliderIndex, setSummarySliderIndex] = useState(0); // Track slider position for summary section
+  
+  // Track step completion based on actual saves
+  const [hasProductConfigSaved, setHasProductConfigSaved] = useState(false);
+  const [hasNotificationConfigSaved, setHasNotificationConfigSaved] = useState(false);
 
   
   // Step 2: Notification Channels
@@ -475,6 +479,13 @@ export function Notifications({ isVisible }: NotificationsProps) {
   };
 
   const handleStepComplete = () => {
+    // Mark the current step as completed when user proceeds
+    if (currentStep === 0) {
+      setHasProductConfigSaved(true);
+    } else if (currentStep === 1) {
+      setHasNotificationConfigSaved(true);
+    }
+    
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
@@ -691,6 +702,20 @@ export function Notifications({ isVisible }: NotificationsProps) {
     setSummarySliderIndex(0);
   }, [selectedProducts]);
 
+  // Reset product config completion flag when configuration changes
+  useEffect(() => {
+    if (hasProductConfigSaved) {
+      setHasProductConfigSaved(false);
+    }
+  }, [selectedProducts, selectionMode, selectedTags, selectedCollections, hasProductConfigSaved]);
+
+  // Reset notification config completion flag when channels change
+  useEffect(() => {
+    if (hasNotificationConfigSaved) {
+      setHasNotificationConfigSaved(false);
+    }
+  }, [channels, hasNotificationConfigSaved]);
+
   const renderSetupProgress = () => (
     <div className={styles.stepsContainer}>
       {/* Step 1: Product Selection */}
@@ -707,34 +732,31 @@ export function Notifications({ isVisible }: NotificationsProps) {
                   >
                     <Icon 
                       source={ProductIcon} 
-                      tone={currentStep >= 0 ? "base" : "subdued"} 
+                      tone={currentStep >= 0 ? undefined : "subdued"} 
                     />
                   </Box>
                 </div>
                 <BlockStack gap="050">
-                  <Text as="h3" variant="headingSm" fontWeight="semibold">
-                    Step 1: Products
-                  </Text>
+                  <InlineStack gap="200" blockAlign="center">
+                    <Text as="h3" variant="headingSm" fontWeight="semibold">
+                      Step 1: Products
+                    </Text>
+                    <div className={`${styles.stepProgress} ${currentStep === 0 ? styles.current : hasProductConfigSaved ? styles.completed : styles.pending}`}>
+                      {currentStep === 0 ? "Current" : hasProductConfigSaved ? "✓ Done" : "1 of 3"}
+                    </div>
+                  </InlineStack>
                   <Text as="p" variant="bodyXs" tone="subdued">
                     Select inventory to monitor
                   </Text>
                 </BlockStack>
-              </InlineStack>
-              <div className={`${styles.stepBadge} ${currentStep === 0 ? styles.active : ''}`}>
-                <Badge tone={currentStep >= 0 ? "info" : "info-strong"}>
-                  {currentStep === 0 ? "Active" : currentStep > 0 ? "Complete" : "Pending"}
-                </Badge>
-              </div>
-            </InlineStack>
-            
-            <Text as="p" variant="bodySm" tone="subdued">
+                    </InlineStack>
+                  </InlineStack>            <Text as="p" variant="bodySm" tone="subdued">
               Choose products by collection, tags, or individually. Set custom thresholds for each product variant.
             </Text>
             
             {currentStep > 0 && selectedProducts.length > 0 && (
               <div className={styles.stepSuccess}>
-                <Icon source={CheckIcon} tone="success" />
-                <Text as="p" variant="bodySm" tone="success">
+                <Text as="p" variant="bodySm" tone="base" fontWeight="medium">
                   {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} configured
                 </Text>
               </div>
@@ -744,47 +766,44 @@ export function Notifications({ isVisible }: NotificationsProps) {
       </div>
 
       {/* Step 2: Notification Channels */}
-      <div className={`${styles.stepCard} ${currentStep === 1 ? `${styles.active} ${styles.activeWarning}` : ''}`}>
+      <div className={`${styles.stepCard} ${currentStep === 1 ? `${styles.active} ${styles.activeInfo}` : ''}`}>
         <Card>
           <BlockStack gap="300">
             <InlineStack align="space-between" blockAlign="center">
               <InlineStack gap="200" blockAlign="center">
                 <div className={`${styles.stepIcon} ${currentStep === 1 ? styles.active : ''}`}>
                   <Box 
-                    background={currentStep >= 1 ? "bg-fill-warning" : "bg-fill-disabled"} 
+                    background={currentStep >= 1 ? "bg-fill-info" : "bg-fill-disabled"} 
                     padding="200" 
                     borderRadius="100"
                   >
                     <Icon 
                       source={NotificationIcon} 
-                      tone={currentStep >= 1 ? "base" : "subdued"} 
+                      tone={currentStep >= 1 ? undefined : "subdued"} 
                     />
                   </Box>
                 </div>
                 <BlockStack gap="050">
-                  <Text as="h3" variant="headingSm" fontWeight="semibold">
-                    Step 2: Notifications
-                  </Text>
+                  <InlineStack gap="200" blockAlign="center">
+                    <Text as="h3" variant="headingSm" fontWeight="semibold">
+                      Step 2: Notifications
+                    </Text>
+                    <div className={`${styles.stepProgress} ${currentStep === 1 ? styles.current : hasNotificationConfigSaved ? styles.completed : styles.pending}`}>
+                      {currentStep === 1 ? "Current" : hasNotificationConfigSaved ? "✓ Done" : "2 of 3"}
+                    </div>
+                  </InlineStack>
                   <Text as="p" variant="bodyXs" tone="subdued">
                     Configure alert channels
                   </Text>
                 </BlockStack>
-              </InlineStack>
-              <div className={`${styles.stepBadge} ${currentStep === 1 ? styles.active : ''}`}>
-                <Badge tone={currentStep >= 1 ? "warning" : "info-strong"}>
-                  {currentStep === 1 ? "Active" : currentStep > 1 ? "Complete" : "Pending"}
-                </Badge>
-              </div>
-            </InlineStack>
-            
-            <Text as="p" variant="bodySm" tone="subdued">
+                    </InlineStack>
+                  </InlineStack>            <Text as="p" variant="bodySm" tone="subdued">
               Set up email alerts, Webflow integrations, and test your notification delivery.
             </Text>
             
             {currentStep > 1 && channels.filter(c => c.enabled && c.verified).length > 0 && (
               <div className={styles.stepSuccess}>
-                <Icon source={CheckIcon} tone="success" />
-                <Text as="p" variant="bodySm" tone="success">
+                <Text as="p" variant="bodySm" tone="base" fontWeight="medium">
                   {channels.filter(c => c.enabled && c.verified).length} channel{channels.filter(c => c.enabled && c.verified).length !== 1 ? 's' : ''} ready
                 </Text>
               </div>
@@ -807,24 +826,24 @@ export function Notifications({ isVisible }: NotificationsProps) {
                   >
                     <Icon 
                       source={currentStep >= 2 ? CheckIcon : PlayIcon} 
-                      tone={currentStep >= 2 ? "base" : "subdued"} 
+                      tone={currentStep >= 2 ? undefined : "subdued"} 
                     />
                   </Box>
                 </div>
                 <BlockStack gap="050">
-                  <Text as="h3" variant="headingSm" fontWeight="semibold">
-                    Step 3: Activate
-                  </Text>
+                  <InlineStack gap="200" blockAlign="center">
+                    <Text as="h3" variant="headingSm" fontWeight="semibold">
+                      Step 3: Activate
+                    </Text>
+                    <div className={`${styles.stepProgress} ${currentStep === 2 ? styles.current : (hasProductConfigSaved && hasNotificationConfigSaved) ? styles.completed : styles.pending}`}>
+                      {currentStep === 2 ? "Current" : (hasProductConfigSaved && hasNotificationConfigSaved) ? "✓ Done" : "3 of 3"}
+                    </div>
+                  </InlineStack>
                   <Text as="p" variant="bodyXs" tone="subdued">
                     Review and launch monitoring
                   </Text>
                 </BlockStack>
               </InlineStack>
-              <div className={`${styles.stepBadge} ${currentStep === 2 ? styles.active : ''}`}>
-                <Badge tone={currentStep >= 2 ? "success" : "info-strong"}>
-                  {currentStep === 2 ? "Active" : currentStep > 2 ? "Complete" : "Pending"}
-                </Badge>
-              </div>
             </InlineStack>
             
             <Text as="p" variant="bodySm" tone="subdued">
@@ -833,8 +852,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
             
             {isSetupComplete && (
               <div className={styles.stepSuccess}>
-                <Icon source={CheckIcon} tone="success" />
-                <Text as="p" variant="bodySm" tone="success">
+                <Text as="p" variant="bodySm" tone="base" fontWeight="medium">
                   Monitoring active
                 </Text>
               </div>
