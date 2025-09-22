@@ -457,51 +457,104 @@ export function ProductTable({
                       }}
                     >
                       <BlockStack gap="400">
-                        {/* Product metadata */}
-                        <InlineStack gap="600">
-                          <div>
-                            <Text as="h4" variant="headingXs" fontWeight="medium">Handle</Text>
-                            <Text as="span" variant="bodyXs" fontWeight="medium">{product.handle}</Text>
+                        {/* Product metadata - Improved alignment */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr 1fr',
+                          gap: '24px',
+                          padding: '8px 0'
+                        }}>
+                          {/* Handle Section */}
+                          <div style={{ minWidth: '120px' }}>
+                            <BlockStack gap="150">
+                              <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
+                                Handle
+                              </Text>
+                              <div style={{
+                                padding: '6px 8px',
+                                backgroundColor: '#ffffff',
+                                borderRadius: '6px',
+                                border: '1px solid #e5e7eb'
+                              }}>
+                                <Text as="span" variant="bodyXs" fontWeight="medium" tone="base">
+                                  {product.handle}
+                                </Text>
+                              </div>
+                            </BlockStack>
                           </div>
                           
-                          <div>
-                            <Text as="h4" variant="headingXs" fontWeight="medium">Tags</Text>
-                            {product.tags && product.tags.length > 0 ? (
-                              <InlineStack gap="100">
-                                {product.tags.slice(0, 2).map((tag, index) => (
-                                  <Badge key={index} size="small">{tag}</Badge>
-                                ))}
-                                {product.tags.length > 2 && (
-                                  <Text as="span" variant="bodyXs" tone="subdued">
-                                    +{product.tags.length - 2}
+                          {/* Tags Section */}
+                          <div style={{ minWidth: '120px' }}>
+                            <BlockStack gap="150">
+                              <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
+                                Tags
+                              </Text>
+                              <div style={{
+                                padding: '6px 8px',
+                                backgroundColor: '#ffffff',
+                                borderRadius: '6px',
+                                border: '1px solid #e5e7eb',
+                                minHeight: '28px',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}>
+                                {product.tags && product.tags.length > 0 ? (
+                                  <InlineStack gap="100" wrap={false}>
+                                    {product.tags.slice(0, 2).map((tag, index) => (
+                                      <Badge key={index} size="small" tone="info">{tag}</Badge>
+                                    ))}
+                                    {product.tags.length > 2 && (
+                                      <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
+                                        +{product.tags.length - 2}
+                                      </Text>
+                                    )}
+                                  </InlineStack>
+                                ) : (
+                                  <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
+                                    No tags
                                   </Text>
                                 )}
-                              </InlineStack>
-                            ) : (
-                              <Text as="span" variant="bodyXs" tone="subdued">No tags</Text>
-                            )}
+                              </div>
+                            </BlockStack>
                           </div>
                           
-                          <div>
-                            <Text as="h4" variant="headingXs" fontWeight="medium">Collections</Text>
-                            {product.collections?.edges && product.collections.edges.length > 0 ? (
-                              <InlineStack gap="100">
-                                {product.collections.edges.slice(0, 1).map((collection) => (
-                                  <Badge key={collection.node.id} size="small">
-                                    {collection.node.title}
-                                  </Badge>
-                                ))}
-                                {product.collections.edges.length > 1 && (
-                                  <Text as="span" variant="bodyXs" tone="subdued">
-                                    +{product.collections.edges.length - 1}
+                          {/* Collections Section */}
+                          <div style={{ minWidth: '120px' }}>
+                            <BlockStack gap="150">
+                              <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
+                                Collections
+                              </Text>
+                              <div style={{
+                                padding: '6px 8px',
+                                backgroundColor: '#ffffff',
+                                borderRadius: '6px',
+                                border: '1px solid #e5e7eb',
+                                minHeight: '28px',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}>
+                                {product.collections?.edges && product.collections.edges.length > 0 ? (
+                                  <InlineStack gap="100" wrap={false}>
+                                    {product.collections.edges.slice(0, 1).map((collection) => (
+                                      <Badge key={collection.node.id} size="small" tone="success">
+                                        {collection.node.title}
+                                      </Badge>
+                                    ))}
+                                    {product.collections.edges.length > 1 && (
+                                      <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
+                                        +{product.collections.edges.length - 1}
+                                      </Text>
+                                    )}
+                                  </InlineStack>
+                                ) : (
+                                  <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
+                                    No collections
                                   </Text>
                                 )}
-                              </InlineStack>
-                            ) : (
-                              <Text as="span" variant="bodyXs" tone="subdued">No collections</Text>
-                            )}
+                              </div>
+                            </BlockStack>
                           </div>
-                        </InlineStack>
+                        </div>
                         
                         {/* Variants section */}
                         <div>

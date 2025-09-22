@@ -10,8 +10,6 @@ import {
 import {
   SettingsIcon,
   QuestionCircleIcon,
-  AlertTriangleIcon,
-  CheckCircleIcon,
   SunIcon,
   MoonIcon,
 } from "@shopify/polaris-icons";
@@ -21,11 +19,10 @@ interface AppHeaderProps {
   onTabChange: (tab: string) => void;
   activeTab: string;
   outOfStockCount?: number;
-  hasNotifications?: boolean;
   onPreloadComponent?: (componentName: string) => void;
 }
 
-export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNotifications = false, onPreloadComponent }: AppHeaderProps) {
+export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPreloadComponent }: AppHeaderProps) {
   const { theme, toggleTheme } = useTheme();
 
   // Theme toggle button
@@ -280,10 +277,9 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, hasNoti
         <Button
           onClick={() => onTabChange("notifications")}
           variant="tertiary"
-          icon={hasNotifications ? CheckCircleIcon : AlertTriangleIcon}
           size="medium"
         >
-          Notification Settings
+          Stock Alerts
         </Button>
       </div>
     </InlineStack>
