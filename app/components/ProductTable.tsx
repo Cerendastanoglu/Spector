@@ -72,6 +72,7 @@ interface ProductTableProps {
   onEditProduct: (product: Product) => void;
   shopCurrency?: string;
   showVariantSelection?: boolean;
+  totalCount?: number;
 }
 
 export function ProductTable({
@@ -86,6 +87,7 @@ export function ProductTable({
   onEditProduct,
   shopCurrency = '$',
   showVariantSelection = false,
+  totalCount,
 }: ProductTableProps) {
   
   const getStatusDot = (status: string) => {
@@ -133,7 +135,7 @@ export function ProductTable({
       return { color: '#22c55e', label: 'Well Stocked' };
     };
     
-    const { color, label } = getInventoryConfig();
+    const { color } = getInventoryConfig();
     
     return (
       <div style={{ 
@@ -632,9 +634,23 @@ export function ProductTable({
       </table>
       
       {products.length === 0 && (
-        <div style={{ padding: '40px', textAlign: 'center' }}>
+        <div style={{ padding: '20px', textAlign: 'center' }}>
           <Text as="p" variant="bodyMd" tone="subdued">
             No products found
+          </Text>
+        </div>
+      )}
+      
+      {/* Product count display */}
+      {products.length > 0 && (
+        <div style={{ 
+          padding: '12px 16px', 
+          borderTop: '1px solid #e5e7eb',
+          backgroundColor: '#f9fafb',
+          textAlign: 'center'
+        }}>
+          <Text as="p" variant="bodyXs" tone="subdued">
+            Showing {products.length}{totalCount ? ` of ${totalCount}` : ''} products
           </Text>
         </div>
       )}

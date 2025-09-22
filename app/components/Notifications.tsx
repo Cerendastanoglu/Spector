@@ -196,6 +196,10 @@ export function Notifications({ isVisible }: NotificationsProps) {
   const [variantThresholds] = useState<{[variantId: string]: number}>({}); // Track threshold values for each variant
   const [selectedProductsSliderIndex, setSelectedProductsSliderIndex] = useState(0); // Track slider position for selected products
   const [summarySliderIndex, setSummarySliderIndex] = useState(0); // Track slider position for summary section
+  const [currentPage, setCurrentPage] = useState(0); // Track current page for product table pagination
+  
+  // Constants
+  const productsPerPage = 20; // Limit products per page
   
   // Track step completion based on actual saves
   const [hasProductConfigSaved, setHasProductConfigSaved] = useState(false);
@@ -276,6 +280,11 @@ export function Notifications({ isVisible }: NotificationsProps) {
       completed: false
     },
   ];
+
+  // Reset pagination when search query changes
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [productSearchQuery]);
 
   // Load collections data
   const loadCollections = async () => {
@@ -746,12 +755,14 @@ export function Notifications({ isVisible }: NotificationsProps) {
                     </div>
                   </InlineStack>
                   <Text as="p" variant="bodyXs" tone="subdued">
-                    Select inventory to monitor
+                    Select products
                   </Text>
                 </BlockStack>
-                    </InlineStack>
-                  </InlineStack>            <Text as="p" variant="bodySm" tone="subdued">
-              Choose products by collection, tags, or individually. Set custom thresholds for each product variant.
+              </InlineStack>
+            </InlineStack>
+            
+            <Text as="p" variant="bodySm" tone="subdued">
+              Choose products and set alert thresholds.
             </Text>
             
             {currentStep > 0 && selectedProducts.length > 0 && (
@@ -793,12 +804,14 @@ export function Notifications({ isVisible }: NotificationsProps) {
                     </div>
                   </InlineStack>
                   <Text as="p" variant="bodyXs" tone="subdued">
-                    Configure alert channels
+                    Setup alerts
                   </Text>
                 </BlockStack>
-                    </InlineStack>
-                  </InlineStack>            <Text as="p" variant="bodySm" tone="subdued">
-              Set up email alerts, Webflow integrations, and test your notification delivery.
+              </InlineStack>
+            </InlineStack>
+            
+            <Text as="p" variant="bodySm" tone="subdued">
+              Configure email and integration channels.
             </Text>
             
             {currentStep > 1 && channels.filter(c => c.enabled && c.verified).length > 0 && (
@@ -813,14 +826,14 @@ export function Notifications({ isVisible }: NotificationsProps) {
       </div>
 
       {/* Step 3: Review & Activate */}
-      <div className={`${styles.stepCard} ${currentStep === 2 ? `${styles.active} ${styles.activeSuccess}` : ''}`}>
+      <div className={`${styles.stepCard} ${currentStep === 2 ? `${styles.active} ${styles.activeInfo}` : ''}`}>
         <Card>
           <BlockStack gap="300">
             <InlineStack align="space-between" blockAlign="center">
               <InlineStack gap="200" blockAlign="center">
                 <div className={`${styles.stepIcon} ${currentStep === 2 ? styles.active : ''}`}>
                   <Box 
-                    background={currentStep >= 2 ? "bg-fill-success" : "bg-fill-disabled"} 
+                    background={currentStep >= 2 ? "bg-fill-info" : "bg-fill-disabled"} 
                     padding="200" 
                     borderRadius="100"
                   >
@@ -840,14 +853,14 @@ export function Notifications({ isVisible }: NotificationsProps) {
                     </div>
                   </InlineStack>
                   <Text as="p" variant="bodyXs" tone="subdued">
-                    Review and launch monitoring
+                    Launch system
                   </Text>
                 </BlockStack>
               </InlineStack>
             </InlineStack>
             
             <Text as="p" variant="bodySm" tone="subdued">
-              Review configuration, test alerts, and activate real-time inventory monitoring.
+              Review settings and activate monitoring.
             </Text>
             
             {isSetupComplete && (
@@ -865,7 +878,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
 
   const renderProductSelection = () => (
     <Card>
-      <BlockStack gap="400">
+      <BlockStack gap="300">
         <BlockStack gap="200">
           <Text as="h3" variant="headingMd">Step 1: Select Products & Configure Thresholds</Text>
           <Text as="p" variant="bodySm" tone="subdued">
@@ -1005,7 +1018,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
         {(selectionMode === 'specific' || selectionMode === 'tags' || selectionMode === 'category') && (
           <BlockStack gap="300">
             <Card>
-              <BlockStack gap="500">
+              <BlockStack gap="300">
                 <InlineStack align="space-between" blockAlign="center">
                   <BlockStack gap="100">
                     <Text as="h4" variant="headingMd">Select Products & Configure Thresholds</Text>
@@ -1018,7 +1031,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
                   </Badge>
                 </InlineStack>
                 
-                <BlockStack gap="400">
+                <BlockStack gap="300">
                   {/* Search Products - moved from above to replace pagination */}
                   <Card background="bg-surface-secondary" padding="300">
                     <TextField
@@ -1031,43 +1044,68 @@ export function Notifications({ isVisible }: NotificationsProps) {
                     />
                   </Card>
                   
-                  <ProductTable
-                    products={filteredProducts.map(convertToTableProduct)}
-                    selectedProducts={selectedProducts}
-                    selectedVariants={[]}
-                    expandedProducts={new Set(expandedVariants)}
-                    onProductSelect={(productId: string, selected: boolean) => {
-                      if (selected && selectedProducts.length < productLimit) {
-                        setSelectedProducts([...selectedProducts, productId]);
-                      } else if (!selected) {
-                        setSelectedProducts(selectedProducts.filter(id => id !== productId));
-                      } else {
-                        setShowLimitWarning(true);
-                      }
-                    }}
-                    onVariantSelect={() => { /* Not used in notifications context */ }}
-                    onExpandProduct={(productId: string) => {
-                      const isExpanded = expandedVariants.includes(productId);
-                      if (isExpanded) {
-                        setExpandedVariants(expandedVariants.filter(id => id !== productId));
-                      } else {
-                        setExpandedVariants([...expandedVariants, productId]);
-                      }
-                    }}
-                    onViewProduct={() => { /* Not used in notifications context */ }}
-                    onEditProduct={() => { /* Not used in notifications context */ }}
-                  />
+                  <div style={{ minHeight: '400px', maxHeight: '600px', overflow: 'auto' }}>
+                    <ProductTable
+                      products={filteredProducts.slice(currentPage * productsPerPage, (currentPage + 1) * productsPerPage).map(convertToTableProduct)}
+                      selectedProducts={selectedProducts}
+                      selectedVariants={[]}
+                      expandedProducts={new Set(expandedVariants)}
+                      onProductSelect={(productId: string, selected: boolean) => {
+                        if (selected && selectedProducts.length < productLimit) {
+                          setSelectedProducts([...selectedProducts, productId]);
+                        } else if (!selected) {
+                          setSelectedProducts(selectedProducts.filter(id => id !== productId));
+                        } else {
+                          setShowLimitWarning(true);
+                        }
+                      }}
+                      onVariantSelect={() => { /* Not used in notifications context */ }}
+                      onExpandProduct={(productId: string) => {
+                        const isExpanded = expandedVariants.includes(productId);
+                        if (isExpanded) {
+                          setExpandedVariants(expandedVariants.filter(id => id !== productId));
+                        } else {
+                          setExpandedVariants([...expandedVariants, productId]);
+                        }
+                      }}
+                      onViewProduct={() => { /* Not used in notifications context */ }}
+                      onEditProduct={() => { /* Not used in notifications context */ }}
+                      totalCount={filteredProducts.length}
+                    />
+                  </div>
+                  
+                  {/* Pagination Controls */}
+                  {filteredProducts.length > productsPerPage && (
+                    <Card background="bg-surface-secondary" padding="300">
+                      <InlineStack align="space-between" blockAlign="center">
+                        <Button
+                          size="slim"
+                          disabled={currentPage === 0}
+                          onClick={() => setCurrentPage(currentPage - 1)}
+                        >
+                          Previous
+                        </Button>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Page {currentPage + 1} of {Math.ceil(filteredProducts.length / productsPerPage)}
+                        </Text>
+                        <Button
+                          size="slim"
+                          disabled={currentPage >= Math.ceil(filteredProducts.length / productsPerPage) - 1}
+                          onClick={() => setCurrentPage(currentPage + 1)}
+                        >
+                          Next
+                        </Button>
+                      </InlineStack>
+                    </Card>
+                  )}
                 </BlockStack>
               </BlockStack>
             </Card>
-            
 
-            
-        
         {/* Selected Products Preview */}
         {selectedProducts.length > 0 && (
-          <Box padding="400" background="bg-surface-secondary" borderRadius="300">
-            <BlockStack gap="400">
+          <Card>
+            <BlockStack gap="300">
               <InlineStack align="space-between" blockAlign="center">
                 <BlockStack gap="100">
                   <Text as="h4" variant="headingSm">Selected for Monitoring</Text>
@@ -1079,6 +1117,14 @@ export function Notifications({ isVisible }: NotificationsProps) {
                   {`${selectedProducts.length} product${selectedProducts.length !== 1 ? 's' : ''}`}
                 </Badge>
               </InlineStack>
+              
+              {selectedProducts.length > 0 && (
+                <div className={styles.stepSuccess}>
+                  <Text as="p" variant="bodySm" tone="base" fontWeight="medium">
+                    {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} selected for monitoring
+                  </Text>
+                </div>
+              )}
               
               <BlockStack gap="300">
                 {/* Slider Controls */}
@@ -1164,7 +1210,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
                 </Grid>
               </BlockStack>
             </BlockStack>
-          </Box>
+          </Card>
         )}
             
         <InlineStack align="space-between" blockAlign="center">
@@ -1654,7 +1700,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
   }
 
   return (
-    <BlockStack gap="500">
+    <BlockStack gap="300">
       {isSetupMode && renderSetupProgress()}
       
       {isSetupMode ? (
