@@ -3618,6 +3618,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       onEditProduct={(product) => navigateToProduct(product, 'admin')}
                       shopCurrency="$"
                       showVariantSelection={true}
+                      totalCount={filteredProducts.length}
                     />
                   )}
                 </div>

@@ -1,7 +1,6 @@
 export { AppHeader } from "./AppHeader";
 export { Dashboard } from "./Dashboard";
 export { ProductManagement } from "./ProductManagement";
-export { InventoryForecasting } from "./InventoryForecasting";
 export { Notifications } from "./Notifications";
 export { WebVitals } from "./WebVitals";
 export { PerformanceDashboard } from "./PerformanceDashboard";
