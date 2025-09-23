@@ -10,13 +10,18 @@ import {
   Button,
   Icon,
   Tabs,
-  // Select,
   Spinner,
   Badge,
   Tooltip,
   Divider,
   Modal,
   Banner,
+  TextField,
+  Select,
+  Checkbox,
+  DataTable,
+  EmptyState,
+  Collapsible,
 } from "@shopify/polaris";
 import {
   RefreshIcon,
@@ -351,8 +356,8 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     },
     {
       id: 'inventory',
-      content: '🔒 Inventory Forecasting',
-      accessibilityLabel: 'Inventory Forecasting - Coming Soon',
+      content: 'Inventory Forecasting',
+      accessibilityLabel: 'Inventory Forecasting',
       panelID: 'inventory-panel',
     },
     {
@@ -1012,13 +1017,11 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     <>
       {/* CSS for greyed out tabs */}
       <style>{`
-        .Polaris-Tabs__Tab:nth-child(2) button,
         .Polaris-Tabs__Tab:nth-child(3) button {
           opacity: 0.5;
           color: #8c9196 !important;
           cursor: not-allowed;
         }
-        .Polaris-Tabs__Tab:nth-child(2) button:hover,
         .Polaris-Tabs__Tab:nth-child(3) button:hover {
           background-color: #f6f6f7 !important;
         }
@@ -1085,8 +1088,8 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
               tabs={tabs}
               selected={activeTab}
               onSelect={(selectedTab) => {
-                // Show coming soon message for disabled tabs (1 and 2)
-                if (selectedTab === 1 || selectedTab === 2) {
+                // Show coming soon message for disabled tab (2)
+                if (selectedTab === 2) {
                   setShowComingSoon(true);
                   return; // Don't change tab
                 }

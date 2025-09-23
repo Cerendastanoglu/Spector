@@ -21,6 +21,7 @@ import {
   ChoiceList,
   Modal,
   Grid,
+  Collapsible,
 } from "@shopify/polaris";
 import {
   AlertCircleIcon,
@@ -36,6 +37,8 @@ import {
   EditIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
   // ArrowRightIcon,
   CheckIcon,
   PlayIcon,
@@ -43,6 +46,7 @@ import {
 } from "@shopify/polaris-icons";
 import { useState, useEffect } from "react";
 import { ProductTable } from "./ProductTable";
+import { ProductConstants } from "../utils/scopedConstants";
 import styles from "./StepsUI.module.css";
 
 interface NotificationsProps {
@@ -185,7 +189,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [availableCollections, setAvailableCollections] = useState<Collection[]>([]);
-  const [productSearchQuery, setProductSearchQuery] = useState('');
+
   const [selectionMode, setSelectionMode] = useState<'all' | 'category' | 'tags' | 'specific' | 'collection'>('specific');
   const [selectedLocations] = useState<string[]>([]);
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
@@ -197,6 +201,23 @@ export function Notifications({ isVisible }: NotificationsProps) {
   const [selectedProductsSliderIndex, setSelectedProductsSliderIndex] = useState(0); // Track slider position for selected products
   const [summarySliderIndex, setSummarySliderIndex] = useState(0); // Track slider position for summary section
   const [currentPage, setCurrentPage] = useState(0); // Track current page for product table pagination
+  
+  // Filter & Search states
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentCategory, setCurrentCategory] = useState<string>('all');
+  const [filterByCollection, setFilterByCollection] = useState('');
+  const [filterByStatus, setFilterByStatus] = useState('all');
+  const [filterByTags, setFilterByTags] = useState<string[]>([]);
+  const [priceRange, setPriceRange] = useState({ min: '', max: '' });
+  const [inventoryRange, setInventoryRange] = useState({ min: '', max: '' });
+  const [hasImages, setHasImages] = useState('all');
+  const [showDraftProducts, setShowDraftProducts] = useState(true);
+  const [sortField, setSortField] = useState('inventory');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [tagSearchQuery, setTagSearchQuery] = useState<string>('');
+  const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
   
   // Constants
   const productsPerPage = 20; // Limit products per page
@@ -284,7 +305,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
   // Reset pagination when search query changes
   useEffect(() => {
     setCurrentPage(0);
-  }, [productSearchQuery]);
+  }, [searchQuery]);
 
   // Load collections data
   const loadCollections = async () => {
@@ -352,9 +373,9 @@ export function Notifications({ isVisible }: NotificationsProps) {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      // Load actual products with variants and inventory locations from Shopify API
+      // Load actual products using the same API call as ProductManagement
       const formData = new FormData();
-      formData.append('action', 'fetch-products-with-variants-and-locations');
+      formData.append('action', 'get-all-products');
       
       console.log('🔄 Making API call to fetch products...');
       const response = await fetch('/app/api/products', {
@@ -371,11 +392,10 @@ export function Notifications({ isVisible }: NotificationsProps) {
         throw new Error(`API Error: ${data.error}`);
       }
       
-      if (data.products && data.products.edges) {
-        const products = data.products.edges.map((edge: any) => {
-          const node = edge.node;
+      if (data.products && data.products.length > 0) {
+        const products = data.products.map((node: any) => {
           
-          // Map variants with inventory data
+          // Map variants with inventory data - note: get-all-products returns variants.edges format
           const variants = node.variants?.edges?.map((variantEdge: any) => {
             const variant = variantEdge.node;
             return {
@@ -415,6 +435,11 @@ export function Notifications({ isVisible }: NotificationsProps) {
         console.log('🔍 Products loaded:', products);
         console.log('🔍 First product variants:', products[0]?.variants);
         setAvailableProducts(products);
+        
+        // Extract available tags for filtering
+        const allTags = products.flatMap((p: Product) => p.tags || []);
+        const uniqueTags = [...new Set(allTags)].sort() as string[];
+        setAvailableTags(uniqueTags);
         
         // Also load collections and locations
         await loadCollections();
@@ -663,7 +688,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
           }
         }
       } : undefined,
-      status: 'ACTIVE',
+      status: product.status,
       totalInventory: product.inventory,
       tags: product.tags || [],
       collections: { edges: [] },
@@ -686,22 +711,144 @@ export function Notifications({ isVisible }: NotificationsProps) {
   };
 
   const filteredProducts = availableProducts.filter(product => {
-    // Text search filter
-    const matchesSearch = product.title.toLowerCase().includes(productSearchQuery.toLowerCase());
+    // Draft products filter (same as ProductManagement)
+    if (!showDraftProducts && product.status === 'DRAFT') {
+      return false;
+    }
+
+    // Search filter (same as ProductManagement)
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const searchableText = [
+        product.title,
+        product.id,
+        ...((product.variants || []).map(v => v.sku || ''))
+      ].join(' ').toLowerCase();
+      
+      if (!searchableText.includes(query)) {
+        return false;
+      }
+    }
+
+    // Category filter (same as ProductManagement)
+    const inventory = product.inventory;
+    const categoryFilter = (inventory: number) => {
+      switch (currentCategory) {
+        case 'out-of-stock': return inventory === 0;
+        case 'critical': return inventory > 0 && inventory <= ProductConstants.CRITICAL_THRESHOLD;
+        case 'low-stock': return inventory > ProductConstants.CRITICAL_THRESHOLD && inventory <= ProductConstants.LOW_STOCK_THRESHOLD;
+        case 'in-stock': return inventory > ProductConstants.LOW_STOCK_THRESHOLD;
+        case 'all': 
+        default: 
+          return true;
+      }
+    };
+
+    if (!categoryFilter(inventory)) {
+      return false;
+    }
+
+    // Collection filter (TODO: implement when collections are added to Product interface)
+    if (filterByCollection) {
+      // For now, skip collection filtering since collections aren't in the Product interface
+      // This will be implemented when we add collections to the Notifications Product interface
+    }
+
+    // Tags filter (same as ProductManagement)
+    if (filterByTags.length > 0) {
+      const productTags = product.tags || [];
+      const hasAllTags = filterByTags.every(tag => 
+        productTags.some(productTag => 
+          productTag.toLowerCase().includes(tag.toLowerCase())
+        )
+      );
+      if (!hasAllTags) {
+        return false;
+      }
+    }
+
+    // Status filter (same as ProductManagement)
+    if (filterByStatus !== 'all' && product.status !== filterByStatus.toUpperCase()) {
+      return false;
+    }
+
+    // Images filter (same as ProductManagement)
+    if (hasImages !== 'all') {
+      const productHasImages = product.imageUrl;
+      if (hasImages === 'with' && !productHasImages) {
+        return false;
+      }
+      if (hasImages === 'without' && productHasImages) {
+        return false;
+      }
+    }
+
+    // Price range filter (same as ProductManagement)
+    if (priceRange.min || priceRange.max) {
+      const productPrice = parseFloat(product.variants?.[0]?.price || '0');
+      if (priceRange.min && productPrice < parseFloat(priceRange.min)) {
+        return false;
+      }
+      if (priceRange.max && productPrice > parseFloat(priceRange.max)) {
+        return false;
+      }
+    }
+
+    // Inventory range filter (same as ProductManagement)
+    if (inventoryRange.min || inventoryRange.max) {
+      const inventoryValue = product.inventory;
+      if (inventoryRange.min && inventoryValue < parseInt(inventoryRange.min)) {
+        return false;
+      }
+      if (inventoryRange.max && inventoryValue > parseInt(inventoryRange.max)) {
+        return false;
+      }
+    }
+
+    // Additional filters for Notifications selection modes
+    // Tags selection mode filter
+    const matchesTagsMode = selectionMode !== 'tags' || selectedTags.length === 0 ||
+      product.tags?.some(tag => selectedTags.includes(tag));
     
     // Location filter (if locations are selected)
     const matchesLocation = selectedLocations.length === 0 || 
       product.locations?.some(loc => selectedLocations.includes(loc.locationId));
     
-    // Tags filter for tags selection mode
-    const matchesTags = selectionMode !== 'tags' || selectedTags.length === 0 ||
-      product.tags?.some(tag => selectedTags.includes(tag));
+    // Collection selection mode filter
+    const matchesCollectionMode = selectionMode !== 'collection' || selectedCollections.length === 0;
     
-    // Collection filter for collection selection mode
-    const matchesCollection = selectionMode !== 'collection' || selectedCollections.length === 0;
-    // TODO: Add collection filtering when we have collection-product relationships
+    return matchesTagsMode && matchesLocation && matchesCollectionMode;
+  }).sort((a, b) => {
+    const getValue = (product: Product) => {
+      switch (sortField) {
+        case 'title': return product.title;
+        case 'inventory': return product.inventory;
+        case 'status': return product.status;
+        case 'created': 
+          // Since createdAt is not available, sort by ID (newer products have later IDs)
+          return product.id;
+        case 'updated': 
+          // Since updatedAt is not available, fallback to title for now
+          return product.title;
+        case 'price': {
+          // Get price from first variant or 0 if no variants
+          const firstVariant = product.variants?.[0];
+          return firstVariant ? parseFloat(firstVariant.price) : 0;
+        }
+        case 'variants': return product.variants?.length || 0;
+        default: return product.title;
+      }
+    };
+
+    const aVal = getValue(a);
+    const bVal = getValue(b);
     
-    return matchesSearch && matchesLocation && matchesTags && matchesCollection;
+    if (typeof aVal === 'number' && typeof bVal === 'number') {
+      return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    }
+    
+    const comparison = String(aVal).localeCompare(String(bVal));
+    return sortDirection === 'asc' ? comparison : -comparison;
   });
 
   // Reset functionality when filters change - pagination removed, no slider to reset
@@ -880,30 +1027,20 @@ export function Notifications({ isVisible }: NotificationsProps) {
     <Card>
       <BlockStack gap="300">
         <BlockStack gap="200">
-          <Text as="h3" variant="headingMd">Step 1: Select Products & Configure Thresholds</Text>
-          <Text as="p" variant="bodySm" tone="subdued">
-            Choose which products to monitor for low stock alerts and configure alert thresholds.
-          </Text>
+          <InlineStack align="space-between" blockAlign="center">
+            <BlockStack gap="100">
+              <Text as="h3" variant="headingMd">Step 1: Select Products & Configure Thresholds</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Choose which products to monitor for low stock alerts and configure alert thresholds.
+              </Text>
+            </BlockStack>
+            {(selectionMode === 'specific' || selectionMode === 'tags' || selectionMode === 'category') && (
+              <Badge tone="info" size="medium">
+                {`${selectedProducts.length} of ${productLimit} selected`}
+              </Badge>
+            )}
+          </InlineStack>
         </BlockStack>
-
-        <ChoiceList
-          title="How do you want to select products to monitor?"
-          choices={[
-            { label: 'By Collection', value: 'collection', helpText: 'Monitor all products in specific collections (up to 150 products total)' },
-            { label: 'By Product Tags', value: 'tags', helpText: 'Monitor products with specific tags (up to 150 products total)' },
-            { label: 'Specific Products Only', value: 'specific', helpText: 'Manually choose individual products (recommended for precise control)' },
-          ]}
-          selected={[selectionMode]}
-          onChange={(value) => {
-            const newMode = value[0] as any;
-            setSelectionMode(newMode);
-            
-            // Check limits when switching modes
-            if (newMode === 'all' && availableProducts.length > productLimit) {
-              setShowLimitWarning(true);
-            }
-          }}
-        />
 
         {showLimitWarning && (
           <Banner tone="warning" onDismiss={() => setShowLimitWarning(false)}>
@@ -1017,31 +1154,322 @@ export function Notifications({ isVisible }: NotificationsProps) {
 
         {(selectionMode === 'specific' || selectionMode === 'tags' || selectionMode === 'category') && (
           <BlockStack gap="300">
-            <Card>
-              <BlockStack gap="300">
-                <InlineStack align="space-between" blockAlign="center">
-                  <BlockStack gap="100">
-                    <Text as="h4" variant="headingMd">Select Products & Configure Thresholds</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Choose products to monitor and set custom alert thresholds
-                    </Text>
-                  </BlockStack>
-                  <Badge tone="info" size="medium">
-                    {`${selectedProducts.length} of ${productLimit} selected`}
-                  </Badge>
-                </InlineStack>
-                
-                <BlockStack gap="300">
-                  {/* Search Products - moved from above to replace pagination */}
-                  <Card background="bg-surface-secondary" padding="300">
-                    <TextField
-                      label="Search Products"
-                      value={productSearchQuery}
-                      onChange={setProductSearchQuery}
-                      placeholder="Search by product name..."
-                      prefix={<Icon source={SearchIcon} />}
-                      autoComplete="false"
-                    />
+                  {/* Filters & Search Section */}
+                  <Card padding="0">
+                    <button
+                      onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        padding: '16px 20px',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <InlineStack align="space-between" blockAlign="center">
+                        <InlineStack gap="200" blockAlign="center">
+                          <Icon source={SearchIcon} />
+                          <Text as="h3" variant="headingXs">Filters & Search</Text>
+                        </InlineStack>
+                        <div style={{ marginLeft: 'auto' }}>
+                          <Icon source={isFiltersOpen ? ChevronUpIcon : ChevronDownIcon} />
+                        </div>
+                      </InlineStack>
+                    </button>
+                    
+                    {isFiltersOpen && (
+                      <div style={{ padding: '0 20px 20px 20px' }}>
+                        <BlockStack gap="300">
+
+                          {/* Search */}
+                          <TextField
+                            label=""
+                            value={searchQuery}
+                            onChange={setSearchQuery}
+                            placeholder="Search by product name, handle, or SKU..."
+                            autoComplete="off"
+                            clearButton
+                            onClearButtonClick={() => setSearchQuery('')}
+                          />
+
+                          {/* Filter Controls - Row 1: Basic Filters */}
+                          <InlineStack gap="300" wrap={false}>
+                            <div style={{ flex: 1 }}>
+                              <Select
+                                label="Category"
+                                value={currentCategory}
+                                onChange={(value) => setCurrentCategory(value)}
+                                options={ProductConstants.CATEGORY_OPTIONS as any}
+                              />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <Select
+                                label="Collection"
+                                options={[
+                                  { label: 'All Collections', value: '' },
+                                  ...availableCollections.map(collection => ({
+                                    label: collection.title,
+                                    value: collection.id
+                                  }))
+                                ]}
+                                value={filterByCollection}
+                                onChange={setFilterByCollection}
+                              />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <Select
+                                label="Status"
+                                options={[
+                                  { label: 'All Status', value: 'all' },
+                                  { label: 'Active', value: 'active' },
+                                  { label: 'Draft', value: 'draft' },
+                                  { label: 'Archived', value: 'archived' }
+                                ]}
+                                value={filterByStatus}
+                                onChange={setFilterByStatus}
+                              />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <Select
+                                label="Sort by"
+                                value={`${sortField}-${sortDirection}`}
+                                onChange={(value) => {
+                                  const [field, direction] = value.split('-');
+                                  setSortField(field);
+                                  setSortDirection(direction as 'asc' | 'desc');
+                                }}
+                                options={ProductConstants.SORT_OPTIONS as any}
+                              />
+                            </div>
+                          </InlineStack>
+
+                          {/* Filter Controls - Row 2: Price & Inventory Ranges */}
+                          <InlineStack gap="300" wrap={false}>
+                            <div style={{ flex: 1 }}>
+                              <Text as="p" variant="bodyMd" fontWeight="medium">Price Range</Text>
+                              <InlineStack gap="200" blockAlign="center">
+                                <div style={{ flex: 1 }}>
+                                  <TextField
+                                    label=""
+                                    placeholder="Min $"
+                                    value={priceRange.min}
+                                    onChange={(value) => setPriceRange(prev => ({ ...prev, min: value }))}
+                                    type="number"
+                                    autoComplete="off"
+                                  />
+                                </div>
+                                <Text as="span" variant="bodySm" tone="subdued">to</Text>
+                                <div style={{ flex: 1 }}>
+                                  <TextField
+                                    label=""
+                                    placeholder="Max $"
+                                    value={priceRange.max}
+                                    onChange={(value) => setPriceRange(prev => ({ ...prev, max: value }))}
+                                    type="number"
+                                    autoComplete="off"
+                                  />
+                                </div>
+                              </InlineStack>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <Text as="p" variant="bodyMd" fontWeight="medium">Inventory Range</Text>
+                              <InlineStack gap="200" blockAlign="center">
+                                <div style={{ flex: 1 }}>
+                                  <TextField
+                                    label=""
+                                    placeholder="Min qty"
+                                    value={inventoryRange.min}
+                                    onChange={(value) => setInventoryRange(prev => ({ ...prev, min: value }))}
+                                    type="number"
+                                    autoComplete="off"
+                                  />
+                                </div>
+                                <Text as="span" variant="bodySm" tone="subdued">to</Text>
+                                <div style={{ flex: 1 }}>
+                                  <TextField
+                                    label=""
+                                    placeholder="Max qty"
+                                    value={inventoryRange.max}
+                                    onChange={(value) => setInventoryRange(prev => ({ ...prev, max: value }))}
+                                    type="number"
+                                    autoComplete="off"
+                                  />
+                                </div>
+                              </InlineStack>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <Select
+                                label="Has Images"
+                                options={[
+                                  { label: 'All Products', value: 'all' },
+                                  { label: 'With Images', value: 'with' },
+                                  { label: 'Without Images', value: 'without' }
+                                ]}
+                                value={hasImages}
+                                onChange={setHasImages}
+                              />
+                            </div>
+                            <div style={{ flex: 1, paddingTop: '22px' }}>
+                              <Checkbox
+                                checked={showDraftProducts}
+                                onChange={setShowDraftProducts}
+                                label="Include draft products"
+                              />
+                            </div>
+                          </InlineStack>
+
+                          {/* Filter Controls - Row 3: Tags Filter (Collapsible) */}
+                          {availableTags.length > 0 && (
+                            <div style={{ 
+                              border: '1px solid #e1e3e5', 
+                              borderRadius: '8px', 
+                              backgroundColor: '#fafbfb',
+                              overflow: 'hidden'
+                            }}>
+                              {/* Tag Filter Header with Selected Tags Preview */}
+                              <div 
+                                style={{ 
+                                  padding: '12px 16px',
+                                  cursor: 'pointer',
+                                  borderBottom: isTagFilterOpen ? '1px solid #e1e3e5' : 'none',
+                                  backgroundColor: filterByTags.length > 0 ? '#f0f8ff' : '#fafbfb'
+                                }}
+                                onClick={() => setIsTagFilterOpen(!isTagFilterOpen)}
+                              >
+                                <InlineStack gap="200" wrap={false} align="space-between">
+                                  <InlineStack gap="200" wrap={false}>
+                                    <Icon source={isTagFilterOpen ? ChevronUpIcon : ChevronDownIcon} />
+                                    <Text as="p" variant="bodyMd" fontWeight="medium">
+                                      Filter by Tags
+                                      {filterByTags.length > 0 && ` (${filterByTags.length} selected)`}
+                                    </Text>
+                                  </InlineStack>
+                                  
+                                  {filterByTags.length > 0 && !isTagFilterOpen && (
+                                    <div style={{ flex: 1, marginLeft: '12px' }}>
+                                      <InlineStack gap="100" wrap>
+                                        {filterByTags.slice(0, 3).map(tag => (
+                                          <Badge key={tag} tone="info" size="small">{tag}</Badge>
+                                        ))}
+                                        {filterByTags.length > 3 && (
+                                          <Badge tone="info" size="small">{`+${filterByTags.length - 3} more`}</Badge>
+                                        )}
+                                      </InlineStack>
+                                    </div>
+                                  )}
+                                </InlineStack>
+                              </div>
+
+                              {/* Collapsible Tag Filter Content */}
+                              <Collapsible open={isTagFilterOpen} id="tag-filter-collapsible">
+                                <div style={{ padding: '16px' }}>
+                                  <BlockStack gap="300">
+                                    {/* Selected Tags Management */}
+                                    {filterByTags.length > 0 && (
+                                      <div style={{ 
+                                        padding: '12px', 
+                                        backgroundColor: '#f0f8ff', 
+                                        borderRadius: '6px',
+                                        border: '1px solid #c7e0f4'
+                                      }}>
+                                        <BlockStack gap="200">
+                                          <InlineStack gap="200" wrap={false} align="space-between">
+                                            <Text as="p" variant="bodySm" fontWeight="medium">Selected Tags ({filterByTags.length})</Text>
+                                            <Button
+                                              variant="plain"
+                                              size="micro"
+                                              onClick={() => setFilterByTags([])}
+                                              accessibilityLabel="Clear all tag filters"
+                                            >
+                                              Clear all
+                                            </Button>
+                                          </InlineStack>
+                                          <InlineStack gap="150" wrap>
+                                            {filterByTags.map(tag => (
+                                              <div key={tag} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                <Badge tone="info">{tag}</Badge>
+                                                <Button
+                                                  variant="plain"
+                                                  size="micro"
+                                                  onClick={() => setFilterByTags(prev => prev.filter(t => t !== tag))}
+                                                  accessibilityLabel={`Remove ${tag} tag filter`}
+                                                >
+                                                  ×
+                                                </Button>
+                                              </div>
+                                            ))}
+                                          </InlineStack>
+                                        </BlockStack>
+                                      </div>
+                                    )}
+
+                                    {/* Tag Search */}
+                                    <TextField
+                                      label="Search Tags"
+                                      placeholder="Type to search tags..."
+                                      value={tagSearchQuery}
+                                      onChange={setTagSearchQuery}
+                                      clearButton
+                                      onClearButtonClick={() => setTagSearchQuery('')}
+                                      prefix={<Icon source={SearchIcon} />}
+                                      autoComplete="off"
+                                    />
+
+                                    {/* Available Tags Grid */}
+                                    <div style={{ 
+                                      maxHeight: '200px', 
+                                      overflowY: 'auto', 
+                                      border: '1px solid #e1e3e5', 
+                                      borderRadius: '6px', 
+                                      padding: '12px',
+                                      backgroundColor: '#ffffff'
+                                    }}>
+                                      <Text as="p" variant="bodySm" fontWeight="medium" tone="subdued">
+                                        Available Tags ({availableTags.filter(tag => 
+                                          !tagSearchQuery || tag.toLowerCase().includes(tagSearchQuery.toLowerCase())
+                                        ).filter(tag => !filterByTags.includes(tag)).length})
+                                        {availableTags.filter(tag => !tagSearchQuery || tag.toLowerCase().includes(tagSearchQuery.toLowerCase())).filter(tag => !filterByTags.includes(tag)).length > 0 && 
+                                          " - Click to add"
+                                        }
+                                      </Text>
+                                      <div style={{ marginTop: '8px' }}>
+                                        <InlineStack gap="150" wrap>
+                                          {availableTags
+                                            .filter(tag => !tagSearchQuery || tag.toLowerCase().includes(tagSearchQuery.toLowerCase()))
+                                            .filter(tag => !filterByTags.includes(tag))
+                                            .map(tag => (
+                                              <div
+                                                key={tag}
+                                                style={{ cursor: 'pointer', padding: '4px 8px', border: '1px solid #e1e3e5', borderRadius: '4px', backgroundColor: '#f6f6f7' }}
+                                                onClick={() => {
+                                                  setFilterByTags(prev => [...prev, tag]);
+                                                  setTagSearchQuery('');
+                                                }}
+                                              >
+                                                <InlineStack gap="100" blockAlign="center">
+                                                  <Badge>{tag}</Badge>
+                                                  <Text as="span" variant="bodySm" tone="subdued">
+                                                    ({availableProducts.filter(p => p.tags?.includes(tag)).length} products)
+                                                  </Text>
+                                                </InlineStack>
+                                              </div>
+                                            ))
+                                          }
+                                        </InlineStack>
+                                      </div>
+                                    </div>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                      ({availableProducts.filter(p => p.tags?.some(tag => selectedTags.includes(tag))).length} products will be monitored)
+                                    </Text>
+                                  </BlockStack>
+                                </div>
+                              </Collapsible>
+                            </div>
+                          )}
+                        </BlockStack>
+                      </div>
+                    )}
                   </Card>
                   
                   <div style={{ minHeight: '400px', maxHeight: '600px', overflow: 'auto' }}>
@@ -1068,8 +1496,22 @@ export function Notifications({ isVisible }: NotificationsProps) {
                           setExpandedVariants([...expandedVariants, productId]);
                         }
                       }}
-                      onViewProduct={() => { /* Not used in notifications context */ }}
-                      onEditProduct={() => { /* Not used in notifications context */ }}
+                      onViewProduct={(product) => {
+                        // Open product in new tab/window
+                        const shopUrl = window.location.origin.includes('.myshopify.com') 
+                          ? window.location.origin 
+                          : 'https://admin.shopify.com';
+                        const productUrl = `${shopUrl}/admin/products/${product.id.replace('gid://shopify/Product/', '')}`;
+                        window.open(productUrl, '_blank');
+                      }}
+                      onEditProduct={(product) => {
+                        // Open product edit page in new tab/window
+                        const shopUrl = window.location.origin.includes('.myshopify.com') 
+                          ? window.location.origin 
+                          : 'https://admin.shopify.com';
+                        const editUrl = `${shopUrl}/admin/products/${product.id.replace('gid://shopify/Product/', '')}`;
+                        window.open(editUrl, '_blank');
+                      }}
                       totalCount={filteredProducts.length}
                     />
                   </div>
@@ -1098,9 +1540,8 @@ export function Notifications({ isVisible }: NotificationsProps) {
                       </InlineStack>
                     </Card>
                   )}
-                </BlockStack>
-              </BlockStack>
-            </Card>
+          </BlockStack>
+        )}
 
         {/* Selected Products Preview */}
         {selectedProducts.length > 0 && (
@@ -1229,8 +1670,6 @@ export function Notifications({ isVisible }: NotificationsProps) {
               Upgrade to monitor more products or manage your selections.
             </Text>
           </Banner>
-        )}
-          </BlockStack>
         )}
 
         <InlineStack align="end">

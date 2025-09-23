@@ -73,6 +73,9 @@ interface ProductTableProps {
   shopCurrency?: string;
   showVariantSelection?: boolean;
   totalCount?: number;
+  showStatusExplanation?: boolean;
+  statusColumnHeader?: string;
+  statusColumnContent?: (product: Product) => React.ReactNode;
 }
 
 export function ProductTable({
@@ -88,44 +91,34 @@ export function ProductTable({
   shopCurrency = '$',
   showVariantSelection = false,
   totalCount,
+  showStatusExplanation = true,
+  statusColumnHeader = "Status",
+  statusColumnContent,
 }: ProductTableProps) {
   
-  const getStatusDot = (status: string) => {
-    const getStatusConfig = () => {
-      switch (status.toUpperCase()) {
-        case 'ACTIVE':
-          return { color: '#22c55e', label: 'Active' };
-        case 'DRAFT':
-          return { color: '#f59e0b', label: 'Draft' };
-        case 'ARCHIVED':
-          return { color: '#ef4444', label: 'Archived' };
-        default:
-          return { color: '#6b7280', label: status };
-      }
-    };
-    
-    const { color, label } = getStatusConfig();
-    
-    return (
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        gap: '8px'
-      }}>
-        <div style={{
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          backgroundColor: color,
-          boxShadow: `0 0 0 2px ${color}20`
-        }} />
-        <Text as="span" variant="bodySm">
-          {label}
-        </Text>
-      </div>
-    );
+  const getStatusColor = (status: string) => {
+    switch (status.toUpperCase()) {
+      case 'ACTIVE':
+        return '#22c55e';
+      case 'DRAFT':
+        return '#f59e0b';
+      case 'ARCHIVED':
+        return '#ef4444';
+      default:
+        return '#6b7280';
+    }
   };
+
+  const StatusDot = ({ status }: { status: string }) => (
+    <div style={{
+      width: '8px',
+      height: '8px',
+      borderRadius: '50%',
+      backgroundColor: getStatusColor(status),
+      flexShrink: 0,
+      marginRight: '8px'
+    }} />
+  );
 
   const getInventoryDot = (inventory: number) => {
     const getInventoryConfig = () => {
@@ -210,18 +203,73 @@ export function ProductTable({
     }
   };
 
+  // Status legend component
+  const StatusLegend = () => {
+    if (!showStatusExplanation) return null;
+    
+    return (
+      <div style={{ 
+        marginBottom: '12px',
+        padding: '8px 12px',
+        backgroundColor: '#f9fafb',
+        borderRadius: '6px',
+        border: '1px solid #e5e7eb'
+      }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center',
+          gap: '6px',
+          flexWrap: 'wrap'
+        }}>
+          <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
+            Product Status:
+          </Text>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              backgroundColor: '#22c55e',
+            }} />
+            <Text as="span" variant="bodyXs" tone="subdued">Active</Text>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              backgroundColor: '#f59e0b',
+            }} />
+            <Text as="span" variant="bodyXs" tone="subdued">Draft</Text>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              backgroundColor: '#ef4444',
+            }} />
+            <Text as="span" variant="bodyXs" tone="subdued">Archived</Text>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div 
-      className="shared-product-table"
-      style={{ 
-        width: '100%',
-        maxWidth: '100%',
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
-        overflow: 'hidden',
-        backgroundColor: '#fff'
-      }}
-    >
+    <div>
+      <StatusLegend />
+      <div 
+        className="shared-product-table"
+        style={{ 
+          width: '100%',
+          maxWidth: '100%',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          backgroundColor: '#fff'
+        }}
+      >
       <table style={{ 
         width: '100%', 
         tableLayout: 'fixed',
@@ -252,7 +300,7 @@ export function ProductTable({
               textTransform: 'uppercase', 
               letterSpacing: '0.05em' 
             }}>
-              Status
+              {statusColumnHeader}
             </th>
             <th style={{ 
               width: '15%', 
@@ -338,6 +386,8 @@ export function ProductTable({
                         )}
                       </div>
                       
+                      <StatusDot status={product.status} />
+                      
                       {product.featuredMedia?.preview?.image ? (
                         <Thumbnail
                           source={product.featuredMedia.preview.image.url}
@@ -378,7 +428,7 @@ export function ProductTable({
                     color: '#111827', 
                     verticalAlign: 'middle' 
                   }}>
-                    {getStatusDot(product.status)}
+                    {statusColumnContent ? statusColumnContent(product) : null}
                   </td>
                   
                   {/* Inventory column */}
@@ -654,6 +704,7 @@ export function ProductTable({
           </Text>
         </div>
       )}
+    </div>
     </div>
   );
 }

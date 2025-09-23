@@ -640,9 +640,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         try {
           const { productId, collectionIds, operation } = update;
           
-          let mutation = '';
-          let variables: any = { productId };
-          
           if (operation === 'add') {
             // Add products to each collection
             console.log(`➕ Adding product ${productId} to collections:`, collectionIds);
@@ -792,8 +789,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       
       for (const productId of productIds) {
         try {
+          const variables: any = { id: productId, tags: tagsArray };
           let mutation = '';
-          let variables: any = { id: productId, tags: tagsArray };
           
           if (tagOperation === 'add') {
             mutation = `#graphql
