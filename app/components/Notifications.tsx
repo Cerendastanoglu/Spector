@@ -1029,16 +1029,24 @@ export function Notifications({ isVisible }: NotificationsProps) {
         <BlockStack gap="200">
           <InlineStack align="space-between" blockAlign="center">
             <BlockStack gap="100">
-              <Text as="h3" variant="headingMd">Step 1: Select Products & Configure Thresholds</Text>
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="h3" variant="headingMd">Step 1: Select Products & Configure Thresholds</Text>
+                <Badge tone="info" size="medium">
+                  {`${selectedProducts.length} of ${productLimit} selected`}
+                </Badge>
+              </InlineStack>
               <Text as="p" variant="bodySm" tone="subdued">
                 Choose which products to monitor for low stock alerts and configure alert thresholds.
               </Text>
             </BlockStack>
-            {(selectionMode === 'specific' || selectionMode === 'tags' || selectionMode === 'category') && (
-              <Badge tone="info" size="medium">
-                {`${selectedProducts.length} of ${productLimit} selected`}
-              </Badge>
-            )}
+            <Button 
+              onClick={loadProducts} 
+              loading={loading} 
+              variant="secondary"
+              size="slim"
+            >
+              Refresh Products
+            </Button>
           </InlineStack>
         </BlockStack>
 
