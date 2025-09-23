@@ -14,9 +14,6 @@ import {
   Checkbox,
   TextField,
   Select,
-  Thumbnail,
-  ResourceList,
-  ResourceItem,
   Box,
   Spinner,
   EmptyState,
@@ -168,6 +165,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('inventory');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   
   // Main Workflow Tab State (Step 1: Select Products -> Step 2: Bulk Edit)
   const [activeMainTab, setActiveMainTab] = useState(0);
@@ -234,11 +232,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     error?: boolean;
   }>({ show: false, message: '' });
   
-  const [descriptionOperation] = useState<'append' | 'prepend' | 'replace'>('append');
-  const [descriptionValue, setDescriptionValue] = useState('');
-  const [descriptionReplaceFrom, setDescriptionReplaceFrom] = useState('');
-  const [descriptionReplaceTo, setDescriptionReplaceTo] = useState('');
-  
   const [tagOperation, setTagOperation] = useState<'add' | 'remove' | 'replace'>('add');
   const [tagValue, setTagValue] = useState('');
   const [tagRemoveValue, setTagRemoveValue] = useState('');
@@ -265,7 +258,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
 
   
   // Status & Visibility State
-  const [newProductStatus, setNewProductStatus] = useState<'ACTIVE' | 'DRAFT' | 'ARCHIVED'>('ACTIVE');
 
   
   // Filter collections based on search query
@@ -317,15 +309,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   };
 
 
-
-  const getProductSelectionState = (productId: string): 'none' | 'some' | 'all' => {
-    const variantIds = getProductVariantIds(productId);
-    const selectedCount = selectedVariants.filter(variantId => variantIds.includes(variantId)).length;
-    
-    if (selectedCount === 0) return 'none';
-    if (selectedCount === variantIds.length) return 'all';
-    return 'some';
-  };
 
   const handleProductSelection = (productId: string, checked: boolean) => {
     const variantIds = getProductVariantIds(productId);
@@ -687,10 +670,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     return sortDirection === 'asc' ? comparison : -comparison;
   });
 
-  const handleBulkSelect = (productId: string, checked: boolean) => {
-    handleProductSelection(productId, checked);
-  };
-
   // Enhanced error handling helpers
   const clearBulkMessages = () => {
     setError(null);
@@ -1009,378 +988,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
   };
 
-  // Separate handler for regular pricing only
-  const handleBulkRegularPricing = async () => {
-    if (selectedVariants.length === 0) {
-      setError("Please select at least one variant to update pricing.");
-      return;
-    }
-    
-    // Validation based on operation type
-    if (priceOperation === 'set' && (!priceValue || parseFloat(priceValue) <= 0)) {
-      setError("Please enter a valid price greater than $0.");
-      return;
-    }
-    
-    if ((priceOperation === 'increase' || priceOperation === 'decrease') && (!pricePercentage || pricePercentage.trim() === '' || isNaN(parseFloat(pricePercentage)))) {
-      setError("Please enter a valid percentage for price adjustment.");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    
-    const failed: string[] = [];
-    const successful: string[] = [];
-    
-    try {
-      // Process each selected variant individually
-      const variantUpdates = [];
-      
-      for (let i = 0; i < selectedVariants.length; i++) {
-        const variantId = selectedVariants[i];
-        
-        // Find the product and variant
-        let targetProduct = null;
-        let targetVariant = null;
-        
-        for (const product of products) {
-          const variant = product.variants.edges.find(edge => edge.node.id === variantId);
-          if (variant) {
-            targetProduct = product;
-            targetVariant = variant.node;
-            break;
-          }
-        }
-
-        if (!targetProduct || !targetVariant) {
-          failed.push(`Variant ${variantId}: Product not found`);
-          continue;
-        }
-
-        try {
-          const currentPrice = parseFloat(targetVariant.price);
-
-          if (currentPrice === 0 && priceOperation !== 'set') {
-            failed.push(`${targetProduct.title} (${targetVariant.title}): No current price found. Please set a fixed price first.`);
-            continue;
-          }
-
-          let newPrice = currentPrice;
-
-          // Calculate new regular price
-          switch (priceOperation) {
-            case 'set':
-              newPrice = parseFloat(priceValue);
-              break;
-            case 'increase': {
-              const increasePercent = parseFloat(pricePercentage) || 0;
-              newPrice = currentPrice * (1 + increasePercent / 100);
-              break;
-            }
-            case 'decrease': {
-              const decreasePercent = parseFloat(pricePercentage) || 0;
-              newPrice = currentPrice * (1 - decreasePercent / 100);
-              break;
-            }
-            case 'round':
-              if (roundingRule === 'up') {
-                newPrice = Math.ceil(currentPrice);
-              } else if (roundingRule === 'down') {
-                newPrice = Math.floor(currentPrice);
-              } else {
-                newPrice = Math.round(currentPrice);
-              }
-              break;
-            case 'smart_round':
-              newPrice = applySmartRounding(currentPrice, roundingRule);
-              break;
-            default:
-              newPrice = currentPrice;
-          }
-
-          // Ensure minimum price
-          if (newPrice < 0.01) {
-            failed.push(`${targetProduct.title} (${targetVariant.title}): Calculated price ($${newPrice.toFixed(2)}) is below minimum ($0.01)`);
-            continue;
-          }
-
-          variantUpdates.push({
-            productId: targetProduct.id,
-            variantId: targetVariant.id,
-            productTitle: targetProduct.title,
-            price: newPrice.toFixed(2),
-            compareAtPrice: targetVariant.compareAtPrice // Keep existing compare price
-          });
-          
-          successful.push(`${targetProduct.title} (${targetVariant.title})`);
-          
-        } catch (error) {
-          console.error(`Error updating variant ${targetVariant.id}:`, error);
-          failed.push(`${targetProduct?.title || targetVariant.id} (${targetVariant.title}): ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      }
-
-      if (variantUpdates.length === 0) {
-        throw new Error('No variants could be updated. Please check the errors above.');
-      }
-      
-      // Make API call to update prices
-      const formData = new FormData();
-      formData.append('action', 'update-product-prices');
-      formData.append('updates', JSON.stringify(variantUpdates));
-      
-      const response = await fetch('/app/api/products', {
-        method: 'POST',
-        body: formData
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update prices');
-      }
-      
-      // Update UI immediately with new prices
-      if (result.success) {
-        setProducts(prevProducts => 
-          prevProducts.map(product => {
-            return {
-              ...product,
-              variants: {
-                ...product.variants,
-                edges: product.variants.edges.map(edge => {
-                  const variantUpdate = result.results.find((r: any) => r.variantId === edge.node.id);
-                  if (variantUpdate && variantUpdate.success) {
-                    return {
-                      ...edge,
-                      node: {
-                        ...edge.node,
-                        price: variantUpdate.newPrice || edge.node.price
-                      }
-                    };
-                  }
-                  return edge;
-                })
-              }
-            };
-          })
-        );
-      }
-      
-      // Handle results
-      const apiFailed = result.results.filter((r: any) => !r.success);
-      const apiSuccessful = result.results.filter((r: any) => r.success);
-      
-      if (apiFailed.length > 0) {
-        apiFailed.forEach((failure: any) => {
-          failed.push(`${failure.productId}: ${failure.error}`);
-        });
-      }
-      
-      if (apiSuccessful.length > 0) {
-        console.log(`✅ Successfully updated regular pricing for ${apiSuccessful.length} variants!`);
-      }
-      
-      if (failed.length > 0) {
-        console.log(`⚠️ ${apiSuccessful.length} variants updated successfully. ${failed.length} failed.`);
-        console.log("Failed operations:", failed);
-      }
-      
-      // Reset form only if completely successful
-      if (failed.length === 0) {
-        setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
-        setPriceValue('');
-        setPricePercentage('0');
-      }
-      
-    } catch (error) {
-      console.error('Bulk regular pricing error:', error);
-      setError(`Failed to update regular prices: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Separate handler for compare pricing only
-  const handleBulkComparePricing = async () => {
-    if (selectedVariants.length === 0) {
-      setError("Please select at least one variant to update compare pricing.");
-      return;
-    }
-    
-    // Validation based on operation type
-    if (compareOperation === 'set' && (!compareValue || parseFloat(compareValue) <= 0)) {
-      setError("Please enter a valid compare price greater than $0.");
-      return;
-    }
-    
-    if ((compareOperation === 'increase' || compareOperation === 'decrease') && (!comparePercentage || comparePercentage.trim() === '' || isNaN(parseFloat(comparePercentage)))) {
-      setError("Please enter a valid percentage for compare price adjustment.");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    
-    const failed: string[] = [];
-    const successful: string[] = [];
-    
-    try {
-      // Process each selected variant individually
-      const variantUpdates = [];
-      
-      for (let i = 0; i < selectedVariants.length; i++) {
-        const variantId = selectedVariants[i];
-        
-        // Find the product and variant
-        let targetProduct = null;
-        let targetVariant = null;
-        
-        for (const product of products) {
-          const variant = product.variants.edges.find(edge => edge.node.id === variantId);
-          if (variant) {
-            targetProduct = product;
-            targetVariant = variant.node;
-            break;
-          }
-        }
-
-        if (!targetProduct || !targetVariant) {
-          failed.push(`Variant ${variantId}: Product not found`);
-          continue;
-        }
-
-        try {
-          const currentComparePrice = targetVariant.compareAtPrice ? parseFloat(targetVariant.compareAtPrice) : null;
-          let newComparePrice = currentComparePrice;
-
-          // Calculate new compare price
-          switch (compareOperation) {
-            case 'set':
-              newComparePrice = parseFloat(compareValue);
-              break;
-            case 'increase':
-              if (currentComparePrice !== null) {
-                const compareIncreasePercent = parseFloat(comparePercentage) || 0;
-                newComparePrice = (currentComparePrice * (1 + compareIncreasePercent / 100));
-              } else {
-                console.log(`${targetProduct.title} (${targetVariant.title}): No existing compare price to increase`);
-                continue; // Skip this variant
-              }
-              break;
-            case 'decrease':
-              if (currentComparePrice !== null) {
-                const compareDecreasePercent = parseFloat(comparePercentage) || 0;
-                newComparePrice = (currentComparePrice * (1 - compareDecreasePercent / 100));
-              } else {
-                console.log(`${targetProduct.title} (${targetVariant.title}): No existing compare price to decrease`);
-                continue; // Skip this variant
-              }
-              break;
-            case 'remove':
-              newComparePrice = null;
-              break;
-          }
-
-          variantUpdates.push({
-            productId: targetProduct.id,
-            variantId: targetVariant.id,
-            productTitle: targetProduct.title,
-            price: targetVariant.price, // Keep existing regular price
-            compareAtPrice: newComparePrice
-          });
-          
-          successful.push(`${targetProduct.title} (${targetVariant.title})`);
-          
-        } catch (error) {
-          console.error(`Error updating variant ${targetVariant.id}:`, error);
-          failed.push(`${targetProduct?.title || targetVariant.id} (${targetVariant.title}): ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      }
-
-      if (variantUpdates.length === 0) {
-        throw new Error('No variants could be updated. Please check the errors above.');
-      }
-      
-      // Make API call to update prices
-      const formData = new FormData();
-      formData.append('action', 'update-product-prices');
-      formData.append('updates', JSON.stringify(variantUpdates));
-      
-      const response = await fetch('/app/api/products', {
-        method: 'POST',
-        body: formData
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update compare prices');
-      }
-      
-      // Update UI immediately with new compare prices
-      if (result.success) {
-        setProducts(prevProducts => 
-          prevProducts.map(product => {
-            return {
-              ...product,
-              variants: {
-                ...product.variants,
-                edges: product.variants.edges.map(edge => {
-                  const variantUpdate = result.results.find((r: any) => r.variantId === edge.node.id);
-                  if (variantUpdate && variantUpdate.success) {
-                    return {
-                      ...edge,
-                      node: {
-                        ...edge.node,
-                        compareAtPrice: variantUpdate.newCompareAtPrice !== undefined ? variantUpdate.newCompareAtPrice : edge.node.compareAtPrice
-                      }
-                    };
-                  }
-                  return edge;
-                })
-              }
-            };
-          })
-        );
-      }
-      
-      // Handle results
-      const apiFailed = result.results.filter((r: any) => !r.success);
-      const apiSuccessful = result.results.filter((r: any) => r.success);
-      
-      if (apiFailed.length > 0) {
-        apiFailed.forEach((failure: any) => {
-          failed.push(`${failure.productId}: ${failure.error}`);
-        });
-      }
-      
-      if (apiSuccessful.length > 0) {
-        console.log(`✅ Successfully updated compare pricing for ${apiSuccessful.length} variants!`);
-      }
-      
-      if (failed.length > 0) {
-        console.log(`⚠️ ${apiSuccessful.length} variants updated successfully. ${failed.length} failed.`);
-        console.log("Failed operations:", failed);
-      }
-      
-      // Reset form only if completely successful
-      if (failed.length === 0) {
-        setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
-        setCompareAtPrice('');
-        setCompareValue('');
-        setComparePercentage('0');
-        setApplyCompareChanges(false);
-      }
-      
-    } catch (error) {
-      console.error('Bulk compare pricing error:', error);
-      setError(`Failed to update compare prices: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // Enhanced Collection Management with Error Handling
   const handleBulkCollections = async () => {
@@ -1701,105 +1308,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
   };
 
-  const handleBulkDescriptionUpdate = async () => {
-    if (selectedProducts.length === 0) {
-      setError("Please select at least one product to update descriptions.");
-      return;
-    }
-    
-    // Validation based on operation type
-    if ((descriptionOperation === 'append' || descriptionOperation === 'prepend') && !descriptionValue) {
-      setError("Please enter description text to add.");
-      return;
-    }
-    
-    if (descriptionOperation === 'replace' && (!descriptionReplaceFrom || !descriptionReplaceTo)) {
-      setError("Please provide both find and replace text for description replacement.");
-      return;
-    }
-    
-    setIsLoading(true);
-    setError("");
-    
-    try {
-      const response = await fetch('/app/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'update-descriptions',
-          productIds: selectedProducts,
-          descriptionOperation,
-          descriptionValue,
-          descriptionReplaceFrom,
-          descriptionReplaceTo,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error Response:', errorText);
-        throw new Error(`Failed to update descriptions: ${errorText}`);
-      }
-      
-      const result = await response.json();
-
-      // Process results like other handlers
-      const successful: string[] = [];
-      const failed: string[] = [];
-      
-      if (result.results) {
-        result.results.forEach((resultItem: any) => {
-          if (resultItem.success) {
-            const product = products.find(p => p.id === resultItem.productId);
-            successful.push(product?.title || resultItem.productId);
-          } else {
-            failed.push(`${resultItem.productId}: ${resultItem.error}`);
-          }
-        });
-      }
-
-      // Update local state to reflect changes
-      if (result.success) {
-        // Fetch updated product data to refresh descriptions
-        await fetchAllProducts();
-      }
-      
-      let operationText = '';
-      if (descriptionOperation === 'append') {
-        operationText = `appended text to descriptions of`;
-      } else if (descriptionOperation === 'prepend') {
-        operationText = `prepended text to descriptions of`;
-      } else {
-        operationText = `replaced "${descriptionReplaceFrom}" with "${descriptionReplaceTo}" in descriptions of`;
-      }
-      
-      if (successful.length > 0) {
-        console.log(`✅ Successfully ${operationText} ${successful.length} products!`);
-      }
-      
-      if (failed.length > 0) {
-        console.log(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
-        console.log("Failed operations:", failed);
-      }
-      
-      // Clear form only if completely successful
-      if (failed.length === 0) {
-        setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
-        setDescriptionValue('');
-        setDescriptionReplaceFrom('');
-        setDescriptionReplaceTo('');
-      }
-      
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update descriptions';
-      console.error('Failed to update descriptions:', error);
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleBulkInventoryUpdate = async () => {
     if (selectedVariants.length === 0) {
@@ -2085,94 +1593,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
   };
 
-  // Bulk Status Handler
-  const handleBulkStatus = async () => {
-    if (selectedProducts.length === 0) {
-      setError("Please select at least one product to update status.");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const formData = new FormData();
-      formData.append('action', 'update-status');
-      formData.append('productIds', JSON.stringify(selectedProducts));
-      formData.append('status', newProductStatus);
-
-      const response = await fetch('/app/api/products', {
-        method: 'POST',
-        body: formData
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update product status');
-      }
-
-      // Update UI with new status
-      if (result.success) {
-        setProducts(prevProducts =>
-          prevProducts.map(product => {
-            if (selectedProducts.includes(product.id)) {
-              return {
-                ...product,
-                status: newProductStatus
-              };
-            }
-            return product;
-          })
-        );
-
-        setNotification({
-          show: true,
-          message: `Successfully updated status to ${newProductStatus} for ${selectedProducts.length} product${selectedProducts.length > 1 ? 's' : ''}`,
-          error: false
-        });
-      }
-
-    } catch (error) {
-      console.error('Failed to update status:', error);
-      setError(`Failed to update status: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Load available collections from Shopify API
-  const loadCollections = async () => {
-    try {
-      console.log('Loading collections from Shopify...');
-      
-      const formData = new FormData();
-      formData.append('action', 'fetch-collections');
-      
-      const response = await fetch('/app/api/products', {
-        method: 'POST',
-        body: formData
-      });
-      
-      const result = await response.json();
-      
-      if (response.ok && result.collections) {
-        const collections = result.collections.edges.map((edge: any) => ({
-          id: edge.node.id,
-          title: edge.node.title
-        }));
-        setAvailableCollections(collections);
-        console.log('Collections loaded:', collections.length);
-      } else {
-        throw new Error(result.error || 'Failed to fetch collections');
-      }
-    } catch (error) {
-      console.error('Failed to load collections:', error);
-      setError('Failed to load collections');
-      // Fallback to empty array so the UI doesn't break
-      setAvailableCollections([]);
-    }
-  };
 
   // Load store currency from Shopify API
   const loadStoreCurrency = async () => {
@@ -2236,22 +1656,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
   };
 
-  // Load collections and currency on component mount
+  // Load currency on component mount
   useEffect(() => {
-    loadCollections();
     loadStoreCurrency();
-  }, []);
-
-  // Load collections when products are selected (for bulk operations)
-  useEffect(() => {
-    if (selectedProducts.length > 0) {
-      loadCollections();
-    }
-  }, [selectedProducts.length]);
-
-  // Load collections on component mount
-  useEffect(() => {
-    loadCollections();
   }, []);
 
   // const handleDraftSelected = () => {
@@ -2370,412 +1777,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   //   });
   // };
 
-  const getBadgeTone = (inventory: number): 'critical' | 'warning' | 'success' => {
-    if (inventory === 0) return 'critical';
-    if (inventory <= ProductConstants.CRITICAL_THRESHOLD) return 'critical';
-    if (inventory <= ProductConstants.LOW_STOCK_THRESHOLD) return 'warning';
-    return 'success';
-  };
-
-
-
   // Helper functions for product results selection
 
 
 
 
-  const renderCardView = () => {
-    const paginatedProducts = filteredProducts.slice(0, productsPerPage);
-    return (
-      <div style={{ 
-        animation: 'fadeIn 0.3s ease-in-out',
-        transition: 'all 0.2s ease-in-out'
-      }}>
-        <ResourceList
-          items={paginatedProducts}
-          renderItem={(product) => {
-            const inventory = product.totalInventory;
-            const isSelected = getProductSelectionState(product.id) !== 'none';
-            return (
-              <div style={{
-                transition: 'all 0.2s ease-in-out',
-                transform: isSelected ? 'scale(1.02)' : 'scale(1)',
-                boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
-                borderRadius: '8px',
-                overflow: 'hidden'
-              }}>
-                <ResourceItem
-                  id={product.id}
-                  media={
-                    <div style={{
-                      transition: 'transform 0.2s ease-in-out',
-                      borderRadius: '6px',
-                      overflow: 'hidden'
-                    }}>
-                      <Thumbnail
-                        source={product.featuredMedia?.preview?.image?.url || ProductIcon}
-                        alt={product.featuredMedia?.preview?.image?.altText || product.title}
-                      />
-                    </div>
-                  }
-                  accessibilityLabel={`View details for ${product.title}`}
-                  onClick={() => {
-                    // View product details - placeholder for future implementation
-                  }}
-                >
-                  <BlockStack gap="200">
-                {/* Main Row: Checkbox, Title, Status, Stock, and Actions */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
-                    <Checkbox
-                      checked={getProductSelectionState(product.id) !== 'none'}
-                      onChange={(checked) => handleBulkSelect(product.id, checked)}
-                      label=""
-                    />
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px',
-                      flex: 1, 
-                      minWidth: 0 
-                    }}>
-                      <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: product.status === 'ACTIVE' ? '#4CAF50' : product.status === 'DRAFT' ? '#FFC107' : '#9E9E9E',
-                        flexShrink: 0
-                      }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div 
-                          style={{ 
-                            overflow: 'hidden',
-                            position: 'relative',
-                            marginBottom: '4px'
-                          }}
-                          className="product-title-container"
-                        >
-                          <div 
-                            style={{ 
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              transition: 'transform 0.3s ease-in-out'
-                            }}
-                            className="product-title-text"
-                            onMouseEnter={(e) => {
-                              const container = e.currentTarget.parentElement;
-                              const containerWidth = container?.offsetWidth || 0;
-                              const textWidth = e.currentTarget.scrollWidth;
-                              if (textWidth > containerWidth) {
-                                const scrollDistance = textWidth - containerWidth + 20;
-                                e.currentTarget.style.transform = `translateX(-${scrollDistance}px)`;
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'translateX(0)';
-                            }}
-                          >
-                            <Text as="h3" variant="bodyMd" fontWeight="semibold">
-                              {product.title}
-                            </Text>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Text as="p" variant="bodySm" tone="subdued">
-                            ${(() => {
-                              const prices = product.variants.edges.map(edge => parseFloat(edge.node.price));
-                              const minPrice = Math.min(...prices);
-                              const maxPrice = Math.max(...prices);
-                              return minPrice === maxPrice ? minPrice.toFixed(2) : `${minPrice.toFixed(2)} - ${maxPrice.toFixed(2)}`;
-                            })()}
-                          </Text>
-                          {(() => {
-                            const comparePrice = product.variants.edges[0]?.node.compareAtPrice;
-                            if (comparePrice && parseFloat(comparePrice) > parseFloat(product.variants.edges[0].node.price)) {
-                              return (
-                                <Text as="span" variant="bodyXs" tone="subdued">
-                                  <span style={{ textDecoration: 'line-through' }}>
-                                    ${parseFloat(comparePrice).toFixed(2)}
-                                  </span>
-                                </Text>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                    <Badge tone={getBadgeTone(inventory)}>
-                      {`${inventory}`}
-                    </Badge>
-
-                    {/* Only show expand button for products with multiple variants */}
-                    {product.variants.edges.length > 1 && (
-                      <Button
-                        icon={expandedProducts.has(product.id) ? ChevronUpIcon : ChevronDownIcon}
-                        variant="plain"
-                        size="slim"
-                        onClick={() => toggleProductExpansion(product.id)}
-                        accessibilityLabel={`${expandedProducts.has(product.id) ? 'Collapse' : 'Expand'} product details`}
-                      />
-                    )}
-                    <Button
-                      icon={ViewIcon}
-                      variant="plain"
-                      size="slim"
-                      onClick={() => navigateToProduct(product, 'storefront')}
-                      accessibilityLabel={`${product.status === 'ACTIVE' ? 'View live' : 'View admin'} ${product.title}`}
-                    />
-                  </div>
-                </div>
-
-                {/* Enhanced Expandable Details Section - Only for products with multiple variants */}
-                {expandedProducts.has(product.id) && product.variants.edges.length > 1 && (
-                  <Box paddingBlockStart="300" paddingInlineStart="400">
-                    <div style={{ minHeight: '320px' }}>
-                      <Card background="bg-surface-secondary" padding="400">
-                      <BlockStack gap="400">
-                        {/* Quick Actions Bar */}
-                        <InlineStack gap="200" wrap>
-                          <Button
-                            variant="tertiary"
-                            size="slim"
-                            onClick={() => window.open(product.adminUrl, '_blank')}
-                            disabled={!product.adminUrl}
-                          >
-                            Edit in Admin
-                          </Button>
-                          <Button
-                            variant="tertiary"
-                            size="slim"
-                            onClick={() => window.open(product.storefrontUrl, '_blank')}
-                            disabled={!product.storefrontUrl}
-                          >
-                            View Store
-                          </Button>
-                          <Button
-                            variant="tertiary"
-                            size="slim"
-                            onClick={() => {
-                              const newSelected = selectedProducts.includes(product.id) 
-                                ? selectedProducts.filter(id => id !== product.id)
-                                : [...selectedProducts, product.id];
-                              setSelectedProducts(newSelected);
-                            }}
-                            tone={selectedProducts.includes(product.id) ? 'critical' : 'success'}
-                          >
-                            {selectedProducts.includes(product.id) ? 'Deselect' : 'Select'} Product
-                          </Button>
-                        </InlineStack>
-
-                        {/* Product Info Grid - Only show when there are multiple variants */}
-                        {product.variants.edges.length > 1 && (
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                            gap: '20px'
-                          }}>
-                            {/* Basic Details */}
-                            <BlockStack gap="200">
-                              <Text as="p" variant="bodySm" fontWeight="medium">Product Details</Text>
-                              <BlockStack gap="100">
-                                <InlineStack gap="200" blockAlign="center">
-                                  <Text as="span" variant="bodyXs" fontWeight="medium">Handle:</Text>
-                                  <Text as="span" variant="bodyXs" tone="subdued">{product.handle}</Text>
-                                </InlineStack>
-
-                                <InlineStack gap="200" blockAlign="center">
-                                  <Text as="span" variant="bodyXs" fontWeight="medium">ID:</Text>
-                                  <Text as="span" variant="bodyXs" tone="subdued">{product.id.slice(-8)}</Text>
-                                </InlineStack>
-                              </BlockStack>
-                            </BlockStack>
-
-                            {/* Pricing Summary */}
-                            <BlockStack gap="200">
-                              <Text as="p" variant="bodySm" fontWeight="medium">Pricing Overview</Text>
-                              <BlockStack gap="100">
-                                <InlineStack gap="200" blockAlign="center">
-                                  <Text as="span" variant="bodyXs" fontWeight="medium">Price Range:</Text>
-                                  <Text as="span" variant="bodyXs" tone="subdued">
-                                    ${Math.min(...product.variants.edges.map(v => parseFloat(v.node.price)))} - 
-                                    ${Math.max(...product.variants.edges.map(v => parseFloat(v.node.price)))}
-                                  </Text>
-                                </InlineStack>
-                                <InlineStack gap="200" blockAlign="center">
-                                  <Text as="span" variant="bodyXs" fontWeight="medium">Variants:</Text>
-                                  <Text as="span" variant="bodyXs" tone="subdued">{product.variants.edges.length}</Text>
-                                </InlineStack>
-                                <InlineStack gap="200" blockAlign="center">
-                                  <Text as="span" variant="bodyXs" fontWeight="medium">Total Stock:</Text>
-                                  <Text as="span" variant="bodyXs" tone="subdued">{product.totalInventory}</Text>
-                                </InlineStack>
-                              </BlockStack>
-                            </BlockStack>
-
-                            {/* URLs & Links */}
-                            <BlockStack gap="200">
-                              <Text as="p" variant="bodySm" fontWeight="medium">Links & Access</Text>
-                              <BlockStack gap="100">
-                                <InlineStack gap="200" blockAlign="center">
-                                  <Text as="span" variant="bodyXs" fontWeight="medium">Admin URL:</Text>
-                                  <Text as="span" variant="bodyXs" tone="subdued">
-                                    {product.adminUrl ? 'Available' : 'Not available'}
-                                  </Text>
-                                </InlineStack>
-                                <InlineStack gap="200" blockAlign="center">
-                                  <Text as="span" variant="bodyXs" fontWeight="medium">Store URL:</Text>
-                                  <Text as="span" variant="bodyXs" tone="subdued">
-                                    {product.storefrontUrl ? 'Available' : 'Not available'}
-                                  </Text>
-                                </InlineStack>
-                                <InlineStack gap="200" blockAlign="center">
-                                  <Text as="span" variant="bodyXs" fontWeight="medium">Has Image:</Text>
-                                  <Text as="span" variant="bodyXs" tone="subdued">
-                                    {product.featuredMedia?.preview?.image ? 'Yes' : 'No'}
-                                  </Text>
-                                </InlineStack>
-                              </BlockStack>
-                            </BlockStack>
-
-                            {/* Tags Section */}
-                            {product.tags && product.tags.length > 0 && (
-                              <BlockStack gap="200">
-                                <Text as="p" variant="bodySm" fontWeight="medium">Tags</Text>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                  {product.tags.slice(0, 6).map((tag, index) => (
-                                    <div
-                                      key={index}
-                                      style={{
-                                        backgroundColor: '#f3f4f6',
-                                        padding: '2px 8px',
-                                        borderRadius: '12px',
-                                        fontSize: '12px',
-                                        color: '#374151',
-                                        border: '1px solid #e5e7eb'
-                                      }}
-                                    >
-                                      {tag}
-                                    </div>
-                                  ))}
-                                  {product.tags.length > 6 && (
-                                    <div
-                                      style={{
-                                        backgroundColor: '#f3f4f6',
-                                        padding: '2px 8px',
-                                        borderRadius: '12px',
-                                        fontSize: '12px',
-                                        color: '#6b7280',
-                                        border: '1px solid #e5e7eb'
-                                      }}
-                                    >
-                                      +{product.tags.length - 6} more
-                                    </div>
-                                  )}
-                                </div>
-                              </BlockStack>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Variant Management Section */}
-                        {product.variants.edges.length > 0 && (
-                          <BlockStack gap="300">
-                            <InlineStack align="space-between" blockAlign="center">
-                              <Text as="p" variant="bodySm" fontWeight="medium">
-                                Variant Management ({product.variants.edges.length} variants)
-                              </Text>
-                              <Button
-                                variant="plain"
-                                size="slim"
-                                onClick={() => handleProductSelection(product.id, true)}
-                                disabled={getProductSelectionState(product.id) === 'all'}
-                              >
-                                {getProductSelectionState(product.id) === 'all' ? 'All Selected' : 'Select All Variants'}
-                              </Button>
-                            </InlineStack>
-                            
-                            <div style={{ 
-                              display: 'grid', 
-                              gridTemplateColumns: 'auto 1fr auto auto auto auto', 
-                              gap: '8px 12px',
-                              alignItems: 'center',
-                              fontSize: '12px',
-                              maxHeight: '200px',
-                              overflowY: 'auto',
-                              backgroundColor: 'var(--p-color-bg-surface)',
-                              padding: '12px',
-                              borderRadius: '6px'
-                            }}>
-                              {/* Headers */}
-                              <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">Select</Text>
-                              <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">Variant</Text>
-                              <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">Price</Text>
-                              <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">Stock</Text>
-                              <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">SKU</Text>
-                              <Text as="span" variant="bodyXs" fontWeight="medium" tone="subdued">Actions</Text>
-                              
-                              {/* Variant rows */}
-                              {product.variants.edges.map((variant) => (
-                                <>
-                                  <Checkbox
-                                    key={`${variant.node.id}-checkbox`}
-                                    label=""
-                                    checked={selectedVariants.includes(variant.node.id)}
-                                    onChange={(checked) => handleVariantSelection(product.id, variant.node.id, checked)}
-                                  />
-                                  <Text key={`${variant.node.id}-title`} as="span" variant="bodyXs">
-                                    {variant.node.title !== 'Default Title' ? variant.node.title : 'Default'}
-                                  </Text>
-                                  <Text key={`${variant.node.id}-price`} as="span" variant="bodyXs" fontWeight="medium">
-                                    ${variant.node.price}
-                                  </Text>
-                                  <Text 
-                                    key={`${variant.node.id}-stock`} 
-                                    as="span" 
-                                    variant="bodyXs"
-                                    tone={variant.node.inventoryQuantity === 0 ? 'critical' : 'success'}
-                                  >
-                                    {variant.node.inventoryQuantity || 0}
-                                  </Text>
-                                  <Text key={`${variant.node.id}-sku`} as="span" variant="bodyXs" tone="subdued">
-                                    {variant.node.sku || '-'}
-                                  </Text>
-                                  <Button
-                                    key={`${variant.node.id}-edit`}
-                                    variant="plain"
-                                    size="slim"
-                                    onClick={() => {
-                                      // Copy variant ID to clipboard for easy access
-                                      navigator.clipboard.writeText(variant.node.id);
-                                    }}
-                                  >
-                                    Copy ID
-                                  </Button>
-                                </>
-                              ))}
-                            </div>
-                          </BlockStack>
-                        )}
-
-
-                      </BlockStack>
-                    </Card>
-                    </div>
-                  </Box>
-                )}
-              </BlockStack>
-            </ResourceItem>
-              </div>
-          );
-        }}
-      />
-      </div>
-    );
-  };
 
   if (!isVisible) {
     return null;
@@ -3155,20 +2161,32 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
               </InlineStack>
 
               {/* Modern Compact Search and Filter Section */}
-              <div style={{ 
-                border: '1px solid #e1e3e5', 
-                borderRadius: '12px', 
-                padding: '20px',
-                backgroundColor: '#fafbfb'
-              }}>
-                <BlockStack gap="300">
-                  {/* Header */}
+              <Card padding="0">
+                <button
+                  onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    padding: '16px 20px',
+                    textAlign: 'left'
+                  }}
+                >
                   <InlineStack align="space-between" blockAlign="center">
                     <InlineStack gap="200" blockAlign="center">
                       <Icon source={SearchIcon} />
                       <Text as="h3" variant="headingXs">Filters & Search</Text>
                     </InlineStack>
+                    <div style={{ marginLeft: 'auto' }}>
+                      <Icon source={isFiltersOpen ? ChevronUpIcon : ChevronDownIcon} />
+                    </div>
                   </InlineStack>
+                </button>
+                
+                {isFiltersOpen && (
+                  <div style={{ padding: '0 20px 20px 20px' }}>
+                    <BlockStack gap="300">
 
                 {/* Search */}
                 <TextField
@@ -3566,8 +2584,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                     </InlineStack>
                   </InlineStack>
                 </div>
-                </BlockStack>
-              </div>
+                    </BlockStack>
+                  </div>
+                )}
+              </Card>
             </BlockStack>
 
             {/* Product Selection Table */}
