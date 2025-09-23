@@ -21,7 +21,6 @@ import {
   Checkbox,
   DataTable,
   EmptyState,
-  Collapsible,
 } from "@shopify/polaris";
 import {
   RefreshIcon,
@@ -32,12 +31,17 @@ import {
   AlertCircleIcon,
   InfoIcon,
   ClockIcon,
-  // PackageIcon,
   CheckIcon,
   AlertTriangleIcon,
   XIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  SearchIcon,
+  FilterIcon,
+  InventoryIcon,
+  EditIcon,
+  ViewIcon,
+  MenuHorizontalIcon,
 } from "@shopify/polaris-icons";
 
 interface DashboardProps {
@@ -113,6 +117,14 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   const [isManualRefresh, setIsManualRefresh] = useState(false);
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
+  
+  // Inventory Forecasting State
+  const [inventorySearchQuery, setInventorySearchQuery] = useState('');
+  const [inventoryCategory, setInventoryCategory] = useState('all');
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+  const [showCriticalOnly, setShowCriticalOnly] = useState(false);
+  const [sortInventoryBy, setSortInventoryBy] = useState('forecast_days');
+  const [inventoryLoading, setInventoryLoading] = useState(false);
   
   // Inventory filtering state
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -902,63 +914,423 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   };
 
   const renderInventoryTab = () => {
+    // Mock data for inventory forecasting (will be replaced with real API calls)
+    const mockInventoryData = [
+      {
+        id: '1',
+        title: 'Premium Cotton T-Shirt',
+        sku: 'TCT-001',
+        currentStock: 5,
+        averageDailyDemand: 2.3,
+        forecastDays: 2,
+        reorderPoint: 15,
+        status: 'critical',
+        vendor: 'Cotton Co.',
+        category: 'Clothing',
+        lastOrderDate: '2024-09-15',
+        suggestedReorderQuantity: 50
+      },
+      {
+        id: '2', 
+        title: 'Wireless Bluetooth Headphones',
+        sku: 'WBH-002',
+        currentStock: 23,
+        averageDailyDemand: 1.8,
+        forecastDays: 13,
+        reorderPoint: 20,
+        status: 'low',
+        vendor: 'Audio Tech',
+        category: 'Electronics',
+        lastOrderDate: '2024-09-10',
+        suggestedReorderQuantity: 30
+      },
+      {
+        id: '3',
+        title: 'Organic Face Moisturizer',
+        sku: 'OFM-003', 
+        currentStock: 45,
+        averageDailyDemand: 1.2,
+        forecastDays: 38,
+        reorderPoint: 25,
+        status: 'healthy',
+        vendor: 'Beauty Supply',
+        category: 'Beauty',
+        lastOrderDate: '2024-08-30',
+        suggestedReorderQuantity: 40
+      },
+      {
+        id: '4',
+        title: 'Stainless Steel Water Bottle',
+        sku: 'SSWB-004',
+        currentStock: 8,
+        averageDailyDemand: 3.1,
+        forecastDays: 3,
+        reorderPoint: 18,
+        status: 'critical',
+        vendor: 'DrinkWare Ltd',
+        category: 'Home & Garden',
+        lastOrderDate: '2024-09-12',
+        suggestedReorderQuantity: 60
+      },
+      {
+        id: '5',
+        title: 'Yoga Mat - Premium',
+        sku: 'YMP-005',
+        currentStock: 15,
+        averageDailyDemand: 0.8,
+        forecastDays: 19,
+        reorderPoint: 12,
+        status: 'low',
+        vendor: 'Fitness Pro',
+        category: 'Sports',
+        lastOrderDate: '2024-09-05',
+        suggestedReorderQuantity: 25
+      }
+    ];
+
+    // Filter and sort logic
+    const getFilteredData = () => {
+      let filtered = mockInventoryData;
+
+      // Search filter
+      if (inventorySearchQuery) {
+        filtered = filtered.filter(item => 
+          item.title.toLowerCase().includes(inventorySearchQuery.toLowerCase()) ||
+          item.sku.toLowerCase().includes(inventorySearchQuery.toLowerCase()) ||
+          item.vendor.toLowerCase().includes(inventorySearchQuery.toLowerCase())
+        );
+      }
+
+      // Category filter
+      if (inventoryCategory !== 'all') {
+        filtered = filtered.filter(item => item.category === inventoryCategory);
+      }
+
+      // Status filters
+      if (showLowStockOnly) {
+        filtered = filtered.filter(item => item.status === 'low' || item.status === 'critical');
+      }
+
+      if (showCriticalOnly) {
+        filtered = filtered.filter(item => item.status === 'critical');
+      }
+
+      // Sort
+      filtered.sort((a, b) => {
+        switch (sortInventoryBy) {
+          case 'forecast_days':
+            return a.forecastDays - b.forecastDays;
+          case 'current_stock':
+            return a.currentStock - b.currentStock;
+          case 'title':
+            return a.title.localeCompare(b.title);
+          case 'category':
+            return a.category.localeCompare(b.category);
+          default:
+            return a.forecastDays - b.forecastDays;
+        }
+      });
+
+      return filtered;
+    };
+
+    const filteredData = getFilteredData();
+
+    const getStatusBadge = (status: string, days: number) => {
+      switch (status) {
+        case 'critical':
+          return <Badge tone="critical">{`Critical (${days}d left)`}</Badge>;
+        case 'low':
+          return <Badge tone="warning">{`Low Stock (${days}d left)`}</Badge>;
+        case 'healthy':
+          return <Badge tone="success">{`Healthy (${days}d left)`}</Badge>;
+        default:
+          return <Badge>Unknown</Badge>;
+      }
+    };
+
+    const categories = ['all', ...Array.from(new Set(mockInventoryData.map(item => item.category)))];
+
     return (
-      <Card>
-        <BlockStack gap="600" align="center">
-          <Box padding="800">
-            <BlockStack gap="500" align="center">
-              <Box 
-                background="bg-fill-warning" 
-                padding="600" 
-                borderRadius="200"
-              >
-                <Icon source={AlertTriangleIcon} tone="base" />
-              </Box>
-              
-              <BlockStack gap="300" align="center">
+      <BlockStack gap="500">
+        {/* Header */}
+        <Card>
+          <BlockStack gap="400">
+            <InlineStack align="space-between" blockAlign="center">
+              <BlockStack gap="200">
                 <Text as="h2" variant="headingLg" fontWeight="bold">
                   Inventory Forecasting
                 </Text>
-                <Text as="p" variant="bodyLg" tone="subdued" alignment="center">
-                  In Development
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Predict when products will run out and optimize reorder points
                 </Text>
               </BlockStack>
-              
-              <BlockStack gap="400" align="center">
-                <Text as="p" variant="bodyMd" alignment="center" tone="subdued">
-                  Advanced inventory forecasting requires order history data to predict stock-outs, 
-                  calculate reorder points, and optimize inventory levels. This feature is currently 
-                  being developed and will be available soon.
-                </Text>
+              <Button
+                icon={RefreshIcon}
+                loading={inventoryLoading}
+                onClick={() => {
+                  setInventoryLoading(true);
+                  // Simulate API call
+                  setTimeout(() => setInventoryLoading(false), 1000);
+                }}
+              >
+                Refresh Forecast
+              </Button>
+            </InlineStack>
+          </BlockStack>
+        </Card>
+
+        {/* Enhanced Filters */}
+        <Card>
+          <BlockStack gap="400">
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="h3" variant="headingMd" fontWeight="semibold">
+                Filters & Search
+              </Text>
+              <Button
+                icon={FilterIcon}
+                variant="tertiary"
+                onClick={() => {
+                  setInventorySearchQuery('');
+                  setInventoryCategory('all');
+                  setShowLowStockOnly(false);
+                  setShowCriticalOnly(false);
+                  setSortInventoryBy('forecast_days');
+                }}
+              >
+                Clear All
+              </Button>
+            </InlineStack>
+
+            {/* Search and Basic Filters */}
+            <InlineStack gap="400" wrap>
+              <Box minWidth="300px">
+                <TextField
+                  label="Search products"
+                  value={inventorySearchQuery}
+                  onChange={setInventorySearchQuery}
+                  placeholder="Search by name, SKU, or vendor..."
+                  prefix={<Icon source={SearchIcon} />}
+                  clearButton
+                  onClearButtonClick={() => setInventorySearchQuery('')}
+                  autoComplete="off"
+                />
+              </Box>
+
+              <Box minWidth="200px">
+                <Select
+                  label="Stock Status"
+                  options={[
+                    { label: 'All Products', value: 'all' },
+                    { label: 'Critical Stock (≤7 days)', value: 'critical' },
+                    { label: 'Low Stock (8-14 days)', value: 'low' },
+                    { label: 'Healthy Stock (>14 days)', value: 'healthy' }
+                  ]}
+                  value={inventoryCategory}
+                  onChange={setInventoryCategory}
+                />
+              </Box>
+
+              <Box minWidth="200px">
+                <Select
+                  label="Category"
+                  options={categories.map(cat => ({
+                    label: cat === 'all' ? 'All Categories' : cat,
+                    value: cat
+                  }))}
+                  value={inventoryCategory}
+                  onChange={setInventoryCategory}
+                />
+              </Box>
+
+              <Box minWidth="180px">
+                <Select
+                  label="Stock Level"
+                  options={[
+                    { label: 'All Levels', value: 'all' },
+                    { label: 'Out of Stock', value: 'out_of_stock' },
+                    { label: 'Low Stock (< 20)', value: 'low_quantity' },
+                    { label: 'Well Stocked (≥ 20)', value: 'well_stocked' }
+                  ]}
+                  value={inventoryCategory}
+                  onChange={setInventoryCategory}
+                />
+              </Box>
+            </InlineStack>
+
+            {/* Advanced Filters */}
+            <BlockStack gap="300">
+              <Text as="p" variant="bodyMd" fontWeight="semibold">
+                Quick Filters
+              </Text>
                 
-                <Box padding="400" background="bg-surface-secondary" borderRadius="300">
-                  <BlockStack gap="300">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">
-                      🚀 Coming Soon:
-                    </Text>
-                    <BlockStack gap="200">
-                      <Text as="p" variant="bodySm" tone="subdued">• AI-powered stock-out predictions</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">• Automated reorder point calculations</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">• Seasonal demand forecasting</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">• Smart inventory optimization</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">• Low stock alerts & notifications</Text>
-                    </BlockStack>
-                  </BlockStack>
-                </Box>
-                
-                <Box padding="300" background="bg-surface-info" borderRadius="200">
-                  <InlineStack gap="200" blockAlign="center">
-                    <Icon source={InfoIcon} tone="info" />
-                    <Text as="p" variant="bodySm">
-                      Order data integration required for accurate forecasting
-                    </Text>
-                  </InlineStack>
-                </Box>
-              </BlockStack>
+              <InlineStack gap="400" wrap>
+                <Checkbox
+                  label="Critical stock alerts only"
+                  checked={showCriticalOnly}
+                  onChange={setShowCriticalOnly}
+                />
+                <Checkbox
+                  label="Needs reorder"
+                  checked={showLowStockOnly}
+                  onChange={setShowLowStockOnly}
+                />
+              </InlineStack>
             </BlockStack>
-          </Box>
-        </BlockStack>
-      </Card>
+          </BlockStack>
+        </Card>
+
+
+
+        {/* Inventory Table */}
+        <Card>
+          <BlockStack gap="400">
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="h3" variant="headingMd" fontWeight="semibold">
+                Inventory Forecast ({filteredData.length} products)
+              </Text>
+              {filteredData.length > 0 && (
+                <InlineStack gap="200" blockAlign="center">
+                  <Icon source={ChartVerticalIcon} tone="subdued" />
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Sorted by {sortInventoryBy.replace('_', ' ')}
+                  </Text>
+                </InlineStack>
+              )}
+            </InlineStack>
+
+            {filteredData.length === 0 ? (
+              <EmptyState
+                heading="No products found"
+                action={{
+                  content: 'Clear filters',
+                  onAction: () => {
+                    setInventorySearchQuery('');
+                    setInventoryCategory('all');
+                    setShowLowStockOnly(false);
+                    setShowCriticalOnly(false);
+                  }
+                }}
+                image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+              >
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  Try adjusting your search or filter criteria to find products.
+                </Text>
+              </EmptyState>
+            ) : (
+              <div style={{ overflow: 'hidden' }}>
+                <DataTable
+                  columnContentTypes={['text', 'text', 'numeric', 'text', 'numeric', 'text', 'text']}
+                  headings={[
+                    'Product',
+                    'SKU',
+                    'Current Stock',
+                    'Status',
+                    'Forecast Days',
+                    'Daily Demand',
+                    'Actions'
+                  ]}
+                  rows={filteredData.map(item => [
+                    <BlockStack gap="100" key={item.id}>
+                      <Text as="p" variant="bodyMd" fontWeight="semibold">
+                        {item.title}
+                      </Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {item.vendor} • {item.category}
+                      </Text>
+                    </BlockStack>,
+                    <Text as="p" variant="bodyMd" fontWeight="medium">
+                      {item.sku}
+                    </Text>,
+                    <Text as="p" variant="bodyMd">
+                      {item.currentStock} units
+                    </Text>,
+                    getStatusBadge(item.status, item.forecastDays),
+                    <Text as="p" variant="bodyMd" fontWeight="medium">
+                      {item.forecastDays} days
+                    </Text>,
+                    <Text as="p" variant="bodyMd">
+                      {item.averageDailyDemand} units/day
+                    </Text>,
+                    <InlineStack gap="200">
+                      <Tooltip content="View details">
+                        <Button
+                          icon={ViewIcon}
+                          variant="tertiary"
+                          size="slim"
+                          onClick={() => console.log('View inventory item:', item.id)}
+                        />
+                      </Tooltip>
+                      <Tooltip content="Edit product">
+                        <Button
+                          icon={EditIcon}
+                          variant="tertiary"
+                          size="slim"
+                          onClick={() => console.log('Edit inventory item:', item.id)}
+                        />
+                      </Tooltip>
+                      <Tooltip content="More actions">
+                        <Button
+                          icon={MenuHorizontalIcon}
+                          variant="tertiary"
+                          size="slim"
+                          onClick={() => console.log('More actions for item:', item.id)}
+                        />
+                      </Tooltip>
+                    </InlineStack>
+                  ])}
+                />
+              </div>
+            )}
+          </BlockStack>
+        </Card>
+
+        {/* Additional Info */}
+        <Card>
+          <BlockStack gap="300">
+            <Text as="h3" variant="headingMd" fontWeight="semibold">
+              How Forecasting Works
+            </Text>
+            <BlockStack gap="200">
+              <InlineStack gap="200" blockAlign="start">
+                <Icon source={InfoIcon} tone="info" />
+                <BlockStack gap="100">
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+                    Forecast Calculation
+                  </Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Days until stock-out = Current Stock ÷ Average Daily Demand
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+              
+              <InlineStack gap="200" blockAlign="start">
+                <Icon source={ClockIcon} tone="warning" />
+                <BlockStack gap="100">
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+                    Status Thresholds
+                  </Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Critical: ≤ 7 days • Low Stock: 8-14 days • Healthy: &gt; 14 days
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+              
+              <InlineStack gap="200" blockAlign="start">
+                <Icon source={InventoryIcon} tone="success" />
+                <BlockStack gap="100">
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+                    Reorder Suggestions
+                  </Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Based on historical demand patterns and lead times
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+            </BlockStack>
+          </BlockStack>
+        </Card>
+      </BlockStack>
     );
   };
 
