@@ -21,12 +21,12 @@ import {
   Collapsible,
   Toast,
   Frame,
+  Divider,
 } from '@shopify/polaris';
 // Import only the icons we actually use
 import { 
   ProductIcon, 
   EditIcon, 
-  ViewIcon, 
   ChevronDownIcon, 
   ChevronUpIcon,
   MoneyIcon,
@@ -177,15 +177,15 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [hasBulkOperationsCompleted, setHasBulkOperationsCompleted] = useState(false);
   
   // Enhanced Pricing Operations State
-  const [priceOperation, setPriceOperation] = useState<'set' | 'increase' | 'decrease' | 'round' | 'smart_round'>('set');
+  const [priceOperation, setPriceOperation] = useState<'set' | 'increase' | 'decrease' | 'round'>('set');
   const [priceValue, setPriceValue] = useState('');
   const [pricePercentage, setPricePercentage] = useState('0');
-  const [roundingRule, setRoundingRule] = useState<'nearest' | 'up' | 'down' | 'psychological' | 'premium' | 'clean' | 'half' | 'match' | 'beat_dollar' | 'beat_percent' | 'charm' | 'prestige' | 'anchoring' | 'odd_even'>('nearest');
+  const [roundingRule, setRoundingRule] = useState<'nearest' | 'up' | 'down'>('nearest');
 
   
   // Compare Price Operations State
   const [, setCompareAtPrice] = useState('');
-  const [compareOperation] = useState<'set' | 'increase' | 'decrease' | 'remove'>('set');
+  const [compareOperation, setCompareOperation] = useState<'set' | 'increase' | 'decrease' | 'remove'>('set');
   const [compareValue, setCompareValue] = useState('');
   
   // Pricing Category State  
@@ -197,6 +197,19 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [availableCollections, setAvailableCollections] = useState<{id: string, title: string}[]>([]);
   const [collectionSearchQuery] = useState('');
+  
+  // Current Ads Management State
+  const [showCurrentAds, setShowCurrentAds] = useState(false);
+  const [currentAds, setCurrentAds] = useState<any[]>([]);
+  
+  // Description Management State  
+  const [descriptionOperation, setDescriptionOperation] = useState<'prefix' | 'suffix' | 'replace'>('prefix');
+  const [descriptionValue, setDescriptionValue] = useState('');
+  
+  // Image Management State
+  const [imageOperation, setImageOperation] = useState<'add' | 'remove' | 'replace'>('add');
+  const [imageUrls, setImageUrls] = useState<string[]>(['']);
+  const [imagePosition, setImagePosition] = useState<'start' | 'end'>('end');
 
   
   // Collection Filter State
@@ -684,23 +697,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   //   setSelectedProducts(checked ? filteredProducts.map(p => p.id) : []);
   // };
 
-  // Smart Pricing Helper Functions
-  const applySmartRounding = (price: number, strategy: string): number => {
-    if (strategy === 'psychological') {
-      // Round to .99 (e.g., 10.32 -> 9.99, 23.45 -> 22.99)
-      return Math.floor(price) + 0.99;
-    } else if (strategy === 'premium') {
-      // Round to .95 (e.g., 10.32 -> 9.95, 23.45 -> 22.95)
-      return Math.floor(price) + 0.95;
-    } else if (strategy === 'clean') {
-      // Round to .00 (e.g., 10.32 -> 10.00, 23.45 -> 23.00)
-      return Math.round(price);
-    } else if (strategy === 'half') {
-      // Round to .50 (e.g., 10.32 -> 10.50, 23.45 -> 23.50)
-      return Math.floor(price) + 0.50;
-    }
-    return price;
-  };
+
 
 
 
@@ -738,10 +735,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
 
 
     // Validation for new pricing operations
-    if (priceOperation === 'smart_round' && !['psychological', 'premium', 'clean', 'half'].includes(roundingRule)) {
-      setError("Please select a smart rounding strategy.");
-      return;
-    }
     
     // Validate compare price operations if enabled
     if (applyCompareChanges) {
@@ -830,9 +823,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
               if (roundingRule === 'up') newPrice = Math.ceil(currentPrice);
               else if (roundingRule === 'down') newPrice = Math.floor(currentPrice);
               else newPrice = Math.round(currentPrice);
-              break;
-            case 'smart_round':
-              newPrice = applySmartRounding(currentPrice, roundingRule);
               break;
             default:
               newPrice = currentPrice;
@@ -1308,6 +1298,192 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
   };
 
+  const handleBulkDescriptionUpdate = async () => {
+    if (selectedProducts.length === 0) {
+      setError("Please select at least one product to update descriptions.");
+      return;
+    }
+    
+    if (descriptionOperation === 'replace' && (!titleReplaceFrom || !titleReplaceTo)) {
+      setError("Please provide both find and replace text for descriptions.");
+      return;
+    }
+    
+    if ((descriptionOperation === 'prefix' || descriptionOperation === 'suffix') && !descriptionValue) {
+      setError(`Please provide ${descriptionOperation} text for descriptions.`);
+      return;
+    }
+    
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      const productIds = selectedProducts;
+      
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'update-descriptions',
+          productIds,
+          descriptionOperation,
+          descriptionValue: descriptionOperation !== 'replace' ? descriptionValue : undefined,
+          descriptionReplaceFrom: descriptionOperation === 'replace' ? titleReplaceFrom : undefined,
+          descriptionReplaceTo: descriptionOperation === 'replace' ? titleReplaceTo : undefined,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update descriptions');
+      }
+
+      // Process results
+      const successful: string[] = [];
+      const failed: string[] = [];
+      
+      if (result.results) {
+        result.results.forEach((resultItem: any) => {
+          if (resultItem.success) {
+            const product = products.find(p => p.id === resultItem.productId);
+            successful.push(product?.title || resultItem.productId);
+          } else {
+            failed.push(`${resultItem.productId}: ${resultItem.error}`);
+          }
+        });
+      }
+
+      // Update local state to reflect changes
+      if (result.success) {
+        await fetchAllProducts();
+      }
+      
+      let operationText = '';
+      if (descriptionOperation === 'prefix') {
+        operationText = `added prefix to descriptions of`;
+      } else if (descriptionOperation === 'suffix') {
+        operationText = `added suffix to descriptions of`;
+      } else {
+        operationText = `replaced text in descriptions of`;
+      }
+      
+      if (successful.length > 0) {
+        console.log(`✅ Successfully ${operationText} ${successful.length} products!`);
+      }
+      
+      if (failed.length > 0) {
+        console.log(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
+        console.log("Failed operations:", failed);
+      }
+      
+      // Clear form only if completely successful
+      if (failed.length === 0) {
+        setHasBulkOperationsCompleted(true);
+        setDescriptionValue('');
+      }
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update descriptions';
+      console.error('Failed to update descriptions:', error);
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBulkImageUpdate = async () => {
+    if (selectedProducts.length === 0) {
+      setError("Please select at least one product to update images.");
+      return;
+    }
+    
+    if (imageOperation !== 'remove' && imageUrls.every(url => !url.trim())) {
+      setError("Please provide at least one valid image URL.");
+      return;
+    }
+    
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      const productIds = selectedProducts;
+      const validImageUrls = imageUrls.filter(url => url.trim());
+      
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'update-images',
+          productIds,
+          imageOperation,
+          imageUrls: validImageUrls,
+          imagePosition: imageOperation === 'add' ? imagePosition : undefined,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update images');
+      }
+
+      // Process results
+      const successful: string[] = [];
+      const failed: string[] = [];
+      
+      if (result.results) {
+        result.results.forEach((resultItem: any) => {
+          if (resultItem.success) {
+            const product = products.find(p => p.id === resultItem.productId);
+            successful.push(product?.title || resultItem.productId);
+          } else {
+            failed.push(`${resultItem.productId}: ${resultItem.error}`);
+          }
+        });
+      }
+
+      // Update local state to reflect changes
+      if (result.success) {
+        await fetchAllProducts();
+      }
+      
+      let operationText = '';
+      if (imageOperation === 'add') {
+        operationText = `added ${validImageUrls.length} image${validImageUrls.length > 1 ? 's' : ''} to`;
+      } else if (imageOperation === 'remove') {
+        operationText = `removed images from`;
+      } else {
+        operationText = `replaced images in`;
+      }
+      
+      if (successful.length > 0) {
+        console.log(`✅ Successfully ${operationText} ${successful.length} products!`);
+      }
+      
+      if (failed.length > 0) {
+        console.log(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
+        console.log("Failed operations:", failed);
+      }
+      
+      // Clear form only if completely successful
+      if (failed.length === 0) {
+        setHasBulkOperationsCompleted(true);
+        setImageUrls(['']);
+      }
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update images';
+      console.error('Failed to update images:', error);
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleBulkInventoryUpdate = async () => {
     if (selectedVariants.length === 0) {
@@ -2684,6 +2860,70 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       Update pricing for {selectedVariants.length} selected variants.
                     </Text>
 
+                    {/* Current Ads Section */}
+                    <Card>
+                      <BlockStack gap="300">
+                        <InlineStack align="space-between" blockAlign="center">
+                          <Text as="h4" variant="headingSm">Current Product Ads</Text>
+                          <Button
+                            variant="plain"
+                            onClick={() => setShowCurrentAds(!showCurrentAds)}
+                            icon={showCurrentAds ? ChevronUpIcon : ChevronDownIcon}
+                          >
+{`${showCurrentAds ? 'Hide' : 'Show'} Ads (${selectedProducts.length} products)`}
+                          </Button>
+                        </InlineStack>
+                        
+                        <Collapsible
+                          open={showCurrentAds}
+                          id="current-ads-collapsible"
+                          transition={{duration: '200ms', timingFunction: 'ease-in-out'}}
+                          expandOnPrint
+                        >
+                          <BlockStack gap="300">
+                            {selectedProducts.length > 0 && products.filter(p => selectedProducts.includes(p.id)).map((product, index) => (
+                              <Box key={product.id} padding="300" background="bg-surface-secondary" borderRadius="200">
+                                <BlockStack gap="200">
+                                  <InlineStack align="space-between" blockAlign="center">
+                                    <Text as="p" variant="bodyMd" fontWeight="semibold">{product.title}</Text>
+                                    <Badge tone={product.status === 'ACTIVE' ? 'success' : 'attention'}>
+                                      {product.status}
+                                    </Badge>
+                                  </InlineStack>
+                                  
+                                  {/* Mock ad data - in real implementation, fetch from ads API */}
+                                  <Text as="p" variant="bodySm" tone="subdued">
+                                    Current Ad Campaigns: 
+                                    {index % 3 === 0 ? " Facebook Ads, Google Shopping" : 
+                                     index % 3 === 1 ? " Google Ads, Instagram" : 
+                                     " No active campaigns"}
+                                  </Text>
+                                  
+                                  {index % 3 !== 2 && (
+                                    <InlineStack gap="200">
+                                      <Text as="p" variant="bodyXs" tone="subdued">
+                                        Spend: ${(index * 23.5 + 45).toFixed(2)} | 
+                                        Clicks: {index * 12 + 34} | 
+                                        CTR: {(index * 0.5 + 2.1).toFixed(1)}%
+                                      </Text>
+                                    </InlineStack>
+                                  )}
+                                </BlockStack>
+                              </Box>
+                            ))}
+                            
+                            {selectedProducts.length === 0 && (
+                              <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                                <Text as="p" variant="bodySm" alignment="center" tone="subdued">
+                                  Select products to view their current ad campaigns
+                                </Text>
+                              </Box>
+                            )}
+                          </BlockStack>
+                        </Collapsible>
+                      </BlockStack>
+                    </Card>
+
                     {/* Price Management Category */}
                     <BlockStack gap="400">
 
@@ -2695,13 +2935,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                             size="medium"
                           >
                             Set Fixed Price
-                          </Button>
-                          <Button
-                            variant={priceOperation === 'smart_round' ? 'primary' : 'secondary'}
-                            onClick={() => setPriceOperation('smart_round')}
-                            size="medium"
-                          >
-                            Smart Rounding
                           </Button>
                           <Button
                             variant={priceOperation === 'increase' ? 'primary' : 'secondary'}
@@ -2720,7 +2953,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                         </div>
                         <Text as="p" variant="bodySm" tone="subdued">
                           {priceOperation === 'set' && 'Apply same price to all variants'}
-                          {priceOperation === 'smart_round' && 'Round to psychological prices'}
                           {priceOperation === 'increase' && 'Increase current prices by percentage'}
                           {priceOperation === 'decrease' && 'Decrease current prices by percentage'}
                         </Text>
@@ -2738,20 +2970,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                           />
                         )}
                         
-                        {priceOperation === 'smart_round' && (
-                          <Select
-                            label="Smart Rounding Strategy"
-                            options={[
-                              { label: 'Psychological (.99) - Round to 9.99, 19.99, etc.', value: 'psychological' },
-                              { label: 'Premium (.95) - Round to 9.95, 19.95, etc.', value: 'premium' },
-                              { label: 'Clean (.00) - Round to 10.00, 20.00, etc.', value: 'clean' },
-                              { label: 'Half (.50) - Round to 9.50, 19.50, etc.', value: 'half' },
-                            ]}
-                            value={roundingRule}
-                            onChange={(value) => setRoundingRule(value as any)}
-                          />
-                        )}
-
                         {(priceOperation === 'increase' || priceOperation === 'decrease') && (
                           <TextField
                             label={`${priceOperation === 'increase' ? 'Increase' : 'Decrease'} Percentage`}
@@ -2765,7 +2983,85 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                           />
                         )}
 
-
+                        {/* Compare Price Section */}
+                        <Divider />
+                        <BlockStack gap="300">
+                          <InlineStack align="space-between" blockAlign="center">
+                            <Text as="p" variant="bodyMd" fontWeight="medium">Compare At Price</Text>
+                            <Checkbox
+                              label="Apply compare price changes"
+                              checked={applyCompareChanges}
+                              onChange={setApplyCompareChanges}
+                            />
+                          </InlineStack>
+                          
+                          {applyCompareChanges && (
+                            <BlockStack gap="300">
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
+                                <Button
+                                  variant={compareOperation === 'set' ? 'primary' : 'secondary'}
+                                  onClick={() => setCompareOperation('set')}
+                                  size="medium"
+                                >
+                                  Set Fixed
+                                </Button>
+                                <Button
+                                  variant={compareOperation === 'increase' ? 'primary' : 'secondary'}
+                                  onClick={() => setCompareOperation('increase')}
+                                  size="medium"
+                                >
+                                  Increase %
+                                </Button>
+                                <Button
+                                  variant={compareOperation === 'decrease' ? 'primary' : 'secondary'}
+                                  onClick={() => setCompareOperation('decrease')}
+                                  size="medium"
+                                >
+                                  Decrease %
+                                </Button>
+                                <Button
+                                  variant={compareOperation === 'remove' ? 'primary' : 'secondary'}
+                                  onClick={() => setCompareOperation('remove')}
+                                  size="medium"
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                              
+                              {compareOperation === 'set' && (
+                                <TextField
+                                  label="Compare At Price"
+                                  type="number"
+                                  value={compareValue}
+                                  onChange={setCompareValue}
+                                  placeholder="0.00"
+                                  prefix={currencySymbol}
+                                  helpText="Set compare at price for all selected variants"
+                                  autoComplete="off"
+                                />
+                              )}
+                              
+                              {(compareOperation === 'increase' || compareOperation === 'decrease') && (
+                                <TextField
+                                  label={`${compareOperation === 'increase' ? 'Increase' : 'Decrease'} Compare Price %`}
+                                  type="number"
+                                  value={comparePercentage}
+                                  onChange={setComparePercentage}
+                                  placeholder="10"
+                                  suffix="%"
+                                  helpText={`${compareOperation === 'increase' ? 'Increase' : 'Decrease'} current compare prices by this percentage`}
+                                  autoComplete="off"
+                                />
+                              )}
+                              
+                              {compareOperation === 'remove' && (
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                  This will remove compare at price from all selected variants
+                                </Text>
+                              )}
+                            </BlockStack>
+                          )}
+                        </BlockStack>
 
                         <Button
                           variant="primary"
@@ -2984,13 +3280,14 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                     {/* Content Sub-tabs */}
                     <div style={{ 
                       display: 'grid', 
-                      gridTemplateColumns: 'repeat(2, 1fr)', 
+                      gridTemplateColumns: 'repeat(3, 1fr)', 
                       gap: '8px', 
                       borderBottom: '1px solid #e1e3e5',
                       marginBottom: '20px'
                     }}>
                       {[
-                        { id: 'title', label: 'Title & Description' },
+                        { id: 'title', label: 'Titles' },
+                        { id: 'description', label: 'Descriptions' },
                         { id: 'images', label: 'Images' }
                       ].map(({ id, label }) => (
                         <Button
@@ -3004,7 +3301,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       ))}
                     </div>
 
-                    {/* Title & Description Management */}
+                    {/* Title Management */}
                     {contentOperation === 'title' && (
                       <BlockStack gap="400">
                         <div>
@@ -3088,44 +3385,281 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       </BlockStack>
                     )}
 
+                    {/* Description Management */}
+                    {contentOperation === 'description' && (
+                      <BlockStack gap="400">
+                        <div>
+                          <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
+                            Description Update Method
+                          </Text>
+                          <div style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+                            gap: '8px', 
+                            marginTop: '8px' 
+                          }}>
+                            <Button
+                              variant={descriptionOperation === 'prefix' ? 'primary' : 'secondary'}
+                              onClick={() => setDescriptionOperation('prefix')}
+                              size="large"
+                            >
+                              Add Prefix
+                            </Button>
+                            <Button
+                              variant={descriptionOperation === 'suffix' ? 'primary' : 'secondary'}
+                              onClick={() => setDescriptionOperation('suffix')}
+                              size="large"
+                            >
+                              Add Suffix
+                            </Button>
+                            <Button
+                              variant={descriptionOperation === 'replace' ? 'primary' : 'secondary'}
+                              onClick={() => setDescriptionOperation('replace')}
+                              size="large"
+                            >
+                              Find & Replace
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {descriptionOperation === 'replace' ? (
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <TextField
+                              label="Find Text in Description"
+                              value={titleReplaceFrom}
+                              onChange={setTitleReplaceFrom}
+                              placeholder="Text to find in descriptions"
+                              autoComplete="off"
+                              multiline={3}
+                            />
+                            <TextField
+                              label="Replace With"
+                              value={titleReplaceTo}
+                              onChange={setTitleReplaceTo}
+                              placeholder="Replacement text"
+                              autoComplete="off"
+                              multiline={3}
+                            />
+                          </div>
+                        ) : (
+                          <TextField
+                            label={descriptionOperation === 'prefix' ? 'Prefix Text' : 'Suffix Text'}
+                            value={descriptionValue}
+                            onChange={setDescriptionValue}
+                            placeholder={
+                              descriptionOperation === 'prefix' 
+                                ? 'Text to add at beginning of descriptions' 
+                                : 'Text to add at end of descriptions'
+                            }
+                            autoComplete="off"
+                            multiline={4}
+                            helpText="This text will be added to all selected product descriptions"
+                          />
+                        )}
+
+                        <Button
+                          variant="primary"
+                          onClick={handleBulkDescriptionUpdate}
+                          disabled={
+                            selectedProducts.length === 0 || 
+                            (descriptionOperation === 'replace' && (!titleReplaceFrom || !titleReplaceTo)) ||
+                            ((descriptionOperation === 'prefix' || descriptionOperation === 'suffix') && !descriptionValue)
+                          }
+                          loading={isLoading}
+                          size="large"
+                        >
+                          Update Product Descriptions
+                        </Button>
+                      </BlockStack>
+                    )}
+
                     {/* Images Management */}
                     {contentOperation === 'images' && (
                       <BlockStack gap="400">
-                        <div style={{
-                          padding: '40px',
-                          textAlign: 'center',
-                          backgroundColor: '#f6f6f7',
-                          borderRadius: '12px',
-                          border: '2px dashed #c9cccf'
-                        }}>
-                          <div style={{ marginBottom: '16px' }}>
-                            <Icon source={ViewIcon} tone="subdued" />
-                          </div>
-                          <Text as="h4" variant="headingMd">
-                            Image Management
+                        <div>
+                          <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
+                            Image Operation Type
                           </Text>
-                          <div style={{ marginTop: '8px' }}>
-                            <Text as="p" variant="bodyMd" tone="subdued">
-                              Bulk image operations coming soon! You can currently manage images individually in each product.
-                            </Text>
-                          </div>
-                          <div style={{ marginTop: '20px' }}>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                              Planned features:
-                            </Text>
-                            <ul style={{ 
-                              textAlign: 'left', 
-                              marginTop: '8px', 
-                              paddingLeft: '20px',
-                              color: '#6b7280'
-                            }}>
-                              <li>Bulk alt text updates</li>
-                              <li>Image replacement</li>
-                              <li>Bulk image uploads</li>
-                              <li>Image optimization</li>
-                            </ul>
+                          <div style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+                            gap: '8px', 
+                            marginTop: '8px' 
+                          }}>
+                            <Button
+                              variant={imageOperation === 'add' ? 'primary' : 'secondary'}
+                              onClick={() => setImageOperation('add')}
+                              size="large"
+                              icon={PlusIcon}
+                            >
+                              Add Images
+                            </Button>
+                            <Button
+                              variant={imageOperation === 'remove' ? 'primary' : 'secondary'}
+                              onClick={() => setImageOperation('remove')}
+                              size="large"
+                              icon={MinusIcon}
+                            >
+                              Remove Images
+                            </Button>
+                            <Button
+                              variant={imageOperation === 'replace' ? 'primary' : 'secondary'}
+                              onClick={() => setImageOperation('replace')}
+                              size="large"
+                            >
+                              Replace Images
+                            </Button>
                           </div>
                         </div>
+
+                        {imageOperation === 'add' && (
+                          <BlockStack gap="400">
+                            <div>
+                              <Text as="p" variant="bodyMd" fontWeight="medium">Image Position</Text>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
+                                <Button
+                                  variant={imagePosition === 'start' ? 'primary' : 'secondary'}
+                                  onClick={() => setImagePosition('start')}
+                                  size="medium"
+                                >
+                                  Add to Beginning
+                                </Button>
+                                <Button
+                                  variant={imagePosition === 'end' ? 'primary' : 'secondary'}
+                                  onClick={() => setImagePosition('end')}
+                                  size="medium"
+                                >
+                                  Add to End
+                                </Button>
+                              </div>
+                            </div>
+
+                            <div>
+                              <Text as="p" variant="bodyMd" fontWeight="medium">Image URLs</Text>
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                Add image URLs to be added to all selected products
+                              </Text>
+                              {imageUrls.map((url, index) => (
+                                <div key={index} style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                  <div style={{ flex: 1 }}>
+                                    <TextField
+                                      label={`Image URL ${index + 1}`}
+                                      value={url}
+                                      onChange={(value) => {
+                                        const newUrls = [...imageUrls];
+                                        newUrls[index] = value;
+                                        setImageUrls(newUrls);
+                                      }}
+                                      placeholder="https://example.com/image.jpg"
+                                      autoComplete="off"
+                                    />
+                                  </div>
+                                  {imageUrls.length > 1 && (
+                                    <div style={{ paddingTop: '24px' }}>
+                                      <Button
+                                        variant="plain"
+                                        icon={MinusIcon}
+                                        onClick={() => {
+                                          const newUrls = imageUrls.filter((_, i) => i !== index);
+                                          setImageUrls(newUrls);
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                              
+                              <div style={{ marginTop: '12px' }}>
+                                <Button
+                                  variant="plain"
+                                  icon={PlusIcon}
+                                  onClick={() => setImageUrls([...imageUrls, ''])}
+                                >
+                                  Add Another Image URL
+                                </Button>
+                              </div>
+                            </div>
+                          </BlockStack>
+                        )}
+
+                        {imageOperation === 'remove' && (
+                          <BlockStack gap="300">
+                            <Text as="p" variant="bodyMd" tone="subdued">
+                              Choose how to remove images from selected products:
+                            </Text>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
+                              <Button variant="secondary" size="medium">
+                                Remove First Image
+                              </Button>
+                              <Button variant="secondary" size="medium">
+                                Remove Last Image
+                              </Button>
+                              <Button variant="secondary" size="medium">
+                                Remove All Images
+                              </Button>
+                            </div>
+                          </BlockStack>
+                        )}
+
+                        {imageOperation === 'replace' && (
+                          <BlockStack gap="300">
+                            <Text as="p" variant="bodyMd" tone="subdued">
+                              Replace all existing images with new ones:
+                            </Text>
+                            {imageUrls.map((url, index) => (
+                              <div key={index} style={{ display: 'flex', gap: '8px' }}>
+                                <div style={{ flex: 1 }}>
+                                  <TextField
+                                    label={`Replacement Image URL ${index + 1}`}
+                                    value={url}
+                                    onChange={(value) => {
+                                      const newUrls = [...imageUrls];
+                                      newUrls[index] = value;
+                                      setImageUrls(newUrls);
+                                    }}
+                                    placeholder="https://example.com/new-image.jpg"
+                                    autoComplete="off"
+                                  />
+                                </div>
+                                {imageUrls.length > 1 && (
+                                  <div style={{ paddingTop: '24px' }}>
+                                    <Button
+                                      variant="plain"
+                                      icon={MinusIcon}
+                                      onClick={() => {
+                                        const newUrls = imageUrls.filter((_, i) => i !== index);
+                                        setImageUrls(newUrls);
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            
+                            <Button
+                              variant="plain"
+                              icon={PlusIcon}
+                              onClick={() => setImageUrls([...imageUrls, ''])}
+                            >
+                              Add Another Replacement Image
+                            </Button>
+                          </BlockStack>
+                        )}
+
+                        <Button
+                          variant="primary"
+                          onClick={handleBulkImageUpdate}
+                          disabled={
+                            selectedProducts.length === 0 || 
+                            (imageOperation !== 'remove' && imageUrls.every(url => !url.trim()))
+                          }
+                          loading={isLoading}
+                          size="large"
+                        >
+                          {imageOperation === 'add' ? 'Add Images to Products' :
+                           imageOperation === 'remove' ? 'Remove Images from Products' :
+                           'Replace Product Images'}
+                        </Button>
                       </BlockStack>
                     )}
                   </BlockStack>
