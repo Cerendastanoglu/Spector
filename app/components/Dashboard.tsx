@@ -14,8 +14,7 @@ import {
   Badge,
   Tooltip,
   Divider,
-  Modal,
-  Banner,
+
   TextField,
   Select,
   Checkbox,
@@ -23,11 +22,8 @@ import {
   EmptyState,
 } from "@shopify/polaris";
 import {
-  RefreshIcon,
   CashDollarIcon,
   ChartVerticalIcon,
-  OrderIcon,
-  CalendarIcon,
   AlertCircleIcon,
   InfoIcon,
   ClockIcon,
@@ -37,11 +33,12 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   SearchIcon,
-  FilterIcon,
   InventoryIcon,
   EditIcon,
   ViewIcon,
   MenuHorizontalIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from "@shopify/polaris-icons";
 
 interface DashboardProps {
@@ -113,9 +110,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   const [error, setError] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
-  const [lastDataUpdate, setLastDataUpdate] = useState<Date | null>(null);
   const [isManualRefresh, setIsManualRefresh] = useState(false);
-  const [showComingSoon, setShowComingSoon] = useState(false);
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   
   // Inventory Forecasting State
@@ -123,8 +118,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   const [inventoryCategory, setInventoryCategory] = useState('all');
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [showCriticalOnly, setShowCriticalOnly] = useState(false);
-  const [sortInventoryBy, setSortInventoryBy] = useState('forecast_days');
-  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [sortInventoryBy] = useState('forecast_days');
   
   // Inventory filtering state
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -132,6 +126,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [searchProduct, setSearchProduct] = useState('');
   const [priceDistributionIndex, setPriceDistributionIndex] = useState(0);
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
   // Top Products Slider State
   
@@ -179,7 +174,6 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
           } else {
             setInventoryData(data);
           }
-          setLastDataUpdate(lastUpdate);
           console.log(`Dashboard: Loaded ${type} data from cache (${data?.totalProducts || 0} products)`);
           return true;
         }
@@ -201,7 +195,6 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
       
       localStorage.setItem(cacheKey, JSON.stringify(data));
       localStorage.setItem(timestampKey, now.toISOString());
-      setLastDataUpdate(now);
       console.log(`Dashboard: Saved ${type} data to cache (${data?.totalOrders || 0} orders)`);
     } catch (error) {
       console.error('Error saving cached data:', error);
@@ -240,19 +233,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     }
   }, []); // No dependencies to prevent recreation
 
-  const handleRefresh = useCallback(() => {
-    setLastRefresh(new Date());
-    
-    // Skip refresh for Inventory Forecasting (tab 1) and Order Analysis (tab 2) - they're in development
-    if (activeTab === 1 || activeTab === 2) {
-      console.log("Dashboard: Skipping refresh for development tab:", activeTab);
-      return;
-    }
-    
-    const type = activeTab === 0 ? 'revenue' : 'inventory';
-    console.log("Dashboard: Refresh triggered, activeTab:", activeTab, "type:", type);
-    fetchFreshData(type, true);
-  }, [activeTab, fetchFreshData]);
+
 
   // Reset loading flag when tab or period changes
   useEffect(() => {
@@ -371,12 +352,6 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
       content: 'Inventory Forecasting',
       accessibilityLabel: 'Inventory Forecasting',
       panelID: 'inventory-panel',
-    },
-    {
-      id: 'orders',
-      content: '🔒 Order Analysis', 
-      accessibilityLabel: 'Order Analysis - Coming Soon',
-      panelID: 'orders-panel',
     },
   ];
 
@@ -1052,132 +1027,117 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     const categories = ['all', ...Array.from(new Set(mockInventoryData.map(item => item.category)))];
 
     return (
-      <BlockStack gap="500">
-        {/* Header */}
+      <BlockStack gap="400">
+        {/* Header Section */}
         <Card>
-          <BlockStack gap="400">
-            <InlineStack align="space-between" blockAlign="center">
-              <BlockStack gap="200">
-                <Text as="h2" variant="headingLg" fontWeight="bold">
-                  Inventory Forecasting
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Predict when products will run out and optimize reorder points
-                </Text>
-              </BlockStack>
-              <Button
-                icon={RefreshIcon}
-                loading={inventoryLoading}
-                onClick={() => {
-                  setInventoryLoading(true);
-                  // Simulate API call
-                  setTimeout(() => setInventoryLoading(false), 1000);
-                }}
-              >
-                Refresh Forecast
-              </Button>
-            </InlineStack>
+          <BlockStack gap="200">
+            <Text as="h3" variant="headingMd" fontWeight="semibold">
+              Inventory Management ({filteredData.length} products)
+            </Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Monitor stock levels and forecast demand
+            </Text>
           </BlockStack>
         </Card>
 
-        {/* Enhanced Filters */}
-        <Card>
-          <BlockStack gap="400">
+        {/* Modern Compact Search and Filter Section */}
+        <Card padding="0">
+          <button
+            onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+            style={{
+              width: '100%',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              padding: '16px 20px',
+              textAlign: 'left'
+            }}
+          >
             <InlineStack align="space-between" blockAlign="center">
-              <Text as="h3" variant="headingMd" fontWeight="semibold">
-                Filters & Search
-              </Text>
-              <Button
-                icon={FilterIcon}
-                variant="tertiary"
-                onClick={() => {
-                  setInventorySearchQuery('');
-                  setInventoryCategory('all');
-                  setShowLowStockOnly(false);
-                  setShowCriticalOnly(false);
-                  setSortInventoryBy('forecast_days');
-                }}
-              >
-                Clear All
-              </Button>
+              <InlineStack gap="200" blockAlign="center">
+                <Icon source={SearchIcon} />
+                <Text as="h3" variant="headingXs">Filters & Search</Text>
+              </InlineStack>
+              <div style={{ marginLeft: 'auto' }}>
+                <Icon source={isFiltersOpen ? ChevronUpIcon : ChevronDownIcon} />
+              </div>
             </InlineStack>
+          </button>
+          
+          {isFiltersOpen && (
+            <div style={{ padding: '0 20px 20px 20px' }}>
+              <BlockStack gap="300">
 
-            {/* Search and Basic Filters */}
-            <InlineStack gap="400" wrap>
-              <Box minWidth="300px">
+                {/* Search */}
                 <TextField
-                  label="Search products"
+                  label=""
                   value={inventorySearchQuery}
                   onChange={setInventorySearchQuery}
-                  placeholder="Search by name, SKU, or vendor..."
-                  prefix={<Icon source={SearchIcon} />}
+                  placeholder="Search by product name, handle, or SKU..."
+                  autoComplete="off"
                   clearButton
                   onClearButtonClick={() => setInventorySearchQuery('')}
-                  autoComplete="off"
                 />
-              </Box>
 
-              <Box minWidth="200px">
-                <Select
-                  label="Stock Status"
-                  options={[
-                    { label: 'All Products', value: 'all' },
-                    { label: 'Critical Stock (≤7 days)', value: 'critical' },
-                    { label: 'Low Stock (8-14 days)', value: 'low' },
-                    { label: 'Healthy Stock (>14 days)', value: 'healthy' }
-                  ]}
-                  value={inventoryCategory}
-                  onChange={setInventoryCategory}
-                />
-              </Box>
+                {/* Filter Controls - Row 1: Basic Filters */}
+                <InlineStack gap="300" wrap={false}>
+                  <div style={{ flex: 1 }}>
+                    <Select
+                      label="Category"
+                      value={inventoryCategory}
+                      onChange={setInventoryCategory}
+                      options={categories.map(cat => ({
+                        label: cat === 'all' ? 'All Categories' : cat,
+                        value: cat
+                      }))}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <Select
+                      label="Stock Status"
+                      options={[
+                        { label: 'All Products', value: 'all' },
+                        { label: 'Critical Stock', value: 'critical' },
+                        { label: 'Low Stock', value: 'low' },
+                        { label: 'Healthy Stock', value: 'healthy' }
+                      ]}
+                      value={inventoryCategory}
+                      onChange={setInventoryCategory}
+                    />
+                  </div>
+                </InlineStack>
 
-              <Box minWidth="200px">
-                <Select
-                  label="Category"
-                  options={categories.map(cat => ({
-                    label: cat === 'all' ? 'All Categories' : cat,
-                    value: cat
-                  }))}
-                  value={inventoryCategory}
-                  onChange={setInventoryCategory}
-                />
-              </Box>
+                {/* Quick Filters - Checkboxes */}
+                <InlineStack gap="400" wrap={false}>
+                  <Checkbox
+                    label="Critical stock alerts only"
+                    checked={showCriticalOnly}
+                    onChange={setShowCriticalOnly}
+                  />
+                  <Checkbox
+                    label="Low stock only"
+                    checked={showLowStockOnly}
+                    onChange={setShowLowStockOnly}
+                  />
+                  <div style={{ marginLeft: 'auto' }}>
+                    <Button
+                      variant="tertiary"
+                      size="slim"
+                      onClick={() => {
+                        setInventorySearchQuery('');
+                        setInventoryCategory('all');
+                        setShowLowStockOnly(false);
+                        setShowCriticalOnly(false);
+                      }}
+                    >
+                      Clear All
+                    </Button>
+                  </div>
+                </InlineStack>
 
-              <Box minWidth="180px">
-                <Select
-                  label="Stock Level"
-                  options={[
-                    { label: 'All Levels', value: 'all' },
-                    { label: 'Out of Stock', value: 'out_of_stock' },
-                    { label: 'Low Stock (< 20)', value: 'low_quantity' },
-                    { label: 'Well Stocked (≥ 20)', value: 'well_stocked' }
-                  ]}
-                  value={inventoryCategory}
-                  onChange={setInventoryCategory}
-                />
-              </Box>
-            </InlineStack>
-
-            {/* Advanced Filters */}
-            <BlockStack gap="300">
-              <Text as="p" variant="bodyMd" fontWeight="semibold">
-                Quick Filters
-              </Text>
-                
-              <InlineStack gap="400" wrap>
-                <Checkbox
-                  label="Critical stock alerts only"
-                  checked={showCriticalOnly}
-                  onChange={setShowCriticalOnly}
-                />
-                <Checkbox
-                  label="Needs reorder"
-                  checked={showLowStockOnly}
-                  onChange={setShowLowStockOnly}
-                />
-              </InlineStack>
-            </BlockStack>
-          </BlockStack>
+              </BlockStack>
+            </div>
+          )}
         </Card>
 
 
@@ -1185,19 +1145,6 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
         {/* Inventory Table */}
         <Card>
           <BlockStack gap="400">
-            <InlineStack align="space-between" blockAlign="center">
-              <Text as="h3" variant="headingMd" fontWeight="semibold">
-                Inventory Forecast ({filteredData.length} products)
-              </Text>
-              {filteredData.length > 0 && (
-                <InlineStack gap="200" blockAlign="center">
-                  <Icon source={ChartVerticalIcon} tone="subdued" />
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Sorted by {sortInventoryBy.replace('_', ' ')}
-                  </Text>
-                </InlineStack>
-              )}
-            </InlineStack>
 
             {filteredData.length === 0 ? (
               <EmptyState
@@ -1287,42 +1234,48 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
 
         {/* Additional Info */}
         <Card>
-          <BlockStack gap="300">
+          <BlockStack gap="300" align="start">
             <Text as="h3" variant="headingMd" fontWeight="semibold">
               How Forecasting Works
             </Text>
-            <BlockStack gap="200">
+            <BlockStack gap="200" align="start">
               <InlineStack gap="200" blockAlign="start">
-                <Icon source={InfoIcon} tone="info" />
-                <BlockStack gap="100">
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+                <Box paddingBlockStart="050">
+                  <Icon source={InfoIcon} tone="info" />
+                </Box>
+                <BlockStack gap="100" align="start">
+                  <Text as="p" variant="bodyMd" fontWeight="semibold" alignment="start">
                     Forecast Calculation
                   </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
+                  <Text as="p" variant="bodySm" tone="subdued" alignment="start">
                     Days until stock-out = Current Stock ÷ Average Daily Demand
                   </Text>
                 </BlockStack>
               </InlineStack>
               
               <InlineStack gap="200" blockAlign="start">
-                <Icon source={ClockIcon} tone="warning" />
-                <BlockStack gap="100">
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+                <Box paddingBlockStart="050">
+                  <Icon source={ClockIcon} tone="warning" />
+                </Box>
+                <BlockStack gap="100" align="start">
+                  <Text as="p" variant="bodyMd" fontWeight="semibold" alignment="start">
                     Status Thresholds
                   </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
+                  <Text as="p" variant="bodySm" tone="subdued" alignment="start">
                     Critical: ≤ 7 days • Low Stock: 8-14 days • Healthy: &gt; 14 days
                   </Text>
                 </BlockStack>
               </InlineStack>
               
               <InlineStack gap="200" blockAlign="start">
-                <Icon source={InventoryIcon} tone="success" />
-                <BlockStack gap="100">
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+                <Box paddingBlockStart="050">
+                  <Icon source={InventoryIcon} tone="success" />
+                </Box>
+                <BlockStack gap="100" align="start">
+                  <Text as="p" variant="bodyMd" fontWeight="semibold" alignment="start">
                     Reorder Suggestions
                   </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
+                  <Text as="p" variant="bodySm" tone="subdued" alignment="start">
                     Based on historical demand patterns and lead times
                   </Text>
                 </BlockStack>
@@ -1334,77 +1287,17 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     );
   };
 
-  const renderOrderAnalysisTab = () => {
-    return (
-      <Card>
-        <BlockStack gap="600" align="center">
-          <Box padding="800">
-            <BlockStack gap="500" align="center">
-              <Box 
-                background="bg-fill-info" 
-                padding="600" 
-                borderRadius="200"
-              >
-                <Icon source={OrderIcon} tone="base" />
-              </Box>
-              
-              <BlockStack gap="300" align="center">
-                <Text as="h2" variant="headingLg" fontWeight="bold">
-                  Order Analysis
-                </Text>
-                <Text as="p" variant="bodyLg" tone="subdued" alignment="center">
-                  Coming Soon
-                </Text>
-              </BlockStack>
-              
-              <BlockStack gap="400" align="center">
-                <Text as="p" variant="bodyMd" alignment="center" tone="subdued">
-                  Advanced order analytics including sales trends, customer behavior patterns, 
-                  revenue forecasting, and performance insights are currently in development.
-                </Text>
-                
-                <Box padding="400" background="bg-surface-secondary" borderRadius="300">
-                  <BlockStack gap="300">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">
-                      📊 Planned Features:
-                    </Text>
-                    <BlockStack gap="200">
-                      <Text as="p" variant="bodySm" tone="subdued">• Sales trend analysis and forecasting</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">• Customer purchase behavior insights</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">• Revenue growth tracking</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">• Order fulfillment analytics</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">• Peak sales time identification</Text>
-                    </BlockStack>
-                  </BlockStack>
-                </Box>
-              </BlockStack>
-            </BlockStack>
-          </Box>
-        </BlockStack>
-      </Card>
-    );
-  };
+
 
   return (
     <>
-      {/* CSS for greyed out tabs */}
-      <style>{`
-        .Polaris-Tabs__Tab:nth-child(3) button {
-          opacity: 0.5;
-          color: #8c9196 !important;
-          cursor: not-allowed;
-        }
-        .Polaris-Tabs__Tab:nth-child(3) button:hover {
-          background-color: #f6f6f7 !important;
-        }
-      `}</style>
       
-      <BlockStack gap="500">
+      <BlockStack gap="300">
         {/* Unified Dashboard Header and Content */}
         <Card>
-          <BlockStack gap="500">
+          <BlockStack gap="300">
             {/* Header Section */}
-            <BlockStack gap="400">
+            <BlockStack gap="200">
               <InlineStack align="space-between" blockAlign="start">
                 <BlockStack gap="200">
                   <Text as="h1" variant="headingLg">
@@ -1415,42 +1308,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                   </Text>
                 </BlockStack>
               
-              <BlockStack gap="200" align="end">
-                <Button
-                  icon={RefreshIcon}
-                  onClick={handleRefresh}
-                  loading={isLoading}
-                  tone={isManualRefresh ? 'success' : undefined}
-                  accessibilityLabel="Refresh analytics data"
-                >
-                  {isLoading ? 'Refreshing...' : 'Refresh Analytics'}
-                </Button>
-                
-                {/* Data Update Information - Only for Inventory & Order Analysis */}
-                {(activeTab === 1 || activeTab === 2) && (
-                  <InlineStack gap="400" wrap={false} align="end">
-                    <InlineStack gap="200" blockAlign="center">
-                      <Icon source={ClockIcon} tone="subdued" />
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Real-time data
-                      </Text>
-                    </InlineStack>
-                    
-                    {lastDataUpdate && (
-                      <InlineStack gap="200" blockAlign="center">
-                        <Icon source={CalendarIcon} tone="subdued" />
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Last updated: {lastDataUpdate.toLocaleDateString()} at {lastDataUpdate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Text>
-                      </InlineStack>
-                    )}
 
-                    <Tooltip content="Analytics data updates in real-time. Click 'Refresh Now' for the latest information.">
-                      <Icon source={InfoIcon} tone="subdued" />
-                    </Tooltip>
-                  </InlineStack>
-                )}
-              </BlockStack>
             </InlineStack>
 
             <Divider />
@@ -1460,11 +1318,6 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
               tabs={tabs}
               selected={activeTab}
               onSelect={(selectedTab) => {
-                // Show coming soon message for disabled tab (2)
-                if (selectedTab === 2) {
-                  setShowComingSoon(true);
-                  return; // Don't change tab
-                }
                 setActiveTab(selectedTab);
               }}
               fitted={false}
@@ -1472,54 +1325,13 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
           </BlockStack>
 
           {/* Tab Content */}
-          <Box paddingBlockStart="400">
+          <Box paddingBlockStart="100">
             {activeTab === 0 && renderProductPerformanceTab()}
             {activeTab === 1 && renderInventoryTab()}
-            {activeTab === 2 && renderOrderAnalysisTab()}
           </Box>
         </BlockStack>
       </Card>
-      
-      {/* Coming Soon Modal */}
-      <Modal
-        open={showComingSoon}
-        onClose={() => setShowComingSoon(false)}
-        title="Feature Coming Soon"
-        primaryAction={{
-          content: 'Got it',
-          onAction: () => setShowComingSoon(false),
-        }}
-      >
-        <Modal.Section>
-          <BlockStack gap="400">
-            <Banner tone="info">
-              <BlockStack gap="200">
-                <Text as="p" variant="bodyMd">
-                  🚧 This feature is currently under development and will be available soon!
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  We're working hard to bring you advanced analytics and insights. Stay tuned for updates!
-                </Text>
-              </BlockStack>
-            </Banner>
-            
-            <Box background="bg-surface-secondary" padding="400" borderRadius="300">
-              <BlockStack gap="300">
-                <Text as="p" variant="headingSm">
-                  🎯 What's Coming:
-                </Text>
-                <BlockStack gap="200">
-                  <Text as="p" variant="bodySm">• AI-powered inventory forecasting</Text>
-                  <Text as="p" variant="bodySm">• Advanced order pattern analysis</Text>
-                  <Text as="p" variant="bodySm">• Predictive stock-out alerts</Text>
-                  <Text as="p" variant="bodySm">• Seasonal demand insights</Text>
-                  <Text as="p" variant="bodySm">• Smart reorder recommendations</Text>
-                </BlockStack>
-              </BlockStack>
-            </Box>
-          </BlockStack>
-        </Modal.Section>
-      </Modal>
+
       
       </BlockStack>
     </>
