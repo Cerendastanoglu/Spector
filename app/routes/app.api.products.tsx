@@ -1194,15 +1194,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (actionType === "update-images") {
     try {
-      let productIds, imageOperation, imageUrls, imagePosition;
+      let productIds, imageOperation, imageUrls;
       
       if (requestData instanceof FormData) {
         productIds = JSON.parse(requestData.get("productIds") as string || "[]");
         imageOperation = requestData.get("imageOperation") as string;
         imageUrls = JSON.parse(requestData.get("imageUrls") as string || "[]");
-        imagePosition = requestData.get("imagePosition") as string;
       } else {
-        ({ productIds, imageOperation, imageUrls, imagePosition } = requestData);
+        ({ productIds, imageOperation, imageUrls } = requestData);
       }
 
       if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
@@ -1218,18 +1217,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const createPromises = imageUrls.map((imageUrl: string) => 
               admin.graphql(
                 `#graphql
-                  mutation productCreateMedia($productId: ID!, $media: CreateMediaInput!) {
-                    productCreateMedia(productId: $productId, media: [$media]) {
-                      media {
+                  mutation productUpdate($input: ProductInput!) {
+                    productUpdate(input: $input) {
+                      product {
                         id
-                        ... on MediaImage {
-                          image {
-                            id
-                            url
+                        media(first: 10) {
+                          edges {
+                            node {
+                              id
+                              ... on MediaImage {
+                                image {
+                                  id
+                                  url
+                                }
+                              }
+                            }
                           }
                         }
                       }
-                      userErrors {
+                      mediaUserErrors {
                         field
                         message
                       }
@@ -1237,10 +1243,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   }`,
                 {
                   variables: {
-                    productId,
-                    media: {
-                      originalSource: imageUrl,
-                      mediaContentType: "IMAGE"
+                    input: {
+                      id: productId,
+                      media: [{
+                        originalSource: imageUrl,
+                        mediaContentType: "IMAGE"
+                      }]
                     }
                   }
                 }
@@ -1252,8 +1260,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             
             for (const response of responses) {
               const json: any = await response.json();
-              if (json.errors || json.data?.productCreateMedia?.userErrors?.length > 0) {
-                const error = json.errors?.[0]?.message || json.data?.productCreateMedia?.userErrors?.[0]?.message;
+              if (json.errors || json.data?.productUpdate?.mediaUserErrors?.length > 0) {
+                const error = json.errors?.[0]?.message || json.data?.productUpdate?.mediaUserErrors?.[0]?.message;
                 errors.push(error);
               }
             }
@@ -1313,7 +1321,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   mutation productDeleteMedia($productId: ID!, $mediaIds: [ID!]!) {
                     productDeleteMedia(productId: $productId, mediaIds: $mediaIds) {
                       deletedMediaIds
-                      userErrors {
+                      mediaUserErrors {
                         field
                         message
                       }
@@ -1333,8 +1341,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             
             for (const response of deleteResponses) {
               const json: any = await response.json();
-              if (json.errors || json.data?.productDeleteMedia?.userErrors?.length > 0) {
-                const error = json.errors?.[0]?.message || json.data?.productDeleteMedia?.userErrors?.[0]?.message;
+              if (json.errors || json.data?.productDeleteMedia?.mediaUserErrors?.length > 0) {
+                const error = json.errors?.[0]?.message || json.data?.productDeleteMedia?.mediaUserErrors?.[0]?.message;
                 deleteErrors.push(error);
               }
             }
@@ -1385,7 +1393,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   mutation productDeleteMedia($productId: ID!, $mediaIds: [ID!]!) {
                     productDeleteMedia(productId: $productId, mediaIds: $mediaIds) {
                       deletedMediaIds
-                      userErrors {
+                      mediaUserErrors {
                         field
                         message
                       }
@@ -1400,8 +1408,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               );
 
               const deleteJson: any = await deleteResponse.json();
-              if (deleteJson.errors || deleteJson.data?.productDeleteMedia?.userErrors?.length > 0) {
-                const error = deleteJson.errors?.[0]?.message || deleteJson.data?.productDeleteMedia?.userErrors?.[0]?.message;
+              if (deleteJson.errors || deleteJson.data?.productDeleteMedia?.mediaUserErrors?.length > 0) {
+                const error = deleteJson.errors?.[0]?.message || deleteJson.data?.productDeleteMedia?.mediaUserErrors?.[0]?.message;
                 results.push({
                   productId,
                   success: false,
@@ -1415,12 +1423,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const createPromises = imageUrls.map((imageUrl: string) => 
               admin.graphql(
                 `#graphql
-                  mutation productCreateMedia($productId: ID!, $media: CreateMediaInput!) {
-                    productCreateMedia(productId: $productId, media: [$media]) {
-                      media {
+                  mutation productUpdate($input: ProductInput!) {
+                    productUpdate(input: $input) {
+                      product {
                         id
+                        media(first: 10) {
+                          edges {
+                            node {
+                              id
+                            }
+                          }
+                        }
                       }
-                      userErrors {
+                      mediaUserErrors {
                         field
                         message
                       }
@@ -1428,10 +1443,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   }`,
                 {
                   variables: {
-                    productId,
-                    media: {
-                      originalSource: imageUrl,
-                      mediaContentType: "IMAGE"
+                    input: {
+                      id: productId,
+                      media: [{
+                        originalSource: imageUrl,
+                        mediaContentType: "IMAGE"
+                      }]
                     }
                   }
                 }
@@ -1443,8 +1460,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             
             for (const response of createResponses) {
               const json: any = await response.json();
-              if (json.errors || json.data?.productCreateMedia?.userErrors?.length > 0) {
-                const error = json.errors?.[0]?.message || json.data?.productCreateMedia?.userErrors?.[0]?.message;
+              if (json.errors || json.data?.productUpdate?.mediaUserErrors?.length > 0) {
+                const error = json.errors?.[0]?.message || json.data?.productUpdate?.mediaUserErrors?.[0]?.message;
                 createErrors.push(error);
               }
             }

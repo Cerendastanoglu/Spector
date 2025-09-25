@@ -180,7 +180,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [priceOperation, setPriceOperation] = useState<'set' | 'increase' | 'decrease' | 'round'>('set');
   const [priceValue, setPriceValue] = useState('');
   const [pricePercentage, setPricePercentage] = useState('0');
-  const [roundingRule, setRoundingRule] = useState<'nearest' | 'up' | 'down'>('nearest');
+  const [roundingRule] = useState<'nearest' | 'up' | 'down'>('nearest');
 
   
   // Compare Price Operations State
