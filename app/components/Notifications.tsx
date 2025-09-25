@@ -302,6 +302,9 @@ export function Notifications({ isVisible }: NotificationsProps) {
     },
   ];
 
+  // Active notifications tracking state
+  const [isActiveNotificationsOpen, setIsActiveNotificationsOpen] = useState(false);
+
   // Reset pagination when search query changes
   useEffect(() => {
     setCurrentPage(0);
@@ -873,7 +876,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
   }, [channels, hasNotificationConfigSaved]);
 
   const renderSetupProgress = () => (
-    <div className={styles.stepsContainer}>
+    <div className={styles.stepsContainerThree}>
       {/* Step 1: Product Selection */}
       <div className={`${styles.stepCard} ${currentStep === 0 ? `${styles.active} ${styles.activeInfo}` : ''}`}>
         <Card>
@@ -2149,6 +2152,137 @@ export function Notifications({ isVisible }: NotificationsProps) {
   return (
     <BlockStack gap="300">
       {isSetupMode && renderSetupProgress()}
+      
+      {/* Active Notifications Tracking - similar to bulk edit history */}
+      {isSetupMode && (
+        <Card>
+          <Box padding="200" background="bg-surface-secondary">
+            <InlineStack align="space-between" blockAlign="center">
+              <InlineStack gap="150" blockAlign="center">
+                <Icon source={NotificationIcon} />
+                <Text as="h3" variant="bodySm" fontWeight="medium">
+                  Active Notifications ({existingRules.filter(rule => rule.enabled).length})
+                </Text>
+              </InlineStack>
+              
+              <Button
+                variant="plain"
+                size="micro"
+                icon={isActiveNotificationsOpen ? ChevronUpIcon : ChevronDownIcon}
+                onClick={() => setIsActiveNotificationsOpen(!isActiveNotificationsOpen)}
+              >
+                {isActiveNotificationsOpen ? 'Hide' : 'Show'}
+              </Button>
+            </InlineStack>
+          </Box>
+          
+          <Collapsible
+            open={isActiveNotificationsOpen}
+            id="active-notifications-collapsible"
+            transition={{duration: '200ms', timingFunction: 'ease-in-out'}}
+          >
+            <Box paddingInline="200" paddingBlockEnd="200" background="bg-surface-tertiary">
+              <Box paddingBlockStart="200">
+                {existingRules.filter(rule => rule.enabled).length > 0 ? (
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    {/* Table Header */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '2fr 1fr 1fr 1fr 80px',
+                      gap: '12px',
+                      padding: '8px 12px',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.3px'
+                    }}>
+                      <Text as="span" variant="bodyXs" fontWeight="semibold">Rule Name</Text>
+                      <Text as="span" variant="bodyXs" fontWeight="semibold">Products</Text>
+                      <Text as="span" variant="bodyXs" fontWeight="semibold">Channels</Text>
+                      <Text as="span" variant="bodyXs" fontWeight="semibold">Status</Text>
+                      <Text as="span" variant="bodyXs" fontWeight="semibold">Actions</Text>
+                    </div>
+
+                  {/* Table Rows */}
+                  {existingRules.filter(rule => rule.enabled).map((rule) => (
+                    <div key={rule.id} style={{
+                      display: 'grid',
+                      gridTemplateColumns: '2fr 1fr 1fr 1fr 80px',
+                      gap: '16px',
+                      padding: '16px',
+                      backgroundColor: 'white',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      alignItems: 'center',
+                      transition: 'all 0.2s ease',
+                    }}>
+                      {/* Rule Name & Description */}
+                      <div>
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">
+                          {rule.name}
+                        </Text>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {rule.description}
+                        </Text>
+                      </div>
+
+                      {/* Products Count */}
+                      <div>
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">
+                          {rule.limits?.currentProducts || 0}
+                        </Text>
+                        <Text as="p" variant="bodyXs" tone="subdued">
+                          products
+                        </Text>
+                      </div>
+
+                      {/* Active Channels */}
+                      <div>
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">
+                          {rule.channels.length}
+                        </Text>
+                        <Text as="p" variant="bodyXs" tone="subdued">
+                          channels
+                        </Text>
+                      </div>
+
+                      {/* Status */}
+                      <Badge tone={rule.enabled ? 'success' : 'critical'}>
+                        {rule.enabled ? 'Active' : 'Inactive'}
+                      </Badge>
+
+                      {/* Actions */}
+                      <InlineStack gap="100">
+                        <Tooltip content="Edit rule">
+                          <Button
+                            icon={EditIcon}
+                            variant="tertiary"
+                            size="micro"
+                            onClick={() => console.log('Edit rule:', rule.id)}
+                          />
+                        </Tooltip>
+                      </InlineStack>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Box background="bg-surface-secondary" padding="300" borderRadius="200">
+                  <BlockStack gap="200" align="center">
+                    <Icon source={NotificationIcon} tone="subdued" />
+                    <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+                      No active notifications yet. Complete setup to start monitoring your products.
+                    </Text>
+                  </BlockStack>
+                </Box>
+              )}
+              </Box>
+            </Box>
+          </Collapsible>
+        </Card>
+      )}
       
       {isSetupMode ? (
         <>

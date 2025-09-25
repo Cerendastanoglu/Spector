@@ -1,24 +1,23 @@
 import { useState } from "react";
 import { json } from "@remix-run/node";
 import {
+  Page,
+  Layout,
   Card,
   Text,
   BlockStack,
   InlineStack,
   Box,
-  Button,
   Icon,
-  Badge,
-  EmptyState,
   Divider,
-  Select,
-  TextField,
-  Spinner,
+  Tabs,
+  EmptyState,
+  Banner,
 } from "@shopify/polaris";
 import {
-  MagicIcon,
-  SearchIcon,
-  InfoIcon,
+  ChartVerticalIcon,
+  CashDollarIcon,
+  AlertTriangleIcon,
 } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 
@@ -33,6 +32,7 @@ export const loader = async ({ request }: { request: Request }) => {
 };
 
 export default function MarketAnalysis() {
+  const [activeTab, setActiveTab] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [analysisType, setAnalysisType] = useState('market-trends');
   const [timeframe, setTimeframe] = useState('30');
@@ -45,6 +45,81 @@ export default function MarketAnalysis() {
       setIsLoading(false);
     }, 2000);
   };
+
+  const marketIntelligenceTools = [
+    {
+      id: 'trends-analyzer',
+      title: 'Trends Analyzer',
+      description: 'Real-time market trend analysis using Google Trends data',
+      icon: '📈',
+      status: 'active',
+      insights: [
+        'Seasonal demand patterns',
+        'Emerging product categories',
+        'Consumer interest shifts'
+      ]
+    },
+    {
+      id: 'price-optimizer',
+      title: 'Price Intelligence',
+      description: 'AI-powered competitive pricing analysis',
+      icon: '💰',
+      status: 'active',
+      insights: [
+        'Competitor price tracking',
+        'Optimal pricing suggestions',
+        'Market positioning analysis'
+      ]
+    },
+    {
+      id: 'demand-predictor',
+      title: 'Demand Forecasting',
+      description: 'ML-based demand prediction models',
+      icon: '🔮',
+      status: 'active',
+      insights: [
+        'Sales volume predictions',
+        'Inventory optimization',
+        'Growth opportunity alerts'
+      ]
+    },
+    {
+      id: 'competitor-scout',
+      title: 'Competitor Intelligence',
+      description: 'Monitor competitor strategies and performance',
+      icon: '🕵️',
+      status: 'active',
+      insights: [
+        'Competitor product launches',
+        'Marketing strategy analysis',
+        'Market share tracking'
+      ]
+    },
+    {
+      id: 'consumer-insights',
+      title: 'Consumer Behavior',
+      description: 'Deep dive into customer preferences and behavior',
+      icon: '👥',
+      status: 'coming-soon',
+      insights: [
+        'Purchase pattern analysis',
+        'Customer sentiment tracking',
+        'Demographic insights'
+      ]
+    },
+    {
+      id: 'keyword-analyzer',
+      title: 'SEO & Keywords',
+      description: 'Product keyword optimization for search visibility',
+      icon: '🔍',
+      status: 'coming-soon',
+      insights: [
+        'High-value keyword discovery',
+        'Search volume trends',
+        'Competitor keyword gaps'
+      ]
+    }
+  ];
 
   const analysisOptions = [
     { label: 'Market Trends', value: 'market-trends' },
@@ -62,280 +137,120 @@ export default function MarketAnalysis() {
     { label: 'Last 1 year', value: '365' },
   ];
 
-  return (
-    <BlockStack gap="500">
-      {/* Header Section */}
-      <Card>
-        <BlockStack gap="400">
-          <InlineStack align="space-between" blockAlign="center">
-            <BlockStack gap="200">
-              <InlineStack gap="300" blockAlign="center">
-                <Box 
-                  background="bg-surface-info" 
-                  padding="200" 
-                  borderRadius="100"
-                >
-                  <Icon source={MagicIcon} tone="info" />
-                </Box>
-                <BlockStack gap="100">
-                  <Text as="h1" variant="headingLg" fontWeight="bold">
-                    Market Analysis & AI Insights
-                  </Text>
-                  <Text as="p" variant="bodyMd" tone="subdued">
-                    Powered by AI to give you competitive intelligence and market insights
-                  </Text>
-                </BlockStack>
-              </InlineStack>
-            </BlockStack>
-            <Badge tone="info">AI Powered</Badge>
-          </InlineStack>
+  const tabs = [
+    { id: 'overview', content: 'Market Overview' },
+    { id: 'trends', content: 'Trends Analysis' },
+    { id: 'competitors', content: 'Competitive Intelligence' },
+    { id: 'opportunities', content: 'Growth Opportunities' },
+  ];
 
-          <Divider />
-
-          {/* Analysis Controls */}
-          <InlineStack gap="400" wrap>
-            <Box minWidth="250px">
-              <Select
-                label="Analysis Type"
-                options={analysisOptions}
-                value={analysisType}
-                onChange={setAnalysisType}
-              />
-            </Box>
-            <Box minWidth="200px">
-              <Select
-                label="Timeframe"
-                options={timeframeOptions}
-                value={timeframe}
-                onChange={setTimeframe}
-              />
-            </Box>
-            <Box minWidth="300px">
-              <TextField
-                label="Search Keywords"
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="Enter product categories, brands, or keywords..."
-                prefix={<Icon source={SearchIcon} />}
-                autoComplete="off"
-              />
-            </Box>
-            <div style={{ alignSelf: 'flex-end' }}>
-              <Button
-                variant="primary"
-                icon={MagicIcon}
-                loading={isLoading}
-                onClick={handleAnalyze}
-              >
-                {isLoading ? 'Analyzing...' : 'Analyze Market'}
-              </Button>
-            </div>
-          </InlineStack>
-        </BlockStack>
-      </Card>
-
-      {/* Feature Cards Grid */}
-      <InlineStack gap="400" wrap>
-        {/* Market Trends Card */}
-        <div style={{ minWidth: '300px', flex: 1 }}>
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="300" blockAlign="center">
-                <Box 
-                  background="bg-surface-success" 
-                  padding="200" 
-                  borderRadius="100"
-                >
-                  <Icon source={MagicIcon} tone="success" />
-                </Box>
-                <BlockStack gap="100">
-                  <Text as="h3" variant="headingMd" fontWeight="semibold">
-                    Market Trends
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Track industry trends and emerging opportunities
-                  </Text>
-                </BlockStack>
-              </InlineStack>
-              
-              <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                <BlockStack gap="200">
-                  <Text as="p" variant="bodySm" fontWeight="semibold">
-                    Coming Soon:
-                  </Text>
-                  <BlockStack gap="100">
-                    <Text as="p" variant="bodySm" tone="subdued">• Real-time trend detection</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">• Seasonal pattern analysis</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">• Emerging category insights</Text>
-                  </BlockStack>
-                </BlockStack>
-              </Box>
-            </BlockStack>
-          </Card>
-        </div>
-
-        {/* Competitor Analysis Card */}
-        <div style={{ minWidth: '300px', flex: 1 }}>
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="300" blockAlign="center">
-                <Box 
-                  background="bg-surface-info" 
-                  padding="200" 
-                  borderRadius="100"
-                >
-                  <Icon source={SearchIcon} tone="info" />
-                </Box>
-                <BlockStack gap="100">
-                  <Text as="h3" variant="headingMd" fontWeight="semibold">
-                    Competitor Intelligence
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Monitor competitor pricing and strategies
-                  </Text>
-                </BlockStack>
-              </InlineStack>
-              
-              <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                <BlockStack gap="200">
-                  <Text as="p" variant="bodySm" fontWeight="semibold">
-                    Coming Soon:
-                  </Text>
-                  <BlockStack gap="100">
-                    <Text as="p" variant="bodySm" tone="subdued">• Price comparison analysis</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">• Product positioning insights</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">• Market share tracking</Text>
-                  </BlockStack>
-                </BlockStack>
-              </Box>
-            </BlockStack>
-          </Card>
-        </div>
-
-        {/* AI Insights Card */}
-        <div style={{ minWidth: '300px', flex: 1 }}>
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="300" blockAlign="center">
-                <Box 
-                  background="bg-surface-warning" 
-                  padding="200" 
-                  borderRadius="100"
-                >
-                  <Icon source={InfoIcon} tone="warning" />
-                </Box>
-                <BlockStack gap="100">
-                  <Text as="h3" variant="headingMd" fontWeight="semibold">
-                    AI-Powered Insights
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Get intelligent recommendations and predictions
-                  </Text>
-                </BlockStack>
-              </InlineStack>
-              
-              <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                <BlockStack gap="200">
-                  <Text as="p" variant="bodySm" fontWeight="semibold">
-                    Coming Soon:
-                  </Text>
-                  <BlockStack gap="100">
-                    <Text as="p" variant="bodySm" tone="subdued">• Demand prediction models</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">• Pricing optimization</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">• Growth opportunity alerts</Text>
-                  </BlockStack>
-                </BlockStack>
-              </Box>
-            </BlockStack>
-          </Card>
-        </div>
-      </InlineStack>
-
-      {/* Main Content Area */}
-      {isLoading ? (
+  const renderOverviewTab = () => (
+    <BlockStack gap="400">
+      <Banner tone="info">
+        <Text as="p" variant="bodySm">
+          Market analysis tools are currently in development. Advanced AI-powered insights and competitive intelligence features will be available soon.
+        </Text>
+      </Banner>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
         <Card>
-          <BlockStack align="center" gap="400">
-            <Spinner accessibilityLabel="Analyzing market data" size="large" />
-            <BlockStack align="center" gap="200">
-              <Text as="h3" variant="headingMd">
-                Analyzing Market Data...
-              </Text>
-              <Text as="p" variant="bodyMd" tone="subdued">
-                Our AI is processing market trends, competitor data, and consumer insights
-              </Text>
-            </BlockStack>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="h3" variant="headingSm" fontWeight="semibold">Market Size</Text>
+              <Icon source={ChartVerticalIcon} tone="info" />
+            </InlineStack>
+            <Text as="p" variant="headingMd" fontWeight="bold">Coming Soon</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Total addressable market analysis for your product categories
+            </Text>
           </BlockStack>
         </Card>
-      ) : (
+        
         <Card>
-          <EmptyState
-            heading="Ready to Analyze"
-            action={{
-              content: 'Start Analysis',
-              onAction: handleAnalyze,
-            }}
-            secondaryAction={{
-              content: 'Learn More',
-              url: '#',
-            }}
-            image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-          >
-            <Box maxWidth="400px">
-              <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
-                Select your analysis type and timeframe above, then click "Analyze Market" to get 
-                AI-powered insights about your market, competitors, and growth opportunities.
-              </Text>
-            </Box>
-          </EmptyState>
-        </Card>
-      )}
-
-      {/* Information Footer */}
-      <Card>
-        <BlockStack gap="300">
-          <InlineStack gap="200" blockAlign="center">
-            <Icon source={InfoIcon} tone="subdued" />
-            <Text as="h3" variant="headingSm" fontWeight="semibold">
-              About Market Analysis
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="h3" variant="headingSm" fontWeight="semibold">Price Trends</Text>
+              <Icon source={CashDollarIcon} tone="success" />
+            </InlineStack>
+            <Text as="p" variant="headingMd" fontWeight="bold">Coming Soon</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Average pricing trends and optimal price points
             </Text>
-          </InlineStack>
-          
-          <Text as="p" variant="bodySm" tone="subdued">
-            Our Market Analysis feature uses advanced AI algorithms to analyze market trends, 
-            competitor data, and consumer behavior patterns. This helps you make data-driven 
-            decisions about pricing, product positioning, and market opportunities.
-          </Text>
-          
-          <InlineStack gap="400" wrap>
-            <BlockStack gap="100">
-              <Text as="p" variant="bodySm" fontWeight="semibold">
-                🤖 AI-Powered Analysis
-              </Text>
-              <Text as="p" variant="bodyXs" tone="subdued">
-                Machine learning models trained on market data
-              </Text>
-            </BlockStack>
-            
-            <BlockStack gap="100">
-              <Text as="p" variant="bodySm" fontWeight="semibold">
-                📊 Real-Time Data
-              </Text>
-              <Text as="p" variant="bodyXs" tone="subdued">
-                Up-to-date market information and trends
-              </Text>
-            </BlockStack>
-            
-            <BlockStack gap="100">
-              <Text as="p" variant="bodySm" fontWeight="semibold">
-                🎯 Actionable Insights
-              </Text>
-              <Text as="p" variant="bodyXs" tone="subdued">
-                Clear recommendations for business growth
-              </Text>
-            </BlockStack>
-          </InlineStack>
-        </BlockStack>
-      </Card>
+          </BlockStack>
+        </Card>
+        
+        <Card>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="h3" variant="headingSm" fontWeight="semibold">Market Risks</Text>
+              <Icon source={AlertTriangleIcon} tone="warning" />
+            </InlineStack>
+            <Text as="p" variant="headingMd" fontWeight="bold">Coming Soon</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Potential market risks and mitigation strategies
+            </Text>
+          </BlockStack>
+        </Card>
+      </div>
     </BlockStack>
+  );
+
+  const renderPlaceholderTab = (title: string, description: string) => (
+    <EmptyState
+      heading={`${title} - In Development`}
+      image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+    >
+      <Text as="p" variant="bodySm" tone="subdued">
+        {description} This feature is being built with advanced AI capabilities and will be available in a future update.
+      </Text>
+    </EmptyState>
+  );
+
+  return (
+    <Page>
+      <Layout>
+        <Layout.Section>
+          <BlockStack gap="400">
+            {/* Header Section */}
+            <Card>
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="start">
+                  <BlockStack gap="200">
+                    <Text as="h1" variant="headingLg">
+                      Market Analysis & AI Insights
+                    </Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      AI-powered market intelligence and competitive analysis tools
+                    </Text>
+                  </BlockStack>
+                </InlineStack>
+
+                <Divider />
+
+                {/* Tabs Section */}
+                <Box background="bg-surface-secondary" borderRadius="300" padding="200">
+                  <Tabs
+                    tabs={tabs}
+                    selected={activeTab}
+                    onSelect={setActiveTab}
+                    fitted={true}
+                  />
+                </Box>
+              </BlockStack>
+            </Card>
+
+            {/* Tab Content */}
+            <Card>
+              <Box paddingBlockStart="100">
+                {activeTab === 0 && renderOverviewTab()}
+                {activeTab === 1 && renderPlaceholderTab('Trends Analysis', 'Advanced trend analysis using machine learning to identify market patterns and consumer behavior shifts.')}
+                {activeTab === 2 && renderPlaceholderTab('Competitive Intelligence', 'Comprehensive competitor monitoring including pricing strategies, product launches, and market positioning.')}
+                {activeTab === 3 && renderPlaceholderTab('Growth Opportunities', 'AI-identified growth opportunities based on market gaps, emerging trends, and demand forecasting.')}
+              </Box>
+            </Card>
+          </BlockStack>
+        </Layout.Section>
+      </Layout>
+    </Page>
   );
 }
