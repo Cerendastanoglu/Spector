@@ -288,7 +288,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [seasonalPricing, setSeasonalPricing] = useState('');
   
   // Enhanced Error and success states for bulk operations
-
+  const [success, setSuccess] = useState<string | null>(null);
 
   
   const [showDraftProducts, setShowDraftProducts] = useState(true);
@@ -699,11 +699,63 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   //   setSelectedProducts(checked ? filteredProducts.map(p => p.id) : []);
   // };
 
+  // CSV Export Function
+  const handleExportCSV = () => {
+    if (selectedProducts.length === 0) {
+      setError("Please select at least one product to export.");
+      return;
+    }
 
+    const selectedProductsData = filteredProducts.filter(product => 
+      selectedProducts.includes(product.id)
+    );
 
+    // Define CSV headers - including variant inventory columns
+    const headers = [
+      'Title',
+      'Handle', 
+      'Status',
+      'Total Inventory',
+      'Total Variants',
+      'Variant Inventories'
+    ];
 
+    // Convert products to CSV format
+    const csvData = selectedProductsData.map(product => {
+      // Get variant inventory details
+      const variantInventories = product.variants?.edges?.map(variant => 
+        `${variant.node.title}: ${variant.node.inventoryQuantity || 0}`
+      ).join('; ') || '';
 
+      return [
+        `"${product.title}"`, // Wrap in quotes to handle commas
+        product.handle,
+        product.status,
+        product.totalInventory,
+        product.variants?.edges?.length || 0,
+        `"${variantInventories}"` // Wrap in quotes to handle commas and semicolons
+      ];
+    });
 
+    // Combine headers and data
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.join(','))
+    ].join('\n');
+
+    // Create and download the file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `products_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setSuccess(`Successfully exported ${selectedProducts.length} products to CSV.`);
+  };
 
   // Enhanced Pricing Operations with Advanced Error Handling
   const handleBulkPricing = async () => {
@@ -2126,14 +2178,26 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 Dismiss
               </Button>
             </InlineStack>
-            <Button
-              onClick={fetchAllProducts}
-              variant="secondary"
-              size="slim"
-              tone="critical"
-            >
-              Retry
-            </Button>
+          </BlockStack>
+        </Card>
+      )}
+
+      {/* Success Display */}
+      {success && (
+        <Card background="bg-surface-success">
+          <BlockStack gap="200">
+            <InlineStack align="space-between">
+              <Text as="p" variant="bodyMd" tone="success">
+                {success}
+              </Text>
+              <Button
+                variant="plain"
+                onClick={() => setSuccess(null)}
+                size="slim"
+              >
+                Dismiss
+              </Button>
+            </InlineStack>
           </BlockStack>
         </Card>
       )}
@@ -2445,14 +2509,30 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                     Choose the products and variants you want to edit in bulk. Use filters to find specific products.
                   </Text>
                 </BlockStack>
-                <Button 
-                  onClick={fetchAllProducts} 
-                  loading={isLoading || fetcher.state === 'submitting'} 
-                  variant="secondary"
-                  size="slim"
-                >
-                  Refresh Products
-                </Button>
+                <InlineStack gap="300" align="end">
+                  <Badge tone="info" size="medium">
+                    {`${selectedProducts.length} of ${filteredProducts.length} selected`}
+                  </Badge>
+                  <InlineStack gap="200">
+                    <Button 
+                      onClick={handleExportCSV}
+                      disabled={selectedProducts.length === 0}
+                      variant="secondary"
+                      size="slim"
+                      tone="success"
+                    >
+                      Export CSV
+                    </Button>
+                    <Button 
+                      onClick={fetchAllProducts} 
+                      loading={isLoading || fetcher.state === 'submitting'} 
+                      variant="secondary"
+                      size="slim"
+                    >
+                      Refresh Products
+                    </Button>
+                  </InlineStack>
+                </InlineStack>
               </InlineStack>
 
               {/* Modern Compact Search and Filter Section */}

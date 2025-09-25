@@ -18,6 +18,7 @@ import {
   ChartVerticalIcon,
   CashDollarIcon,
   AlertTriangleIcon,
+  InfoIcon,
 } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 
@@ -41,13 +42,58 @@ export default function MarketAnalysis() {
     { id: 'opportunities', content: 'Growth Opportunities' },
   ];
 
+  const upcomingFeatures = [
+    "Real-time market trend analysis using Google Trends data",
+    "AI-powered competitive pricing intelligence",
+    "ML-based demand forecasting and inventory optimization",
+    "Competitor monitoring and strategy analysis", 
+    "Consumer behavior insights and sentiment tracking",
+    "SEO keyword optimization for product discovery",
+    "Market share tracking and growth opportunity alerts",
+    "Seasonal demand pattern analysis",
+    "Price elasticity modeling and optimization"
+  ];
+
   const renderOverviewTab = () => (
     <BlockStack gap="400">
-      <Banner tone="info">
-        <Text as="p" variant="bodySm">
-          Market analysis tools are currently in development. Advanced AI-powered insights and competitive intelligence features will be available soon.
-        </Text>
-      </Banner>
+      {/* Development Status Banner */}
+      <Card>
+        <BlockStack gap="400">
+          <Banner tone="info">
+            <BlockStack gap="300">
+              <Text as="p" variant="bodyMd">
+                <strong>🚧 Market Analysis - In Development</strong>
+              </Text>
+              <Text as="p" variant="bodySm">
+                Our advanced AI-powered market intelligence platform is currently under development. These features will provide you with comprehensive competitive insights and market analysis.
+              </Text>
+            </BlockStack>
+          </Banner>
+          
+          <BlockStack gap="300">
+            <Text as="h3" variant="headingMd" fontWeight="semibold">Upcoming Features:</Text>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px' }}>
+              {upcomingFeatures.map((feature, index) => (
+                <Box key={index} background="bg-surface-secondary" padding="300" borderRadius="200">
+                  <InlineStack gap="200" blockAlign="start">
+                    <Text as="span" variant="bodySm" tone="subdued">•</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">{feature}</Text>
+                  </InlineStack>
+                </Box>
+              ))}
+            </div>
+            
+            <Box padding="300" background="bg-surface-info" borderRadius="200" borderWidth="025" borderColor="border-info">
+              <InlineStack gap="200" blockAlign="center">
+                <Icon source={InfoIcon} tone="info" />
+                <Text as="p" variant="bodySm">
+                  Expected launch: Q1 2026. Sign up for early access notifications in your account settings.
+                </Text>
+              </InlineStack>
+            </Box>
+          </BlockStack>
+        </BlockStack>
+      </Card>
       
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
         <Card>

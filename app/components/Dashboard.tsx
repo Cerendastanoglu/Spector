@@ -14,6 +14,7 @@ import {
   Badge,
   Tooltip,
   Divider,
+  Collapsible,
 
 
 } from "@shopify/polaris";
@@ -28,6 +29,7 @@ import {
   XIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
   ViewIcon,
   CheckCircleIcon,
   PlusCircleIcon,
@@ -111,6 +113,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [searchProduct, setSearchProduct] = useState('');
   const [priceDistributionIndex, setPriceDistributionIndex] = useState(0);
+  const [showAIMethodology, setShowAIMethodology] = useState(false);
 
   // Top Products Slider State
   
@@ -1128,7 +1131,6 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
               </Text>
               <InlineStack gap="200">
                 <Button variant="secondary" size="slim">Export Report</Button>
-                <Button variant="primary" size="slim">Bulk Reorder</Button>
               </InlineStack>
             </InlineStack>
 
@@ -1275,52 +1277,76 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
           </BlockStack>
         </Card>
 
-        {/* Forecasting Methodology */}
+        {/* Forecasting Methodology - Accordion */}
         <Card>
-          <BlockStack gap="400">
-            <Text as="h3" variant="headingMd" fontWeight="semibold">How Our AI Forecasting Works</Text>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-              gap: '20px' 
-            }}>
-              <Box background="bg-surface-secondary" padding="400" borderRadius="200">
-                <BlockStack gap="200">
-                  <InlineStack gap="200" blockAlign="center">
-                    <Icon source={ChartVerticalIcon} tone="info" />
-                    <Text as="p" variant="headingSm" fontWeight="semibold">Smart Demand Analysis</Text>
-                  </InlineStack>
-                  <Text as="p" variant="bodyMd">
-                    We analyze your sales history, seasonal trends, and market patterns to predict accurate daily demand for each product.
-                  </Text>
-                </BlockStack>
-              </Box>
+          <Box background="bg-surface-secondary" padding="300" borderRadius="200">
+            <Button
+              onClick={() => setShowAIMethodology(!showAIMethodology)}
+              variant="plain"
+              size="large"
+              textAlign="left"
+              fullWidth
+              icon={showAIMethodology ? ChevronDownIcon : ChevronRightIcon}
+            >
+              How Our AI Forecasting Works
+            </Button>
+            
+            <Collapsible
+              open={showAIMethodology}
+              id="ai-methodology"
+              transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
+            >
+              <Box paddingBlockStart="400">
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+                  gap: '16px' 
+                }}>
+                  <Box background="bg-surface" padding="400" borderRadius="200" borderWidth="025" borderColor="border">
+                    <BlockStack gap="300">
+                      <InlineStack gap="300" blockAlign="center">
+                        <Box background="bg-fill-info-secondary" padding="200" borderRadius="100">
+                          <Icon source={ChartVerticalIcon} tone="info" />
+                        </Box>
+                        <Text as="p" variant="headingSm" fontWeight="semibold">Smart Demand Analysis</Text>
+                      </InlineStack>
+                      <Text as="p" variant="bodyMd" tone="subdued">
+                        We analyze your sales history, seasonal trends, and market patterns to predict accurate daily demand for each product.
+                      </Text>
+                    </BlockStack>
+                  </Box>
 
-              <Box background="bg-surface-secondary" padding="400" borderRadius="200">
-                <BlockStack gap="200">
-                  <InlineStack gap="200" blockAlign="center">
-                    <Icon source={ClockIcon} tone="warning" />
-                    <Text as="p" variant="headingSm" fontWeight="semibold">Lead Time Optimization</Text>
-                  </InlineStack>
-                  <Text as="p" variant="bodyMd">
-                    Our system tracks supplier lead times and automatically adjusts reorder points to prevent stockouts while minimizing carrying costs.
-                  </Text>
-                </BlockStack>
-              </Box>
+                  <Box background="bg-surface" padding="400" borderRadius="200" borderWidth="025" borderColor="border">
+                    <BlockStack gap="300">
+                      <InlineStack gap="300" blockAlign="center">
+                        <Box background="bg-fill-warning-secondary" padding="200" borderRadius="100">
+                          <Icon source={ClockIcon} tone="warning" />
+                        </Box>
+                        <Text as="p" variant="headingSm" fontWeight="semibold">Lead Time Optimization</Text>
+                      </InlineStack>
+                      <Text as="p" variant="bodyMd" tone="subdued">
+                        Our system tracks supplier lead times and automatically adjusts reorder points to prevent stockouts while minimizing carrying costs.
+                      </Text>
+                    </BlockStack>
+                  </Box>
 
-              <Box background="bg-surface-secondary" padding="400" borderRadius="200">
-                <BlockStack gap="200">
-                  <InlineStack gap="200" blockAlign="center">
-                    <Icon source={CashDollarIcon} tone="success" />
-                    <Text as="p" variant="headingSm" fontWeight="semibold">Profit-First Prioritization</Text>
-                  </InlineStack>
-                  <Text as="p" variant="bodyMd">
-                    We prioritize inventory decisions based on profit margins and velocity, helping you focus capital on your most profitable products.
-                  </Text>
-                </BlockStack>
+                  <Box background="bg-surface" padding="400" borderRadius="200" borderWidth="025" borderColor="border">
+                    <BlockStack gap="300">
+                      <InlineStack gap="300" blockAlign="center">
+                        <Box background="bg-fill-success-secondary" padding="200" borderRadius="100">
+                          <Icon source={CashDollarIcon} tone="success" />
+                        </Box>
+                        <Text as="p" variant="headingSm" fontWeight="semibold">Profit-First Prioritization</Text>
+                      </InlineStack>
+                      <Text as="p" variant="bodyMd" tone="subdued">
+                        We prioritize inventory decisions based on profit margins and velocity, helping you focus capital on your most profitable products.
+                      </Text>
+                    </BlockStack>
+                  </Box>
+                </div>
               </Box>
-            </div>
-          </BlockStack>
+            </Collapsible>
+          </Box>
         </Card>
       </BlockStack>
     );
