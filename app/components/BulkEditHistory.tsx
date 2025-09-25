@@ -297,42 +297,44 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
       <BlockStack gap="100">
         {batches.map((batch) => (
           <div key={batch.id}>
-            {/* Ultra-Minimal List Item */}
+            {/* Enhanced List Item */}
             <Box 
-              paddingBlock="150" 
-              paddingInline="200"
+              paddingBlock="200" 
+              paddingInline="300"
             >
               <InlineStack align="space-between" blockAlign="center">
-                <InlineStack gap="200" align="center" wrap={false}>
-                  <Text variant="bodySm" as="span" fontWeight="medium">
-                    {batch.operationName}
-                  </Text>
-                  <Text variant="bodySm" tone="subdued" as="span">
-                    • {formatDate(batch.createdAt)}
-                  </Text>
-                  {getStatusBadge(batch)}
-                </InlineStack>
-                
-                <InlineStack gap="100" align="center">
+                {/* Action Buttons on Left */}
+                <InlineStack gap="150" align="center">
                   <Button
-                    variant="plain"
+                    variant="tertiary"
                     size="micro"
                     onClick={() => toggleDetails(batch.id)}
                   >
-                    {expandedDetails.has(batch.id) ? 'Less' : 'Details'}
+                    {expandedDetails.has(batch.id) ? '👁️ Less' : '👁️ Details'}
                   </Button>
                   {batch.canRevert && !batch.isReverted && (
                     <Button
                       size="micro"
-                      variant="plain"
+                      variant="tertiary"
                       tone="critical"
                       loading={revertingBatchId === batch.id}
                       disabled={revertingBatchId !== null}
                       onClick={() => handleRevert(batch)}
                     >
-                      Revert
+                      ↶ Revert
                     </Button>
                   )}
+                </InlineStack>
+                
+                {/* Content on Right */}
+                <InlineStack gap="300" align="center" wrap={false}>
+                  <Text variant="bodyMd" as="span" fontWeight="semibold">
+                    {batch.operationName}
+                  </Text>
+                  <Text variant="bodySm" tone="subdued" as="span">
+                    {formatDate(batch.createdAt)}
+                  </Text>
+                  {getStatusBadge(batch)}
                 </InlineStack>
               </InlineStack>
             </Box>
@@ -397,16 +399,21 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
 
   return (
     <>
-      {/* Ultra-Minimal Header */}
-      <Box paddingBlock="150" paddingInline="100">
-        <Button
-          variant="plain"
-          size="micro"
-          icon={expanded ? ChevronUpIcon : ChevronDownIcon}
-          onClick={() => setExpanded(!expanded)}
-        >
-          Recent Activity ({mockBatches.length.toString()})
-        </Button>
+      {/* Enhanced Header */}
+      <Box paddingBlock="200" paddingInline="200">
+        <InlineStack gap="200" align="center">
+          <Button
+            variant="plain"
+            size="large"
+            icon={expanded ? ChevronUpIcon : ChevronDownIcon}
+            onClick={() => setExpanded(!expanded)}
+          >
+            Recent Activity
+          </Button>
+          <Badge tone="info" size="small">
+            {mockBatches.length.toString()}
+          </Badge>
+        </InlineStack>
       </Box>
 
       <Collapsible
@@ -414,7 +421,7 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
         id="bulk-edit-history"
         transition={{ duration: '150ms', timingFunction: 'ease-out' }}
       >
-        <Box paddingInline="100" paddingBlockEnd="200">
+        <Box paddingInline="200" paddingBlockStart="100" paddingBlockEnd="200">
           {renderHistory()}
         </Box>
       </Collapsible>
