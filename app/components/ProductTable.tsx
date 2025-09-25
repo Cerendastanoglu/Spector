@@ -70,6 +70,7 @@ interface ProductTableProps {
   onExpandProduct: (productId: string) => void;
   onViewProduct: (product: Product) => void;
   onEditProduct: (product: Product) => void;
+  onContinueToBulkEdit?: () => void;
   shopCurrency?: string;
   showVariantSelection?: boolean;
   totalCount?: number;
@@ -88,6 +89,7 @@ export function ProductTable({
   onExpandProduct,
   onViewProduct,
   onEditProduct,
+  onContinueToBulkEdit,
   shopCurrency = '$',
   showVariantSelection = false,
   totalCount,
@@ -702,6 +704,25 @@ export function ProductTable({
           <Text as="p" variant="bodyXs" tone="subdued">
             Showing {products.length}{totalCount ? ` of ${totalCount}` : ''} products
           </Text>
+        </div>
+      )}
+      
+      {/* Continue to Bulk Edit Button */}
+      {selectedProducts.length > 0 && (
+        <div style={{ 
+          padding: '16px', 
+          borderTop: '1px solid #e5e7eb',
+          backgroundColor: '#f8fafc',
+          textAlign: 'center'
+        }}>
+          <Button
+            variant="primary"
+            size="large"
+            onClick={onContinueToBulkEdit}
+            disabled={selectedProducts.length === 0}
+          >
+            {`Continue with ${selectedProducts.length} selected product${selectedProducts.length !== 1 ? 's' : ''} →`}
+          </Button>
         </div>
       )}
     </div>

@@ -129,3 +129,44 @@ model DataRetentionPolicy {
   @@unique([shop, dataType])
   @@index([shop])
 }
+
+// Bulk Edit History System
+model BulkEditBatch {
+  id              String   @id @default(cuid())
+  shop            String   // Which Shopify store
+  operationType   String   // 'pricing', 'collections', 'tags', 'content', 'inventory', 'variants'
+  operationName   String   // Human readable name like "Price Update", "Tag Addition"
+  description     String?  // Optional description of the operation
+  totalProducts   Int      // Number of products affected
+  totalVariants   Int      // Number of variants affected
+  createdAt       DateTime @default(now())
+  canRevert       Boolean  @default(true)  // Whether this batch can be reverted
+  isReverted      Boolean  @default(false) // Whether this batch has been reverted
+  revertedAt      DateTime? // When it was reverted
+  
+  // Relationships
+  items           BulkEditItem[]
+  
+  @@index([shop])
+  @@index([shop, createdAt])
+  @@index([operationType])
+}
+
+model BulkEditItem {
+  id              String   @id @default(cuid())
+  batchId         String
+  productId       String   // Shopify product ID
+  variantId       String?  // Shopify variant ID (if applicable)
+  productTitle    String   // Cache product title
+  variantTitle    String?  // Cache variant title (if applicable)
+  fieldChanged    String   // Field that was changed (price, compareAtPrice, tags, etc.)
+  oldValue        String?  // Previous value (JSON string for complex data)
+  newValue        String?  // New value (JSON string for complex data)
+  changeType      String   // 'update', 'add', 'remove'
+  
+  // Relationships
+  batch           BulkEditBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  
+  @@index([batchId])
+  @@index([productId])
+}

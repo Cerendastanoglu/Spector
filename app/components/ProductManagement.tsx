@@ -3,6 +3,7 @@ import { useFetcher } from "@remix-run/react";
 import { openInNewTab } from "../utils/browserUtils";
 import { ProductConstants } from "../utils/scopedConstants";
 import { ProductTable } from "./ProductTable";
+import { BulkEditHistory } from "./BulkEditHistory";
 import styles from "./StepsUI.module.css";
 import {
   Card,
@@ -20,7 +21,6 @@ import {
   Icon,
   Collapsible,
   Toast,
-  Frame,
   Divider,
 } from '@shopify/polaris';
 // Import only the icons we actually use
@@ -199,8 +199,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [collectionSearchQuery] = useState('');
   
   // Current Ads Management State
-  const [showCurrentAds, setShowCurrentAds] = useState(false);
+  const [showCurrentAds, setShowCurrentAds] = useState<{[key: number]: boolean}>({});
   const [currentAds, setCurrentAds] = useState<any[]>([]);
+  const [adsLoaded, setAdsLoaded] = useState<{[key: number]: boolean}>({});
+  const [fetchingAds, setFetchingAds] = useState(false);
   
   // Description Management State  
   const [descriptionOperation, setDescriptionOperation] = useState<'prefix' | 'suffix' | 'replace'>('prefix');
@@ -1719,6 +1721,120 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
   };
 
+  // Handler for fetching current ads with lazy loading
+  const handleFetchCurrentAds = async (tabIndex: number) => {
+    if (selectedProducts.length === 0) {
+      alert('Please select products first');
+      return;
+    }
+
+    // If ads are already loaded for this tab, don't fetch again
+    if (adsLoaded[tabIndex]) {
+      return;
+    }
+
+    setFetchingAds(true);
+    try {
+      const productIds = selectedProducts;
+      const response = await fetch('/app/api/product-analytics', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          productIds,
+          action: 'getCurrentAds'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch current ads');
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        setCurrentAds(result.ads || []);
+        setAdsLoaded(prev => ({ ...prev, [tabIndex]: true }));
+      } else {
+        throw new Error(result.error || 'Failed to fetch ads');
+      }
+    } catch (error) {
+      console.error('Error fetching current ads:', error);
+      alert('Failed to fetch current ads. Please try again.');
+    } finally {
+      setFetchingAds(false);
+    }
+  };
+
+  // Reusable function to render Current Ads section
+  const renderCurrentAdsSection = () => (
+    <Card>
+      <BlockStack gap="300">
+        <InlineStack align="space-between" blockAlign="center">
+          <Text as="h4" variant="headingSm">Current Product Ads</Text>
+          <Button
+            variant="plain"
+            onClick={() => {
+              const isCurrentlyOpen = showCurrentAds[activeBulkTab] || false;
+              setShowCurrentAds(prev => ({
+                ...prev,
+                [activeBulkTab]: !isCurrentlyOpen
+              }));
+              // Lazy load ads when opening
+              if (!isCurrentlyOpen) {
+                handleFetchCurrentAds(activeBulkTab);
+              }
+            }}
+            icon={showCurrentAds[activeBulkTab] ? ChevronUpIcon : ChevronDownIcon}
+            loading={fetchingAds}
+          >
+{`${showCurrentAds[activeBulkTab] ? 'Hide' : 'Show'} Ads (${selectedProducts.length} products)`}
+          </Button>
+        </InlineStack>
+        
+        <Collapsible
+          open={showCurrentAds[activeBulkTab] || false}
+          id={`current-ads-collapsible-${activeBulkTab}`}
+          transition={{duration: '200ms', timingFunction: 'ease-in-out'}}
+          expandOnPrint
+        >
+          <BlockStack gap="300">
+            {selectedProducts.length > 0 && products.filter(p => selectedProducts.includes(p.id)).map((product) => (
+              <Box key={product.id} padding="300" background="bg-surface-secondary" borderRadius="200">
+                <BlockStack gap="200">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">{product.title}</Text>
+                    <Badge tone={product.status === 'ACTIVE' ? 'success' : 'attention'}>
+                      {product.status}
+                    </Badge>
+                  </InlineStack>
+                  
+                  {/* Mock ad data - in real implementation, fetch from ads API */}
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Current Ad Campaigns: {fetchingAds ? 'Loading...' : (currentAds.length > 0 ? `${currentAds.length} active campaigns` : 'No active campaigns')}
+                  </Text>
+                  
+                  {!fetchingAds && currentAds.length > 0 && (
+                    <InlineStack gap="100">
+                      {currentAds.slice(0, 3).map((ad: any, adIndex: number) => (
+                        <Badge key={adIndex} tone="info">
+                          {ad.platform || `Campaign ${adIndex + 1}`}
+                        </Badge>
+                      ))}
+                      {currentAds.length > 3 && (
+                        <Badge>{`+${currentAds.length - 3} more`}</Badge>
+                      )}
+                    </InlineStack>
+                  )}
+                </BlockStack>
+              </Box>
+            ))}
+          </BlockStack>
+        </Collapsible>
+      </BlockStack>
+    </Card>
+  );
+
   // Advanced Marketing Operations (commented out - unused)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleBulkMarketing = async () => {
@@ -2313,6 +2429,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           )}
       </BlockStack>
 
+      {/* Bulk Edit History - Always visible thin collapsible */}
+      <BulkEditHistory isVisible={true} />
+
       {/* Step Content */}
       {activeMainTab === 0 ? (
         /* Step 1: Product Selection */
@@ -2812,6 +2931,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       onExpandProduct={toggleProductExpansion}
                       onViewProduct={(product) => navigateToProduct(product, 'storefront')}
                       onEditProduct={(product) => navigateToProduct(product, 'admin')}
+                      onContinueToBulkEdit={() => setActiveMainTab(1)}
                       shopCurrency="$"
                       showVariantSelection={true}
                       totalCount={filteredProducts.length}
@@ -2823,7 +2943,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         </Card>
       ) : (
         /* Step 2: Bulk Edit - Complete Interface */
-        <BlockStack gap="400">
+        <BlockStack gap="200">
           {/* Bulk Edit Content */}
           {selectedVariants.length === 0 ? (
             <Card>
@@ -2861,68 +2981,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                     </Text>
 
                     {/* Current Ads Section */}
-                    <Card>
-                      <BlockStack gap="300">
-                        <InlineStack align="space-between" blockAlign="center">
-                          <Text as="h4" variant="headingSm">Current Product Ads</Text>
-                          <Button
-                            variant="plain"
-                            onClick={() => setShowCurrentAds(!showCurrentAds)}
-                            icon={showCurrentAds ? ChevronUpIcon : ChevronDownIcon}
-                          >
-{`${showCurrentAds ? 'Hide' : 'Show'} Ads (${selectedProducts.length} products)`}
-                          </Button>
-                        </InlineStack>
-                        
-                        <Collapsible
-                          open={showCurrentAds}
-                          id="current-ads-collapsible"
-                          transition={{duration: '200ms', timingFunction: 'ease-in-out'}}
-                          expandOnPrint
-                        >
-                          <BlockStack gap="300">
-                            {selectedProducts.length > 0 && products.filter(p => selectedProducts.includes(p.id)).map((product, index) => (
-                              <Box key={product.id} padding="300" background="bg-surface-secondary" borderRadius="200">
-                                <BlockStack gap="200">
-                                  <InlineStack align="space-between" blockAlign="center">
-                                    <Text as="p" variant="bodyMd" fontWeight="semibold">{product.title}</Text>
-                                    <Badge tone={product.status === 'ACTIVE' ? 'success' : 'attention'}>
-                                      {product.status}
-                                    </Badge>
-                                  </InlineStack>
-                                  
-                                  {/* Mock ad data - in real implementation, fetch from ads API */}
-                                  <Text as="p" variant="bodySm" tone="subdued">
-                                    Current Ad Campaigns: 
-                                    {index % 3 === 0 ? " Facebook Ads, Google Shopping" : 
-                                     index % 3 === 1 ? " Google Ads, Instagram" : 
-                                     " No active campaigns"}
-                                  </Text>
-                                  
-                                  {index % 3 !== 2 && (
-                                    <InlineStack gap="200">
-                                      <Text as="p" variant="bodyXs" tone="subdued">
-                                        Spend: ${(index * 23.5 + 45).toFixed(2)} | 
-                                        Clicks: {index * 12 + 34} | 
-                                        CTR: {(index * 0.5 + 2.1).toFixed(1)}%
-                                      </Text>
-                                    </InlineStack>
-                                  )}
-                                </BlockStack>
-                              </Box>
-                            ))}
-                            
-                            {selectedProducts.length === 0 && (
-                              <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                                <Text as="p" variant="bodySm" alignment="center" tone="subdued">
-                                  Select products to view their current ad campaigns
-                                </Text>
-                              </Box>
-                            )}
-                          </BlockStack>
-                        </Collapsible>
-                      </BlockStack>
-                    </Card>
+                    {renderCurrentAdsSection()}
 
                     {/* Price Management Category */}
                     <BlockStack gap="400">
@@ -3097,9 +3156,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       <Text as="h3" variant="headingSm">Collection Management</Text>
                       <Text as="p" variant="bodySm" tone="subdued">
                         Manage collections for {selectedProducts.length} selected {selectedProducts.length === 1 ? 'product' : 'products'}.
+                        <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium"> 
+                          {" "}• Green dots indicate products already in the collection.
+                        </Text>
                       </Text>
 
-
+                      {/* Current Ads Section */}
+                      {renderCurrentAdsSection()}
 
                       <div>
                         <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
@@ -3215,6 +3278,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       Manage tags for {selectedProducts.length} selected {selectedProducts.length === 1 ? 'product' : 'products'}.
                     </Text>
 
+                    {/* Current Ads Section */}
+                    {renderCurrentAdsSection()}
+
                     <div>
                       <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
                         Tag Operations
@@ -3276,6 +3342,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                     <Text as="p" variant="bodySm" tone="subdued">
                       Update content for {selectedProducts.length} selected {selectedProducts.length === 1 ? 'product' : 'products'}.
                     </Text>
+
+                    {/* Current Ads Section */}
+                    {renderCurrentAdsSection()}
 
                     {/* Content Sub-tabs */}
                     <div style={{ 
@@ -3673,6 +3742,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       Manage inventory for {selectedVariants.length} selected variant{selectedVariants.length === 1 ? '' : 's'} across {selectedProducts.length} product{selectedProducts.length === 1 ? '' : 's'}.
                     </Text>
 
+                    {/* Current Ads Section */}
+                    {renderCurrentAdsSection()}
+
                     {/* Inventory Operation Buttons */}
                     <div>
                       <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
@@ -3826,6 +3898,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       Manage variants across {selectedProducts.length} selected product{selectedProducts.length === 1 ? '' : 's'}. This helps with common variant operations that are tedious to do one-by-one.
                     </Text>
 
+                    {/* Current Ads Section */}
+                    {renderCurrentAdsSection()}
+
                     {/* Variant Operations */}
                     <div>
                       <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
@@ -3932,16 +4007,14 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         </BlockStack>
       )}
 
-      <Frame>
-        {notification.show && (
-          <Toast
-            content={notification.message}
-            error={notification.error}
-            onDismiss={() => setNotification({ show: false, message: '' })}
-            duration={4000}
-          />
-        )}
-      </Frame>
+      {notification.show && (
+        <Toast
+          content={notification.message}
+          error={notification.error}
+          onDismiss={() => setNotification({ show: false, message: '' })}
+          duration={4000}
+        />
+      )}
     </BlockStack>
     </>
   );
