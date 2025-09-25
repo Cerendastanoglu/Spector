@@ -12,17 +12,13 @@ import {
   Spinner,
   EmptyState,
   Icon,
-  Divider,
-  Tooltip,
   Modal,
   TextContainer,
 } from '@shopify/polaris';
 import {
-  ClockIcon,
-  RefreshIcon,
   AlertTriangleIcon,
-  ChevronUpIcon,
   ChevronDownIcon,
+  ChevronUpIcon,
 } from "@shopify/polaris-icons";
 
 interface BulkEditItem {
@@ -119,17 +115,7 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
     return date.toLocaleString();
   };
 
-  const getOperationIcon = (operationType: string) => {
-    switch (operationType) {
-      case 'pricing': return '💰';
-      case 'collections': return '📁';
-      case 'tags': return '🏷️';
-      case 'content': return '📝';
-      case 'inventory': return '📦';
-      case 'variants': return '🔧';
-      default: return '📋';
-    }
-  };
+
 
   const getStatusBadge = (batch: BulkEditBatch) => {
     if (batch.isReverted) {
@@ -311,61 +297,65 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
       <BlockStack gap="100">
         {batches.map((batch) => (
           <div key={batch.id}>
-            {/* Compact Single Line Display */}
-            <Card padding="300">
+            {/* Ultra-Minimal List Item */}
+            <Box 
+              paddingBlock="150" 
+              paddingInline="200"
+            >
               <InlineStack align="space-between" blockAlign="center">
-                <InlineStack gap="300" align="center">
-                  <Text as="span">{getOperationIcon(batch.operationType)}</Text>
-                  <BlockStack gap="100">
-                    <Text variant="bodyMd" as="span" fontWeight="semibold">
-                      {batch.operationName}
-                    </Text>
-                    <Text variant="bodySm" tone="subdued" as="span">
-                      {formatDate(batch.createdAt)}
-                    </Text>
-                  </BlockStack>
+                <InlineStack gap="200" align="center" wrap={false}>
+                  <Text variant="bodySm" as="span" fontWeight="medium">
+                    {batch.operationName}
+                  </Text>
+                  <Text variant="bodySm" tone="subdued" as="span">
+                    • {formatDate(batch.createdAt)}
+                  </Text>
+                  {getStatusBadge(batch)}
                 </InlineStack>
                 
-                <InlineStack gap="200" align="center">
-                  {getStatusBadge(batch)}
+                <InlineStack gap="100" align="center">
                   <Button
                     variant="plain"
                     size="micro"
                     onClick={() => toggleDetails(batch.id)}
                   >
-                    Show Details
+                    {expandedDetails.has(batch.id) ? 'Less' : 'Details'}
                   </Button>
                   {batch.canRevert && !batch.isReverted && (
-                    <Tooltip content="Revert this bulk edit">
-                      <Button
-                        size="micro"
-                        variant="tertiary"
-                        icon={RefreshIcon}
-                        loading={revertingBatchId === batch.id}
-                        disabled={revertingBatchId !== null}
-                        onClick={() => handleRevert(batch)}
-                      />
-                    </Tooltip>
+                    <Button
+                      size="micro"
+                      variant="plain"
+                      tone="critical"
+                      loading={revertingBatchId === batch.id}
+                      disabled={revertingBatchId !== null}
+                      onClick={() => handleRevert(batch)}
+                    >
+                      Revert
+                    </Button>
                   )}
                 </InlineStack>
               </InlineStack>
-            </Card>
+            </Box>
 
-            {/* Collapsible Details */}
+            {/* Minimal Details */}
             <Collapsible
               open={expandedDetails.has(batch.id)}
               id={`batch-details-${batch.id}`}
-              transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
+              transition={{ duration: '150ms', timingFunction: 'ease-out' }}
             >
-              <Card padding="400">
-                <BlockStack gap="300">
-                  <InlineStack gap="400">
-                    <Text variant="bodySm" as="p">
-                      <Text as="span" fontWeight="semibold">{batch.totalProducts}</Text> products
+              <Box 
+                paddingInline="300" 
+                paddingBlock="200"
+                background="bg-surface-secondary"
+              >
+                <BlockStack gap="200">
+                  <InlineStack gap="300">
+                    <Text variant="bodySm" as="span" tone="subdued">
+                      {batch.totalProducts} products
                     </Text>
                     {batch.totalVariants > 0 && (
-                      <Text variant="bodySm" as="p">
-                        <Text as="span" fontWeight="semibold">{batch.totalVariants}</Text> variants
+                      <Text variant="bodySm" as="span" tone="subdued">
+                        • {batch.totalVariants} variants
                       </Text>
                     )}
                   </InlineStack>
@@ -377,36 +367,23 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
                   )}
 
                   {batch.isReverted && batch.revertedAt && (
-                    <Box
-                      background="bg-fill-critical-secondary"
-                      padding="200"
-                      borderRadius="100"
-                    >
-                      <InlineStack gap="200" align="center">
-                        <Icon source={AlertTriangleIcon} tone="critical" />
-                        <Text variant="bodySm" tone="critical" as="p">
-                          Reverted on {formatDate(batch.revertedAt)}
-                        </Text>
-                      </InlineStack>
-                    </Box>
+                    <Text variant="bodySm" tone="critical" as="p">
+                      ⚠️ Reverted on {formatDate(batch.revertedAt)}
+                    </Text>
                   )}
-
-                  <Divider />
-                  {renderBatchDetails(batch)}
                 </BlockStack>
-              </Card>
+              </Box>
             </Collapsible>
           </div>
         ))}
         {hasMoreBatches && !showAllBatches && (
-          <Box paddingBlockStart="300" paddingInline="300">
+          <Box paddingBlock="200" paddingInline="200">
             <Button
               variant="plain"
-              size="large"
-              fullWidth
+              size="micro"
               onClick={() => setShowAllBatches(true)}
             >
-              {`Show ${mockBatches.length - 5} more edits`}
+              Show {(mockBatches.length - 5).toString()} more...
             </Button>
           </Box>
         )}
@@ -420,43 +397,27 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
 
   return (
     <>
-      <Card>
-        <Box padding="300">
-          <InlineStack align="space-between" blockAlign="center">
-            <InlineStack gap="200" align="center">
-              <Icon source={ClockIcon} />
-              <Text variant="bodySm" as="h3" fontWeight="medium">
-                Bulk Edit History
-              </Text>
-              <Badge tone="info" size="small">
-                {mockBatches.length.toString()}
-              </Badge>
-            </InlineStack>
-            
-            <Button
-              variant="plain"
-              size="micro"
-              icon={expanded ? ChevronUpIcon : ChevronDownIcon}
-              onClick={() => setExpanded(!expanded)}
-            >
-              {expanded ? 'Hide' : 'Show'}
-            </Button>
-          </InlineStack>
-        </Box>
-
-        <Collapsible
-          open={expanded}
-          id="bulk-edit-history"
-          transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
+      {/* Ultra-Minimal Header */}
+      <Box paddingBlock="150" paddingInline="100">
+        <Button
+          variant="plain"
+          size="micro"
+          icon={expanded ? ChevronUpIcon : ChevronDownIcon}
+          onClick={() => setExpanded(!expanded)}
         >
-          <Box paddingInline="200" paddingBlockEnd="200" background="bg-surface-tertiary">
-            <Divider />
-            <Box paddingBlockStart="200">
-              {renderHistory()}
-            </Box>
-          </Box>
-        </Collapsible>
-      </Card>
+          Recent Activity ({mockBatches.length.toString()})
+        </Button>
+      </Box>
+
+      <Collapsible
+        open={expanded}
+        id="bulk-edit-history"
+        transition={{ duration: '150ms', timingFunction: 'ease-out' }}
+      >
+        <Box paddingInline="100" paddingBlockEnd="200">
+          {renderHistory()}
+        </Box>
+      </Collapsible>
 
       {/* Revert Confirmation Modal */}
       {showRevertModal && selectedBatch && (
