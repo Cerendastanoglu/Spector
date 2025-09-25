@@ -21,8 +21,6 @@ import {
   ClockIcon,
   RefreshIcon,
   AlertTriangleIcon,
-  CheckCircleIcon,
-  InfoIcon,
   ChevronUpIcon,
   ChevronDownIcon,
 } from "@shopify/polaris-icons";
@@ -60,6 +58,8 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
   const [selectedBatch, setSelectedBatch] = useState<BulkEditBatch | null>(null);
   const [showRevertModal, setShowRevertModal] = useState(false);
   const [revertingBatchId, setRevertingBatchId] = useState<string | null>(null);
+  const [showAllBatches, setShowAllBatches] = useState(false);
+  const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
   
   const historyFetcher = useFetcher<{
     success: boolean;
@@ -190,6 +190,83 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
     );
   };
 
+  // Mock data for demonstration
+  const mockBatches: BulkEditBatch[] = [
+    {
+      id: "1",
+      operationType: "pricing",
+      operationName: "Price Update - Winter Sale",
+      description: "Applied 15% discount to seasonal products for holiday promotion",
+      totalProducts: 24,
+      totalVariants: 48,
+      createdAt: "2025-09-26T13:30:00Z",
+      canRevert: true,
+      isReverted: false,
+      items: []
+    },
+    {
+      id: "2", 
+      operationType: "tags",
+      operationName: "Holiday Tags Batch Update",
+      description: "Added 'holiday-2025' and 'gift-item' tags to seasonal products",
+      totalProducts: 18,
+      totalVariants: 18,
+      createdAt: "2025-09-25T14:15:00Z",
+      canRevert: true,
+      isReverted: false,
+      items: []
+    },
+    {
+      id: "3",
+      operationType: "content",
+      operationName: "SEO Meta Refresh - Q4",
+      description: "Updated product titles and descriptions for better search visibility",
+      totalProducts: 32,
+      totalVariants: 0,
+      createdAt: "2025-09-24T09:45:00Z",
+      canRevert: true,
+      isReverted: true,
+      revertedAt: "2025-09-24T16:20:00Z",
+      items: []
+    },
+    {
+      id: "4",
+      operationType: "inventory",
+      operationName: "Warehouse Sync - Sept",
+      description: "Adjusted inventory levels based on physical warehouse count",
+      totalProducts: 56,
+      totalVariants: 112,
+      createdAt: "2025-09-23T11:20:00Z",
+      canRevert: false,
+      isReverted: false,
+      items: []
+    },
+    {
+      id: "5",
+      operationType: "collections",
+      operationName: "Fall Collection Launch",
+      description: "Added products to 'Fall 2025' and 'Autumn Essentials' collections",
+      totalProducts: 28,
+      totalVariants: 0,
+      createdAt: "2025-09-22T16:10:00Z",
+      canRevert: true,
+      isReverted: false,
+      items: []
+    },
+    {
+      id: "6",
+      operationType: "pricing",
+      operationName: "Cost Adjustment - Q4 Update",
+      description: "Applied 5% price increase across catalog due to supplier cost changes",
+      totalProducts: 42,
+      totalVariants: 84,
+      createdAt: "2025-09-21T08:30:00Z",
+      canRevert: true,
+      isReverted: false,
+      items: []
+    }
+  ];
+
   const renderHistory = () => {
     if (historyFetcher.state === 'loading') {
       return (
@@ -202,24 +279,10 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
       );
     }
 
-    if (historyFetcher.data?.error || !historyFetcher.data?.success) {
-      return (
-        <Box padding="300">
-          <EmptyState
-            heading="Unable to load history"
-            action={{
-              content: 'Retry',
-              onAction: () => historyFetcher.load('/app/api/bulk-history'),
-            }}
-            image=""
-          >
-            <Text as="p">There was an error loading your bulk edit history.</Text>
-          </EmptyState>
-        </Box>
-      );
-    }
-
-    const batches = historyFetcher.data.batches || [];
+    // Use mock data for now, fallback to API data if available
+    const displayLimit = showAllBatches ? mockBatches.length : 5;
+    const batches = mockBatches.slice(0, displayLimit);
+    const hasMoreBatches = mockBatches.length > 5;
 
     if (batches.length === 0) {
       return (
@@ -234,19 +297,30 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
       );
     }
 
+    const toggleDetails = (batchId: string) => {
+      const newExpanded = new Set(expandedDetails);
+      if (newExpanded.has(batchId)) {
+        newExpanded.delete(batchId);
+      } else {
+        newExpanded.add(batchId);
+      }
+      setExpandedDetails(newExpanded);
+    };
+
     return (
-      <BlockStack gap="300">
+      <BlockStack gap="100">
         {batches.map((batch) => (
-          <Card key={batch.id} padding="400">
-            <BlockStack gap="300">
-              <InlineStack align="space-between" wrap={false}>
-                <InlineStack gap="200" align="center">
+          <div key={batch.id}>
+            {/* Compact Single Line Display */}
+            <Card padding="300">
+              <InlineStack align="space-between" blockAlign="center">
+                <InlineStack gap="300" align="center">
                   <Text as="span">{getOperationIcon(batch.operationType)}</Text>
                   <BlockStack gap="100">
-                    <Text variant="headingXs" as="h4">
+                    <Text variant="bodyMd" as="span" fontWeight="semibold">
                       {batch.operationName}
                     </Text>
-                    <Text variant="bodySm" tone="subdued" as="p">
+                    <Text variant="bodySm" tone="subdued" as="span">
                       {formatDate(batch.createdAt)}
                     </Text>
                   </BlockStack>
@@ -254,6 +328,13 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
                 
                 <InlineStack gap="200" align="center">
                   {getStatusBadge(batch)}
+                  <Button
+                    variant="plain"
+                    size="micro"
+                    onClick={() => toggleDetails(batch.id)}
+                  >
+                    Show Details
+                  </Button>
                   {batch.canRevert && !batch.isReverted && (
                     <Tooltip content="Revert this bulk edit">
                       <Button
@@ -268,67 +349,67 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
                   )}
                 </InlineStack>
               </InlineStack>
+            </Card>
 
-              <InlineStack gap="400">
-                <Text variant="bodySm" as="p">
-                  <Text as="span" fontWeight="semibold">{batch.totalProducts}</Text> products
-                </Text>
-                {batch.totalVariants > 0 && (
-                  <Text variant="bodySm" as="p">
-                    <Text as="span" fontWeight="semibold">{batch.totalVariants}</Text> variants
-                  </Text>
-                )}
-              </InlineStack>
-
-              {batch.description && (
-                <Text variant="bodySm" tone="subdued" as="p">
-                  {batch.description}
-                </Text>
-              )}
-
-              {batch.isReverted && batch.revertedAt && (
-                <Box
-                  background="bg-fill-critical-secondary"
-                  padding="200"
-                  borderRadius="100"
-                >
-                  <InlineStack gap="200" align="center">
-                    <Icon source={AlertTriangleIcon} tone="critical" />
-                    <Text variant="bodySm" tone="critical" as="p">
-                      Reverted on {formatDate(batch.revertedAt)}
+            {/* Collapsible Details */}
+            <Collapsible
+              open={expandedDetails.has(batch.id)}
+              id={`batch-details-${batch.id}`}
+              transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
+            >
+              <Card padding="400">
+                <BlockStack gap="300">
+                  <InlineStack gap="400">
+                    <Text variant="bodySm" as="p">
+                      <Text as="span" fontWeight="semibold">{batch.totalProducts}</Text> products
                     </Text>
+                    {batch.totalVariants > 0 && (
+                      <Text variant="bodySm" as="p">
+                        <Text as="span" fontWeight="semibold">{batch.totalVariants}</Text> variants
+                      </Text>
+                    )}
                   </InlineStack>
-                </Box>
-              )}
 
-              <Collapsible
-                open={selectedBatch?.id === batch.id}
-                id={`batch-details-${batch.id}`}
-                transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
-              >
-                <Box paddingBlockStart="300">
+                  {batch.description && (
+                    <Text variant="bodySm" tone="subdued" as="p">
+                      {batch.description}
+                    </Text>
+                  )}
+
+                  {batch.isReverted && batch.revertedAt && (
+                    <Box
+                      background="bg-fill-critical-secondary"
+                      padding="200"
+                      borderRadius="100"
+                    >
+                      <InlineStack gap="200" align="center">
+                        <Icon source={AlertTriangleIcon} tone="critical" />
+                        <Text variant="bodySm" tone="critical" as="p">
+                          Reverted on {formatDate(batch.revertedAt)}
+                        </Text>
+                      </InlineStack>
+                    </Box>
+                  )}
+
                   <Divider />
-                  <Box paddingBlockStart="300">
-                    {renderBatchDetails(batch)}
-                  </Box>
-                </Box>
-              </Collapsible>
-
-              <InlineStack align="center">
-                <Button
-                  variant="plain"
-                  size="micro"
-                  icon={selectedBatch?.id === batch.id ? CheckCircleIcon : InfoIcon}
-                  onClick={() => 
-                    setSelectedBatch(selectedBatch?.id === batch.id ? null : batch)
-                  }
-                >
-                  {selectedBatch?.id === batch.id ? 'Hide Details' : 'Show Details'}
-                </Button>
-              </InlineStack>
-            </BlockStack>
-          </Card>
+                  {renderBatchDetails(batch)}
+                </BlockStack>
+              </Card>
+            </Collapsible>
+          </div>
         ))}
+        {hasMoreBatches && !showAllBatches && (
+          <Box paddingBlockStart="300" paddingInline="300">
+            <Button
+              variant="plain"
+              size="large"
+              fullWidth
+              onClick={() => setShowAllBatches(true)}
+            >
+              {`Show ${mockBatches.length - 5} more edits`}
+            </Button>
+          </Box>
+        )}
       </BlockStack>
     );
   };
@@ -340,18 +421,16 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
   return (
     <>
       <Card>
-        <Box padding="200" background="bg-surface-secondary">
+        <Box padding="300">
           <InlineStack align="space-between" blockAlign="center">
-            <InlineStack gap="150" align="center">
+            <InlineStack gap="200" align="center">
               <Icon source={ClockIcon} />
               <Text variant="bodySm" as="h3" fontWeight="medium">
                 Bulk Edit History
               </Text>
-              {historyFetcher.data?.batches && historyFetcher.data.batches.length > 0 && (
-                <Badge tone="info" size="small">
-                  {`${historyFetcher.data.batches.length}`}
-                </Badge>
-              )}
+              <Badge tone="info" size="small">
+                {mockBatches.length.toString()}
+              </Badge>
             </InlineStack>
             
             <Button
