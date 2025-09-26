@@ -304,24 +304,24 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
             >
               <InlineStack align="space-between" blockAlign="center">
                 {/* Action Buttons on Left */}
-                <InlineStack gap="150" align="center">
+                <InlineStack gap="200" align="center">
                   <Button
-                    variant="tertiary"
+                    variant="secondary"
                     size="micro"
                     onClick={() => toggleDetails(batch.id)}
                   >
-                    {expandedDetails.has(batch.id) ? '👁️ Less' : '👁️ Details'}
+                    {expandedDetails.has(batch.id) ? 'Hide' : 'Details'}
                   </Button>
                   {batch.canRevert && !batch.isReverted && (
                     <Button
                       size="micro"
-                      variant="tertiary"
+                      variant="secondary"
                       tone="critical"
                       loading={revertingBatchId === batch.id}
                       disabled={revertingBatchId !== null}
                       onClick={() => handleRevert(batch)}
                     >
-                      ↶ Revert
+                      Revert
                     </Button>
                   )}
                 </InlineStack>
