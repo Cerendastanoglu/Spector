@@ -1217,7 +1217,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const createPromises = imageUrls.map((imageUrl: string) => 
               admin.graphql(
                 `#graphql
-                  mutation productUpdate($product: ProductInput!) {
+                  mutation productUpdate($product: ProductUpdateInput!) {
                     productUpdate(product: $product) {
                       product {
                         id
@@ -1235,7 +1235,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                           }
                         }
                       }
-                      mediaUserErrors {
+                      userErrors {
                         field
                         message
                       }
@@ -1318,10 +1318,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const deletePromises = images.map((edge: any) =>
               admin.graphql(
                 `#graphql
-                  mutation productDeleteMedia($productId: ID!, $mediaIds: [ID!]!) {
-                    productDeleteMedia(productId: $productId, mediaIds: $mediaIds) {
-                      deletedMediaIds
-                      mediaUserErrors {
+                  mutation fileUpdate($files: [FileUpdateInput!]!) {
+                    fileUpdate(files: $files) {
+                      files {
+                        id
+                        fileStatus
+                      }
+                      userErrors {
                         field
                         message
                       }
@@ -1329,8 +1332,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   }`,
                 {
                   variables: {
-                    productId,
-                    mediaIds: [edge.node.id]
+                    files: [{
+                      id: edge.node.id,
+                      fileStatus: "READY_TO_DELETE"
+                    }]
                   }
                 }
               )
@@ -1390,10 +1395,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (existingImages.length > 0) {
               const deleteResponse = await admin.graphql(
                 `#graphql
-                  mutation productDeleteMedia($productId: ID!, $mediaIds: [ID!]!) {
-                    productDeleteMedia(productId: $productId, mediaIds: $mediaIds) {
-                      deletedMediaIds
-                      mediaUserErrors {
+                  mutation fileUpdate($files: [FileUpdateInput!]!) {
+                    fileUpdate(files: $files) {
+                      files {
+                        id
+                        fileStatus
+                      }
+                      userErrors {
                         field
                         message
                       }
@@ -1401,8 +1409,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   }`,
                 {
                   variables: {
-                    productId,
-                    mediaIds: existingImages.map((edge: any) => edge.node.id)
+                    files: existingImages.map((edge: any) => ({
+                      id: edge.node.id,
+                      fileStatus: "READY_TO_DELETE"
+                    }))
                   }
                 }
               );
@@ -1423,7 +1433,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const createPromises = imageUrls.map((imageUrl: string) => 
               admin.graphql(
                 `#graphql
-                  mutation productUpdate($product: ProductInput!) {
+                  mutation productUpdate($product: ProductUpdateInput!) {
                     productUpdate(product: $product) {
                       product {
                         id
@@ -1435,7 +1445,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                           }
                         }
                       }
-                      mediaUserErrors {
+                      userErrors {
                         field
                         message
                       }

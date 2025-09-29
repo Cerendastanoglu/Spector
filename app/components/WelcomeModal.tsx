@@ -1,185 +1,247 @@
 import { useState, useEffect } from "react";
 import {
   Button,
-  Icon,
+  ButtonGroup,
 } from "@shopify/polaris";
-import {
-  ChartVerticalIcon,
-  PackageIcon,
-  OrderIcon,
-  StarIcon,
-  CheckIcon,
-} from "@shopify/polaris-icons";
 import styles from "./WelcomeModal.module.css";
 
 interface WelcomeModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenHelp?: () => void;
 }
 
-export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [isModalReady, setIsModalReady] = useState(false);
+const slides = [
+  {
+    title: "Welcome to Spector",
+    subtitle: "Your intelligent inventory management solution",
+    features: [
+      {
+        icon: "📊",
+        title: "Real-Time Dashboard",
+        description: "Monitor inventory health with live analytics and performance metrics."
+      },
+      {
+        icon: "🤖",
+        title: "AI Forecasting",
+        description: "Predict demand trends to prevent stockouts and optimize inventory."
+      },
+      {
+        icon: "💰",
+        title: "Revenue Tracking",
+        description: "Track profitability and identify your best-performing products."
+      },
+      {
+        icon: "📈",
+        title: "Performance Analytics",
+        description: "Analyze sales patterns and inventory turnover rates."
+      },
+      {
+        icon: "⚡",
+        title: "Quick Insights",
+        description: "Get instant overview of your inventory status at a glance."
+      },
+      {
+        icon: "🎯",
+        title: "Smart Alerts",
+        description: "Receive notifications for important inventory changes."
+      }
+    ]
+  },
+  {
+    title: "Product Management Tools",
+    subtitle: "Efficiently manage your entire product catalog",
+    features: [
+      {
+        icon: "📦",
+        title: "Product Selection",
+        description: "Advanced filtering to find and select specific products quickly."
+      },
+      {
+        icon: "✏️",
+        title: "Bulk Editing",
+        description: "Update prices, descriptions, and details across multiple products."
+      },
+      {
+        icon: "🔍",
+        title: "Smart Filters",
+        description: "Filter by stock level, price range, vendor, and product type."
+      },
+      {
+        icon: "📋",
+        title: "Two-Step Workflow",
+        description: "Select products first, then apply bulk changes efficiently."
+      },
+      {
+        icon: "⚙️",
+        title: "Bulk Operations",
+        description: "Manage hundreds of products with single actions."
+      },
+      {
+        icon: "📊",
+        title: "Product Analytics",
+        description: "View performance metrics for individual products."
+      }
+    ]
+  },
+  {
+    title: "Automation & Notifications",
+    subtitle: "Stay informed with intelligent monitoring",
+    features: [
+      {
+        icon: "🔔",
+        title: "Inventory Alerts",
+        description: "Automated notifications for low stock and out-of-stock items."
+      },
+      {
+        icon: "📧",
+        title: "Email Reports",
+        description: "Receive detailed inventory reports directly in your inbox."
+      },
+      {
+        icon: "🛡️",
+        title: "Data Security",
+        description: "Encrypted data storage with automated retention policies."
+      },
+      {
+        icon: "📱",
+        title: "Real-time Updates",
+        description: "Instant notifications for critical inventory changes."
+      },
+      {
+        icon: "⏰",
+        title: "Scheduled Reports",
+        description: "Automated daily, weekly, or monthly inventory summaries."
+      },
+      {
+        icon: "🎛️",
+        title: "Custom Settings",
+        description: "Configure notification preferences to match your workflow."
+      }
+    ]
+  }
+];
 
-  // Add a small delay before showing modal content
+export function WelcomeModal({ isOpen, onClose, onOpenHelp }: WelcomeModalProps) {
+  const [isModalReady, setIsModalReady] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
   useEffect(() => {
     if (isOpen) {
       const timer = setTimeout(() => {
         setIsModalReady(true);
-      }, 150);
+      }, 100);
       return () => clearTimeout(timer);
     } else {
       setIsModalReady(false);
-      setCurrentStep(0);
+      setCurrentSlide(0);
     }
   }, [isOpen]);
 
-  const features = [
-    {
-      icon: ChartVerticalIcon,
-      title: "Smart Analytics",
-      description: "Real-time insights into your product performance and inventory health"
-    },
-    {
-      icon: PackageIcon,
-      title: "Inventory Management",
-      description: "Never run out of stock with intelligent monitoring and alerts"
-    },
-    {
-      icon: OrderIcon,
-      title: "Bulk Operations",
-      description: "Manage hundreds of products efficiently with powerful bulk editing tools"
-    }
-  ];
-
-  const nextStep = () => {
-    if (currentStep < 2) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      onClose();
+  const handleNext = () => {
+    if (currentSlide < slides.length - 1) {
+      setCurrentSlide(currentSlide + 1);
     }
   };
+
+  const handlePrevious = () => {
+    if (currentSlide > 0) {
+      setCurrentSlide(currentSlide - 1);
+    }
+  };
+
+  const handleGetStarted = () => {
+    onClose();
+  };
+
+  const handleOpenHelp = () => {
+    onClose();
+    onOpenHelp?.();
+  };
+
+  const currentSlideData = slides[currentSlide];
 
   if (!isOpen || !isModalReady) {
     return null;
   }
 
   return (
-    <div className={styles.modalOverlay}>
-      <div className={styles.glassModal}>
-        {/* Close button */}
+    <div className={styles.overlay}>
+      <div className={styles.modal}>
         <button 
           className={styles.closeButton}
           onClick={onClose}
           type="button"
+          aria-label="Close welcome modal"
         >
-          ✕
+          ×
         </button>
 
-        {/* Header */}
-        <div className={styles.header}>
-          <div className={styles.logoContainer}>
-            <div className={styles.logo}>
-              <Icon source={StarIcon} />
-            </div>
-          </div>
-          <h1 className={styles.title}>Welcome to Spector</h1>
-          <p className={styles.subtitle}>
-            Your intelligent inventory management companion
-          </p>
-        </div>
-
-        {/* Progress Steps */}
-        <div className={styles.progressContainer}>
-          {[0, 1, 2].map((step) => (
-            <div 
-              key={step}
-              className={`${styles.progressStep} ${step <= currentStep ? styles.active : ''}`}
-            />
-          ))}
-        </div>
-
-        {/* Content */}
         <div className={styles.content}>
-          {currentStep === 0 && (
-            <div className={styles.step}>
-              <div className={styles.stepHeader}>
-                <h2>Get Started in Seconds</h2>
-                <p>Spector is designed to help you manage inventory effortlessly</p>
-              </div>
-              <div className={styles.checklistContainer}>
-                {[
-                  "Connect your Shopify store",
-                  "Analyze your current inventory",
-                  "Start optimizing your business"
-                ].map((item, index) => (
-                  <div key={index} className={styles.checklistItem}>
-                    <div className={styles.checkIcon}>
-                      <Icon source={CheckIcon} />
-                    </div>
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className={styles.header}>
+            <h1>{currentSlideData.title}</h1>
+            <p>{currentSlideData.subtitle}</p>
+          </div>
 
-          {currentStep === 1 && (
-            <div className={styles.step}>
-              <div className={styles.stepHeader}>
-                <h2>Powerful Features</h2>
-                <p>Everything you need to optimize your inventory</p>
-              </div>
-              <div className={styles.featuresGrid}>
-                {features.map((feature, index) => (
-                  <div key={index} className={styles.featureCard}>
-                    <div className={styles.featureIcon}>
-                      <Icon source={feature.icon} />
-                    </div>
-                    <h3>{feature.title}</h3>
-                    <p>{feature.description}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {currentStep === 2 && (
-            <div className={styles.step}>
-              <div className={styles.stepHeader}>
-                <h2>You're All Set!</h2>
-                <p>Start exploring your dashboard and discover insights</p>
-              </div>
-              <div className={styles.finalStep}>
-                <div className={styles.successIcon}>
-                  <Icon source={CheckIcon} />
-                </div>
-                <div className={styles.finalMessage}>
-                  <h3>Ready to optimize your inventory?</h3>
-                  <p>Click "Get Started" to begin your journey with Spector</p>
+          <div className={styles.features}>
+            {currentSlideData.features.map((feature, index) => (
+              <div key={index} className={styles.feature}>
+                <div className={styles.featureIcon}>{feature.icon}</div>
+                <div>
+                  <h3>{feature.title}</h3>
+                  <p>{feature.description}</p>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            ))}
+          </div>
 
-        {/* Actions */}
-        <div className={styles.actions}>
-          <Button
-            variant="primary"
-            size="large"
-            onClick={nextStep}
-          >
-            {currentStep === 2 ? "Get Started" : "Continue"}
-          </Button>
-          {currentStep > 0 && (
+          <div className={styles.slideIndicators}>
+            {slides.map((_, index) => (
+              <button
+                key={index}
+                className={`${styles.slideIndicator} ${
+                  index === currentSlide ? styles.active : ''
+                }`}
+                onClick={() => setCurrentSlide(index)}
+                type="button"
+                aria-label={`Go to slide ${index + 1}`}
+              />
+            ))}
+          </div>
+
+          <div className={styles.navigation}>
             <Button
-              variant="plain"
-              onClick={() => setCurrentStep(currentStep - 1)}
+              variant="secondary"
+              disabled={currentSlide === 0}
+              onClick={handlePrevious}
             >
-              Back
+              Previous
             </Button>
-          )}
+            
+            {currentSlide < slides.length - 1 ? (
+              <Button
+                variant="primary"
+                onClick={handleNext}
+              >
+                Next
+              </Button>
+            ) : (
+              <ButtonGroup>
+                <Button
+                  variant="secondary"
+                  onClick={handleOpenHelp}
+                >
+                  View Help Guide
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleGetStarted}
+                >
+                  Get Started
+                </Button>
+              </ButtonGroup>
+            )}
+          </div>
         </div>
       </div>
     </div>

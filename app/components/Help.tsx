@@ -76,7 +76,6 @@ export function Help({ isVisible }: HelpProps) {
                 Your complete guide to mastering inventory management and analytics
               </Text>
             </BlockStack>
-            <Badge tone="success" size="large">v1.0.0</Badge>
           </InlineStack>
           
           <Banner tone="info">
@@ -330,49 +329,52 @@ export function Help({ isVisible }: HelpProps) {
           </InlineStack>
           
           <Text as="p" variant="bodyMd">
-            Your command center for inventory insights and business metrics
+            Your comprehensive command center with real-time insights and AI-powered analytics
           </Text>
           
           <Grid>
             <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
               <BlockStack gap="300">
-                <Text as="h4" variant="headingSm">Key Features</Text>
+                <Text as="h4" variant="headingSm">Core Analytics</Text>
                 <List type="bullet">
-                  <List.Item>Real-time inventory overview</List.Item>
-                  <List.Item>Revenue tracking and analytics</List.Item>
-                  <List.Item>Product performance metrics</List.Item>
-                  <List.Item>Low stock alerts and warnings</List.Item>
-                  <List.Item>Interactive charts and graphs</List.Item>
-                  <List.Item>Export capabilities for reporting</List.Item>
+                  <List.Item>Real-time product performance metrics</List.Item>
+                  <List.Item>Catalog health monitoring with percentage indicators</List.Item>
+                  <List.Item>Revenue tracking and profit margin analysis</List.Item>
+                  <List.Item>Interactive charts with hover details</List.Item>
+                  <List.Item>Stock level categorization (Critical, Low, Healthy)</List.Item>
+                  <List.Item>Top performing products identification</List.Item>
                 </List>
                 
-                <Text as="h4" variant="headingSm">How to Use</Text>
-                <List type="number">
-                  <List.Item>Navigate to the Dashboard tab</List.Item>
-                  <List.Item>View your inventory summary at the top</List.Item>
-                  <List.Item>Use the tabs to switch between different analytics views</List.Item>
-                  <List.Item>Click on any metric for detailed information</List.Item>
-                  <List.Item>Use the refresh button to get the latest data</List.Item>
+                <Text as="h4" variant="headingSm">Inventory Forecasting</Text>
+                <List type="bullet">
+                  <List.Item>AI-powered demand prediction</List.Item>
+                  <List.Item>Days until stockout calculations</List.Item>
+                  <List.Item>Lead time optimization suggestions</List.Item>
+                  <List.Item>Velocity-based product categorization</List.Item>
+                  <List.Item>Profit margin visibility per product</List.Item>
+                  <List.Item>Direct access to product online store & admin pages</List.Item>
                 </List>
               </BlockStack>
             </Grid.Cell>
             
             <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
-              <Box padding="400" background="bg-surface-secondary" borderRadius="300">
-                <Text as="p" variant="bodySm" fontWeight="medium">
-                  📹 Video Tutorial
-                </Text>
-                <div style={{ marginTop: '8px' }}>
-                  <Box padding="300" background="bg-surface" borderRadius="200">
-                  <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-                    YouTube Video Placeholder
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-                    "Dashboard Overview - 4 minutes"
-                  </Text>
-                  </Box>
-                </div>
-              </Box>
+              <BlockStack gap="300">
+                <Text as="h4" variant="headingSm">Recent Activity</Text>
+                <List type="bullet">
+                  <List.Item>Slider-based activity navigation</List.Item>
+                  <List.Item>Bulk edit history with expandable details</List.Item>
+                  <List.Item>Clean card-based activity display</List.Item>
+                  <List.Item>Action tracking with timestamps</List.Item>
+                </List>
+                
+                <Text as="h4" variant="headingSm">How to Navigate</Text>
+                <List type="number">
+                  <List.Item>Use dashboard tabs to switch between Product Analytics & Inventory Forecasting</List.Item>
+                  <List.Item>Click forecast items to view/edit products directly</List.Item>
+                  <List.Item>Navigate activity with previous/next buttons</List.Item>
+                  <List.Item>Expand methodology section to understand AI predictions</List.Item>
+                </List>
+              </BlockStack>
             </Grid.Cell>
           </Grid>
         </BlockStack>
@@ -402,27 +404,44 @@ export function Help({ isVisible }: HelpProps) {
               <Grid>
                 <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
                   <BlockStack gap="300">
-                    <Text as="h4" variant="headingSm">Core Features</Text>
+                    <Text as="h4" variant="headingSm">Step 1: Product Selection</Text>
                     <List type="bullet">
-                      <List.Item>Advanced product filtering and search</List.Item>
+                      <List.Item>Advanced filtering (status, inventory levels, collections, tags)</List.Item>
+                      <List.Item>Real-time search with handle and SKU support</List.Item>
                       <List.Item>Inventory categorization (All, Out of Stock, Critical, Low Stock, In Stock)</List.Item>
-                      <List.Item>Bulk operations for pricing and collections</List.Item>
-                      <List.Item>Product status management (Draft, Active, Archived)</List.Item>
-                      <List.Item>Pagination with slider controls</List.Item>
+                      <List.Item>Multi-select with variant-level control</List.Item>
                       <List.Item>Export functionality (CSV)</List.Item>
+                      <List.Item>Continue button appears when products are selected</List.Item>
+                    </List>
+                    
+                    <Text as="h4" variant="headingSm">Smart Filtering</Text>
+                    <List type="bullet">
+                      <List.Item>Collapsible filter section to save space</List.Item>
+                      <List.Item>Status-based filtering (Draft, Active, Archived)</List.Item>
+                      <List.Item>Collection and tag-based filtering</List.Item>
+                      <List.Item>Inventory level smart categorization</List.Item>
                     </List>
                   </BlockStack>
                 </Grid.Cell>
                 
                 <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
                   <BlockStack gap="300">
-                    <Text as="h4" variant="headingSm">Bulk Operations</Text>
+                    <Text as="h4" variant="headingSm">Step 2: Bulk Operations</Text>
                     <List type="bullet">
                       <List.Item>Bulk pricing updates (set, increase, decrease, round)</List.Item>
                       <List.Item>Collection management (add, remove, replace)</List.Item>
+                      <List.Item>Image operations (add, remove, replace)</List.Item>
                       <List.Item>Status changes (activate, draft multiple products)</List.Item>
                       <List.Item>Advanced error handling with retry logic</List.Item>
                       <List.Item>Progress tracking for large operations</List.Item>
+                    </List>
+                    
+                    <Text as="h4" variant="headingSm">Operation History</Text>
+                    <List type="bullet">
+                      <List.Item>Detailed operation logs with timestamps</List.Item>
+                      <List.Item>Success/failure tracking per product</List.Item>
+                      <List.Item>Retry failed operations</List.Item>
+                      <List.Item>Export operation results</List.Item>
                     </List>
                   </BlockStack>
                 </Grid.Cell>
@@ -469,13 +488,19 @@ export function Help({ isVisible }: HelpProps) {
           </InlineStack>
           
           <Text as="p" variant="bodyMd">
-            Automated inventory alerts with multi-channel delivery and customer-facing notifications
+            Automated inventory monitoring with single active notification rule - edit your setting to modify behavior
           </Text>
+          
+          <Banner tone="info">
+            <Text as="p">
+              <strong>Important:</strong> You can have only 1 active notification rule at a time. Edit your existing rule to modify settings or create a new one to replace it.
+            </Text>
+          </Banner>
           
           <Grid>
             <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
               <BlockStack gap="300">
-                <Text as="h4" variant="headingSm">Notification Types</Text>
+                <Text as="h4" variant="headingSm">Notification Channels</Text>
                 <List type="bullet">
                   <List.Item>Email alerts for team members</List.Item>
                   <List.Item>Webflow integration for customer notifications</List.Item>
@@ -484,12 +509,13 @@ export function Help({ isVisible }: HelpProps) {
                   <List.Item>Real-time inventory monitoring</List.Item>
                 </List>
                 
-                <Text as="h4" variant="headingSm">Setup Process</Text>
-                <List type="number">
-                  <List.Item>Select products to monitor (by collection, tags, or specific products)</List.Item>
-                  <List.Item>Configure alert thresholds for each product/variant</List.Item>
-                  <List.Item>Set up notification channels (email, webflow, etc.)</List.Item>
-                  <List.Item>Test and activate monitoring</List.Item>
+                <Text as="h4" variant="headingSm">Single Rule Management</Text>
+                <List type="bullet">
+                  <List.Item>Only one notification rule can be active</List.Item>
+                  <List.Item>Edit existing rules to modify settings</List.Item>
+                  <List.Item>Create new rule to replace current one</List.Item>
+                  <List.Item>Test rules before activation</List.Item>
+                  <List.Item>Enable/disable as needed</List.Item>
                 </List>
               </BlockStack>
             </Grid.Cell>

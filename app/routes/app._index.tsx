@@ -134,6 +134,10 @@ export default function Index() {
     }
   };
 
+  const handleOpenHelp = () => {
+    setActiveTab("help");
+  };
+
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
   };
@@ -395,7 +399,8 @@ export default function Index() {
       {isAppReady && (
         <WelcomeModal 
           isOpen={showWelcomeModal} 
-          onClose={handleWelcomeModalClose} 
+          onClose={handleWelcomeModalClose}
+          onOpenHelp={handleOpenHelp}
         />
       )}
     </Page>
