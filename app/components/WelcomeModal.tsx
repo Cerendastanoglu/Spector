@@ -21,17 +21,17 @@ const slides = [
     },
     features: [
       {
-        icon: "ANA",
+        icon: "📊",
         title: "Live Analytics",
         description: "Real-time inventory health monitoring"
       },
       {
-        icon: "AI",
+        icon: "🤖",
         title: "AI Forecasting",
         description: "Predict demand and prevent stockouts"
       },
       {
-        icon: "REV",
+        icon: "💰",
         title: "Revenue Insights",
         description: "Track profitability and margins"
       }
@@ -46,17 +46,17 @@ const slides = [
     },
     features: [
       {
-        icon: "FIL",
+        icon: "🔍",
         title: "Smart Filters",
         description: "Advanced product selection tools"
       },
       {
-        icon: "EDT",
+        icon: "✏️",
         title: "Bulk Editor",
         description: "Update multiple products instantly"
       },
       {
-        icon: "ACT",
+        icon: "⚡",
         title: "Quick Actions",
         description: "One-click mass operations"
       }
@@ -71,17 +71,17 @@ const slides = [
     },
     features: [
       {
-        icon: "ALT",
+        icon: "🔔",
         title: "Smart Alerts",
         description: "Intelligent inventory notifications"
       },
       {
-        icon: "RPT",
+        icon: "📧",
         title: "Auto Reports",
         description: "Scheduled email summaries"
       },
       {
-        icon: "SEC",
+        icon: "🔒",
         title: "Secure Data",
         description: "Enterprise-grade protection"
       }
