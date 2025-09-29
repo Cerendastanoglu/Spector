@@ -1217,8 +1217,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const createPromises = imageUrls.map((imageUrl: string) => 
               admin.graphql(
                 `#graphql
-                  mutation productUpdate($input: ProductInput!) {
-                    productUpdate(input: $input) {
+                  mutation productUpdate($product: ProductInput!) {
+                    productUpdate(product: $product) {
                       product {
                         id
                         media(first: 10) {
@@ -1243,7 +1243,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   }`,
                 {
                   variables: {
-                    input: {
+                    product: {
                       id: productId,
                       media: [{
                         originalSource: imageUrl,
@@ -1423,8 +1423,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const createPromises = imageUrls.map((imageUrl: string) => 
               admin.graphql(
                 `#graphql
-                  mutation productUpdate($input: ProductInput!) {
-                    productUpdate(input: $input) {
+                  mutation productUpdate($product: ProductInput!) {
+                    productUpdate(product: $product) {
                       product {
                         id
                         media(first: 10) {
@@ -1443,7 +1443,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   }`,
                 {
                   variables: {
-                    input: {
+                    product: {
                       id: productId,
                       media: [{
                         originalSource: imageUrl,

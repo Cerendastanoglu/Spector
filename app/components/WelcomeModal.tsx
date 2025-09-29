@@ -1,24 +1,16 @@
 import { useState, useEffect } from "react";
 import {
-  Modal,
-  Text,
-  // Button,
-  BlockStack,
-  InlineStack,
-  Box,
+  Button,
   Icon,
-  Card,
-  Badge,
-  List,
 } from "@shopify/polaris";
 import {
   ChartVerticalIcon,
   PackageIcon,
   OrderIcon,
-  // CheckIcon,
   StarIcon,
-  CalendarIcon,
+  CheckIcon,
 } from "@shopify/polaris-icons";
+import styles from "./WelcomeModal.module.css";
 
 interface WelcomeModalProps {
   isOpen: boolean;
@@ -26,211 +18,170 @@ interface WelcomeModalProps {
 }
 
 export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0);
   const [isModalReady, setIsModalReady] = useState(false);
 
-  // Add a small delay before showing modal content to prevent rendering issues
+  // Add a small delay before showing modal content
   useEffect(() => {
     if (isOpen) {
       const timer = setTimeout(() => {
         setIsModalReady(true);
-      }, 100);
+      }, 150);
       return () => clearTimeout(timer);
     } else {
       setIsModalReady(false);
+      setCurrentStep(0);
     }
   }, [isOpen]);
 
-  const slides = [
-    {
-      icon: StarIcon,
-      title: "Welcome to Spector",
-      subtitle: "Your Product Management Suite Dashboard",
-      content: (
-        <BlockStack gap="400">
-          <Text as="p" variant="bodyMd">
-            Spector helps you prevent stockouts, optimize product performance, and make 
-            data-driven decisions that grow your business.
-          </Text>
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h3" variant="headingMd">Key Features:</Text>
-              <List type="bullet">
-                <List.Item>Real-time inventory monitoring</List.Item>
-                <List.Item>Advanced analytics and forecasting</List.Item>
-                <List.Item>Automated alerts and notifications</List.Item>
-                <List.Item>Performance insights and recommendations</List.Item>
-              </List>
-            </BlockStack>
-          </Card>
-        </BlockStack>
-      )
-    },
+  const features = [
     {
       icon: ChartVerticalIcon,
-      title: "Product Performance Analytics",
-      subtitle: "Deep insights into your catalog health",
-      content: (
-        <BlockStack gap="400">
-          <Text as="p" variant="bodyMd">
-            Track your product performance with comprehensive analytics including 
-            catalog value, product health scores, and top performers.
-          </Text>
-          <InlineStack gap="300" wrap={false}>
-            <Box padding="400" background="bg-surface-success" borderRadius="200">
-              <BlockStack gap="200" align="center">
-                <Icon source={ChartVerticalIcon} tone="success" />
-                <Text as="p" variant="bodyMd" fontWeight="semibold">Real-time Data</Text>
-              </BlockStack>
-            </Box>
-            <Box padding="400" background="bg-surface-info" borderRadius="200">
-              <BlockStack gap="200" align="center">
-                <Icon source={PackageIcon} tone="info" />
-                <Text as="p" variant="bodyMd" fontWeight="semibold">Catalog Health</Text>
-              </BlockStack>
-            </Box>
-            <Box padding="400" background="bg-surface-warning" borderRadius="200">
-              <BlockStack gap="200" align="center">
-                <Icon source={OrderIcon} tone="warning" />
-                <Text as="p" variant="bodyMd" fontWeight="semibold">Order Analysis</Text>
-              </BlockStack>
-            </Box>
-          </InlineStack>
-        </BlockStack>
-      )
+      title: "Smart Analytics",
+      description: "Real-time insights into your product performance and inventory health"
     },
     {
-      icon: CalendarIcon,
-      title: "Coming Soon",
-      subtitle: "Exciting features in development",
-      content: (
-        <BlockStack gap="400">
-          <Text as="p" variant="bodyMd">
-            We're continuously improving Spector with new features and capabilities.
-          </Text>
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="200" align="space-between">
-                <Text as="p" variant="bodyMd">Inventory Forecasting</Text>
-                <Badge tone="info">In Development</Badge>
-              </InlineStack>
-              <InlineStack gap="200" align="space-between">
-                <Text as="p" variant="bodyMd">Order Analysis</Text>
-                <Badge tone="info">In Development</Badge>
-              </InlineStack>
-              <InlineStack gap="200" align="space-between">
-                <Text as="p" variant="bodyMd">AI-Powered Recommendations</Text>
-                <Badge tone="attention">Coming Soon</Badge>
-              </InlineStack>
-              <InlineStack gap="200" align="space-between">
-                <Text as="p" variant="bodyMd">Advanced Integrations</Text>
-                <Badge tone="attention">Coming Soon</Badge>
-              </InlineStack>
-            </BlockStack>
-          </Card>
-        </BlockStack>
-      )
+      icon: PackageIcon,
+      title: "Inventory Management",
+      description: "Never run out of stock with intelligent monitoring and alerts"
+    },
+    {
+      icon: OrderIcon,
+      title: "Bulk Operations",
+      description: "Manage hundreds of products efficiently with powerful bulk editing tools"
     }
   ];
 
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % slides.length);
+  const nextStep = () => {
+    if (currentStep < 2) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      onClose();
+    }
   };
 
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
-  };
-
-  const handleClose = () => {
-    setCurrentSlide(0); // Reset to first slide for next time
-    setIsModalReady(false);
-    onClose();
-  };
-
-  const currentSlideData = slides[currentSlide];
-  const isLastSlide = currentSlide === slides.length - 1;
-
-  // Don't render modal content until it's ready to prevent freezing
   if (!isOpen || !isModalReady) {
-    return (
-      <Modal
-        open={isOpen}
-        onClose={handleClose}
-        title=""
-        size="large"
-      >
-        <Modal.Section>
-          <BlockStack gap="400" align="center">
-            <Text as="p" variant="bodyMd">Loading...</Text>
-          </BlockStack>
-        </Modal.Section>
-      </Modal>
-    );
+    return null;
   }
 
   return (
-    <Modal
-      open={isOpen}
-      onClose={handleClose}
-      title=""
-      primaryAction={{
-        content: isLastSlide ? "Get Started" : "Next",
-        onAction: isLastSlide ? handleClose : nextSlide,
-      }}
-      secondaryActions={[
-        ...(currentSlide > 0 ? [{
-          content: "Previous",
-          onAction: prevSlide,
-        }] : []),
-        {
-          content: "Skip Tour",
-          onAction: handleClose,
-        }
-      ]}
-      size="large"
-    >
-      <Modal.Section>
-        <BlockStack gap="600" align="center">
-          {/* Icon and Title */}
-          <BlockStack gap="400" align="center">
-            <Box 
-              background="bg-fill-info" 
-              padding="600" 
-              borderRadius="200"
+    <div className={styles.modalOverlay}>
+      <div className={styles.glassModal}>
+        {/* Close button */}
+        <button 
+          className={styles.closeButton}
+          onClick={onClose}
+          type="button"
+        >
+          ✕
+        </button>
+
+        {/* Header */}
+        <div className={styles.header}>
+          <div className={styles.logoContainer}>
+            <div className={styles.logo}>
+              <Icon source={StarIcon} />
+            </div>
+          </div>
+          <h1 className={styles.title}>Welcome to Spector</h1>
+          <p className={styles.subtitle}>
+            Your intelligent inventory management companion
+          </p>
+        </div>
+
+        {/* Progress Steps */}
+        <div className={styles.progressContainer}>
+          {[0, 1, 2].map((step) => (
+            <div 
+              key={step}
+              className={`${styles.progressStep} ${step <= currentStep ? styles.active : ''}`}
+            />
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className={styles.content}>
+          {currentStep === 0 && (
+            <div className={styles.step}>
+              <div className={styles.stepHeader}>
+                <h2>Get Started in Seconds</h2>
+                <p>Spector is designed to help you manage inventory effortlessly</p>
+              </div>
+              <div className={styles.checklistContainer}>
+                {[
+                  "Connect your Shopify store",
+                  "Analyze your current inventory",
+                  "Start optimizing your business"
+                ].map((item, index) => (
+                  <div key={index} className={styles.checklistItem}>
+                    <div className={styles.checkIcon}>
+                      <Icon source={CheckIcon} />
+                    </div>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {currentStep === 1 && (
+            <div className={styles.step}>
+              <div className={styles.stepHeader}>
+                <h2>Powerful Features</h2>
+                <p>Everything you need to optimize your inventory</p>
+              </div>
+              <div className={styles.featuresGrid}>
+                {features.map((feature, index) => (
+                  <div key={index} className={styles.featureCard}>
+                    <div className={styles.featureIcon}>
+                      <Icon source={feature.icon} />
+                    </div>
+                    <h3>{feature.title}</h3>
+                    <p>{feature.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {currentStep === 2 && (
+            <div className={styles.step}>
+              <div className={styles.stepHeader}>
+                <h2>You're All Set!</h2>
+                <p>Start exploring your dashboard and discover insights</p>
+              </div>
+              <div className={styles.finalStep}>
+                <div className={styles.successIcon}>
+                  <Icon source={CheckIcon} />
+                </div>
+                <div className={styles.finalMessage}>
+                  <h3>Ready to optimize your inventory?</h3>
+                  <p>Click "Get Started" to begin your journey with Spector</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className={styles.actions}>
+          <Button
+            variant="primary"
+            size="large"
+            onClick={nextStep}
+          >
+            {currentStep === 2 ? "Get Started" : "Continue"}
+          </Button>
+          {currentStep > 0 && (
+            <Button
+              variant="plain"
+              onClick={() => setCurrentStep(currentStep - 1)}
             >
-              <Icon source={currentSlideData.icon} tone="base" />
-            </Box>
-            
-            <BlockStack gap="200" align="center">
-              <Text as="h1" variant="headingLg" fontWeight="bold" alignment="center">
-                {currentSlideData.title}
-              </Text>
-              <Text as="p" variant="bodyLg" tone="subdued" alignment="center">
-                {currentSlideData.subtitle}
-              </Text>
-            </BlockStack>
-          </BlockStack>
-
-          {/* Content */}
-          <Box width="100%">
-            {currentSlideData.content}
-          </Box>
-
-          {/* Slide Indicators */}
-          <InlineStack gap="200" align="center">
-            {slides.map((_, index) => (
-              <Box
-                key={index}
-                background={index === currentSlide ? "bg-fill-info" : "bg-fill-disabled"}
-                borderRadius="100"
-                minHeight="8px"
-                minWidth="8px"
-                padding="100"
-              />
-            ))}
-          </InlineStack>
-        </BlockStack>
-      </Modal.Section>
-    </Modal>
+              Back
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

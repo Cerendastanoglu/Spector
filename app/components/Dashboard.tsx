@@ -32,13 +32,14 @@ import {
   ChevronDownIcon,
   ViewIcon,
   CheckCircleIcon,
-  PlusCircleIcon,
+  EditIcon,
 } from "@shopify/polaris-icons";
 
 interface DashboardProps {
   isVisible: boolean;
   outOfStockCount: number;
   onNavigate: (tab: string) => void;
+  shopDomain?: string;
 }
 
 interface ProductAnalyticsData {
@@ -93,7 +94,7 @@ interface InventoryData {
   }>;
 }
 
-export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavigate: _onNavigate }: DashboardProps) {
+export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavigate: _onNavigate, shopDomain }: DashboardProps) {
   const [activeTab, setActiveTab] = useState(0);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [timePeriod, setTimePeriod] = useState('30');
@@ -956,6 +957,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
         id: '1',
         title: 'Premium Cotton T-Shirt',
         sku: 'TCT-001',
+        handle: 'premium-cotton-t-shirt',
         currentStock: 5,
         averageDailyDemand: 2.3,
         forecastDays: 2,
@@ -973,6 +975,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
         id: '2', 
         title: 'Wireless Bluetooth Headphones',
         sku: 'WBH-002',
+        handle: 'wireless-bluetooth-headphones',
         currentStock: 23,
         averageDailyDemand: 1.8,
         forecastDays: 13,
@@ -989,7 +992,8 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
       {
         id: '3',
         title: 'Organic Face Moisturizer',
-        sku: 'OFM-003', 
+        sku: 'OFM-003',
+        handle: 'organic-face-moisturizer',
         currentStock: 45,
         averageDailyDemand: 1.2,
         forecastDays: 38,
@@ -1007,6 +1011,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
         id: '4',
         title: 'Stainless Steel Water Bottle',
         sku: 'SSWB-004',
+        handle: 'stainless-steel-water-bottle',
         currentStock: 8,
         averageDailyDemand: 3.1,
         forecastDays: 3,
@@ -1024,6 +1029,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
         id: '5',
         title: 'Yoga Mat - Premium',
         sku: 'YMP-005',
+        handle: 'yoga-mat-premium',
         currentStock: 15,
         averageDailyDemand: 0.8,
         forecastDays: 19,
@@ -1254,20 +1260,34 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
 
                   {/* Actions */}
                   <InlineStack gap="100">
-                    <Tooltip content="View details">
+                    <Tooltip content="View online store">
                       <Button
                         icon={ViewIcon}
                         variant="tertiary"
                         size="micro"
-                        onClick={() => console.log('View inventory item:', item.id)}
+                        onClick={() => {
+                          // Open product's online store page
+                          if (shopDomain && item.handle) {
+                            window.open(`https://${shopDomain}/products/${item.handle}`, '_blank');
+                          } else {
+                            console.log('Product handle or shop domain not available for:', item.id);
+                          }
+                        }}
                       />
                     </Tooltip>
-                    <Tooltip content="Quick reorder">
+                    <Tooltip content="Edit product">
                       <Button
-                        icon={PlusCircleIcon}
+                        icon={EditIcon}
                         variant="tertiary"
                         size="micro"
-                        onClick={() => console.log('Quick reorder:', item.id)}
+                        onClick={() => {
+                          // Open product in Shopify admin
+                          if (shopDomain && item.id) {
+                            window.open(`https://${shopDomain}/admin/products/${item.id}`, '_blank');
+                          } else {
+                            console.log('Product ID or shop domain not available for:', item.id);
+                          }
+                        }}
                       />
                     </Tooltip>
                   </InlineStack>
