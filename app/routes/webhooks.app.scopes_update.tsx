@@ -4,8 +4,11 @@ import db from "../db.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
+    // Clone the request to avoid body reading conflicts
+    const webhookRequest = request.clone();
+    
     // authenticate.webhook automatically verifies HMAC signature
-    const { payload, session, topic, shop } = await authenticate.webhook(request);
+    const { payload, session, topic, shop } = await authenticate.webhook(webhookRequest);
     
     console.log(`✅ Verified webhook: ${topic} for shop: ${shop}`);
     console.log(`🔐 HMAC signature verified successfully`);
