@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -16,8 +17,32 @@ import { Help } from "../components/Help";
 import { OptimizedComponents, useComponentPreloader } from "../utils/lazyLoader";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-  return null;
+  const { admin } = await authenticate.admin(request);
+  
+  // Fetch shop information
+  try {
+    const response = await admin.graphql(
+      `#graphql
+        query getShop {
+          shop {
+            id
+            name
+            myshopifyDomain
+            primaryDomain {
+              host
+            }
+          }
+        }`
+    );
+    
+    const data = await response.json();
+    return {
+      shop: data.data?.shop || null
+    };
+  } catch (error) {
+    console.error('Error fetching shop data:', error);
+    return { shop: null };
+  }
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -63,6 +88,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Index() {
+  const { shop } = useLoaderData<typeof loader>();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [outOfStockCount] = useState(0);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
@@ -120,6 +146,7 @@ export default function Index() {
             isVisible={true}
             outOfStockCount={outOfStockCount}
             onNavigate={handleTabChange}
+            shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain}
           />
         );
       case "out-of-stock":
@@ -159,10 +186,10 @@ export default function Index() {
                           Free Trial Active
                         </Text>
                         <Text as="p" variant="bodyMd">
-                          You're currently on a 14-day free trial. Full access to all features until your trial expires.
+                          You're currently on a 3-day free trial. Access to all available features until your trial expires.
                         </Text>
                         <Text as="p" variant="bodySm" tone="subdued">
-                          Trial ends: January 1, 2025
+                          Trial ends: October 2, 2025
                         </Text>
                       </BlockStack>
                     </Card>
@@ -175,13 +202,14 @@ export default function Index() {
                           Current Plan
                         </Text>
                         <Text as="p" variant="bodyMd">
-                          <strong>Spector Pro - Free Trial</strong>
+                          <strong>Spector Limited Plan - Trial</strong>
                         </Text>
                         <Text as="p" variant="bodySm" tone="subdued">
-                          • Unlimited products monitoring
-                          • Real-time notifications
-                          • Email & webhook alerts
-                          • Advanced analytics
+                          • Basic inventory tracking
+                          • Product analytics dashboard
+                          • Bulk product operations
+                          • Email notifications
+                          • Performance monitoring
                         </Text>
                       </BlockStack>
                     </Card>
@@ -192,10 +220,13 @@ export default function Index() {
                 <Card background="bg-surface-secondary">
                   <BlockStack gap="400">
                     <Text as="h4" variant="headingSm">
-                      After Your Trial Ends
+                      Continue with Spector Limited Plan
                     </Text>
                     <Text as="p" variant="bodyMd">
-                      Choose how you'd like to continue using Spector:
+                      <strong>$14.99/month</strong> - Introductory pricing for early adopters
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      This is our beginning price as we're a new app. More advanced plans with additional features will be added in the future.
                     </Text>
                     
                     <Layout>
