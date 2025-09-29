@@ -13,9 +13,20 @@ import { ShopifyAppPerformance, useAppBridgePerformance } from "../utils/appBrid
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  // Ensure proper OAuth authentication before any app access
+  const { admin, session } = await authenticate.admin(request);
+  
+  // This ensures the shop is properly authenticated and session is valid
+  if (!session || !admin) {
+    throw new Error('Authentication required');
+  }
 
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  console.log(`✅ Authenticated request for shop: ${session.shop}`);
+
+  return { 
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    shop: session.shop
+  };
 };
 
 export default function App() {

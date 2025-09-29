@@ -2316,17 +2316,23 @@ export function Notifications({ isVisible }: NotificationsProps) {
           <BlockStack gap="400">
             <InlineStack align="space-between" blockAlign="center">
               <BlockStack gap="100">
-                <Text as="h3" variant="headingMd">Existing Notification Rules</Text>
+                <Text as="h3" variant="headingMd">Active Notification</Text>
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Manage your active notification rules and their settings
+                  You can have only 1 active notification rule at a time. Edit your existing rule or create a new one to replace it.
                 </Text>
               </BlockStack>
               <Button
                 variant="primary"
-                icon={PlusIcon}
-                onClick={() => setShowRuleModal(true)}
+                icon={existingRules.filter(rule => rule.enabled).length > 0 ? EditIcon : PlusIcon}
+                onClick={() => {
+                  const activeRule = existingRules.find(rule => rule.enabled);
+                  if (activeRule) {
+                    setEditingRule(activeRule);
+                  }
+                  setShowRuleModal(true);
+                }}
               >
-                Add Rule
+                {existingRules.filter(rule => rule.enabled).length > 0 ? "Edit Notification" : "Add Notification"}
               </Button>
             </InlineStack>
 
@@ -2335,7 +2341,7 @@ export function Notifications({ isVisible }: NotificationsProps) {
                 <BlockStack gap="200" align="center">
                   <Icon source={NotificationIcon} tone="subdued" />
                   <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
-                    No notification rules created yet. Add your first rule to start monitoring.
+                    No notification rule created yet. Add your notification to start monitoring inventory levels.
                   </Text>
                 </BlockStack>
               </Box>
