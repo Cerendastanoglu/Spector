@@ -6,11 +6,6 @@ handle = "spector"
 application_url = "https://miscellaneous-financing-collected-sheer.trycloudflare.com"
 embedded = true
 
-[app_info]
-privacy_policy_url = "https://spector-app.com/privacy"
-support_email = "hello@spector-app.com"
-support_url = "https://spector-app.com/support"
-
 [build]
 automatically_update_urls_on_dev = true
 
@@ -34,23 +29,3 @@ redirect_urls = ["https://miscellaneous-financing-collected-sheer.trycloudflare.
 
 [pos]
 embedded = false
-
-# Pricing configuration for App Store
-[pricing]
-  [[pricing.plans]]
-  name = "Spector Limited Plan"
-  price = 14.99
-  currency = "USD" 
-  interval = "monthly"
-  trial_days = 3
-  description = "Limited features plan - Perfect for getting started with inventory management. New features and plans coming soon!"
-  features = [
-    "Basic inventory tracking",
-    "Product analytics dashboard", 
-    "Bulk product operations",
-    "Email notifications",
-    "Performance monitoring"
-  ]
-  
-  # Note: This is an introductory price for early adopters
-  # More plans with advanced features will be added in future updates
