@@ -2,6 +2,12 @@ import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 
+/**
+ * App Uninstall Webhook Handler
+ * 
+ * SHOPIFY REQUIREMENT: Apps must completely clean up all data when uninstalled
+ * This ensures compliance with privacy and data retention policies
+ */
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     // Clone the request to avoid body reading conflicts
@@ -12,12 +18,54 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     console.log(`✅ Verified webhook: ${topic} for shop: ${shop}`);
     console.log(`🔐 HMAC signature verified successfully`);
+    console.log(`🧹 Starting complete data cleanup for shop: ${shop}`);
 
-    // Webhook requests can trigger multiple times and after an app has already been uninstalled.
-    // If this webhook already ran, the session may have been deleted previously.
-    if (session) {
-      await db.session.deleteMany({ where: { shop } });
-      console.log(`🗑️ Cleaned up sessions for shop: ${shop}`);
+    // COMPLETE DATA CLEANUP - Remove ALL shop data to ensure compliance
+    try {
+      // Start transaction for complete cleanup
+      await db.$transaction(async (tx) => {
+        // 1. Delete all sessions (OAuth tokens)
+        const sessionsDeleted = await tx.session.deleteMany({ where: { shop } });
+        console.log(`🗑️ Deleted ${sessionsDeleted.count} sessions`);
+
+        // 2. Delete notification system data (rules cascade to channels and logs)
+        const notificationRulesDeleted = await tx.notificationRule.deleteMany({ where: { shop } });
+        console.log(`🗑️ Deleted ${notificationRulesDeleted.count} notification rules (cascades to channels and logs)`);
+
+        // 3. Delete analytics snapshots and product analytics
+        const analyticsSnapshotsDeleted = await tx.analyticsSnapshot.deleteMany({ where: { shop } });
+        console.log(`🗑️ Deleted ${analyticsSnapshotsDeleted.count} analytics snapshots`);
+
+        const productAnalyticsDeleted = await tx.productAnalytics.deleteMany({ where: { shop } });
+        console.log(`🗑️ Deleted ${productAnalyticsDeleted.count} product analytics records`);
+
+        // 4. Delete data retention policies
+        const retentionPoliciesDeleted = await tx.dataRetentionPolicy.deleteMany({ where: { shop } });
+        console.log(`🗑️ Deleted ${retentionPoliciesDeleted.count} retention policies`);
+
+        // 5. Delete bulk edit history (batches cascade to items)
+        const bulkEditBatchesDeleted = await tx.bulkEditBatch.deleteMany({ where: { shop } });
+        console.log(`🗑️ Deleted ${bulkEditBatchesDeleted.count} bulk edit batches (cascades to items)`);
+
+        // 6. Log the complete cleanup
+        console.log(`✅ COMPLETE DATA CLEANUP SUCCESSFUL for shop: ${shop}`);
+        console.log(`📊 Total records cleaned: ${
+          sessionsDeleted.count + 
+          notificationRulesDeleted.count + 
+          analyticsSnapshotsDeleted.count + 
+          productAnalyticsDeleted.count + 
+          retentionPoliciesDeleted.count + 
+          bulkEditBatchesDeleted.count
+        }`);
+      });
+
+      // Log successful cleanup for audit trail
+      console.log(`🎯 COMPLIANCE: All shop data successfully removed for ${shop}`);
+      console.log(`🔒 PRIVACY: No residual data remains in system`);
+      
+    } catch (cleanupError) {
+      console.error(`❌ Data cleanup failed for shop ${shop}:`, cleanupError);
+      // Still return 200 to prevent webhook retries, but log the error
     }
 
     // Log payload for debugging (remove in production)
