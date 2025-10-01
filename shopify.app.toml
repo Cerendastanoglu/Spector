@@ -21,9 +21,8 @@ api_version = "2024-10"
   uri = "/webhooks/app/scopes_update"
 
   # Mandatory GDPR Privacy Compliance Webhooks
-  [[webhooks.subscriptions]]
-  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
-  uri = "/webhooks"
+  # Note: These are configured automatically by Shopify for published apps
+  # The handler is already implemented in /app/routes/webhooks.tsx
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
