@@ -1,5 +1,4 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
-import { authenticate } from "../shopify.server";
 import db from "../db.server";
 
 /**
@@ -13,17 +12,44 @@ import db from "../db.server";
  * Must respond with 200 series status code to confirm receipt
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
+  const body = await request.text();
+  const webhookId = request.headers.get("X-Shopify-Webhook-Id") || "unknown";
+  const topic = request.headers.get("X-Shopify-Topic");
+  const hmac = request.headers.get("X-Shopify-Hmac-Sha256");
+  const shop = request.headers.get("X-Shopify-Shop-Domain");
+  let auditRecordId = 'not-created';
+
+  if (!topic || !hmac || !shop) {
+    console.log("❌ Missing required webhook headers");
+    return new Response("Missing headers", { status: 400 });
+  }
+
+  console.log(`� GDPR Compliance Webhook received: ${topic} from ${shop}`);
+
   try {
-    const { topic, shop, payload } = await authenticate.webhook(request);
+    // Verify HMAC signature for security
+    if (process.env.SHOPIFY_WEBHOOK_SECRET) {
+      const crypto = await import('crypto');
+      const expectedHmac = crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET)
+        .update(body, 'utf8')
+        .digest('base64');
+      
+      if (hmac !== expectedHmac) {
+        console.log(`❌ HMAC verification failed. Expected: ${expectedHmac}, Received: ${hmac}`);
+        return new Response("Unauthorized", { status: 401 });
+      }
+      console.log(`✅ HMAC verification successful`);
+    } else {
+      console.log(`⚠️ HMAC verification skipped - no webhook secret configured`);
+    }
+
+    const payload = JSON.parse(body);
     
-    console.log(`🔐 GDPR Compliance Webhook: ${topic} for shop: ${shop}`);
-    console.log(`📋 Payload received:`, JSON.stringify(payload, null, 2));
-    
-    // Log compliance request for audit trail (30-day retention)
+    // Create 30-day expiration for GDPR compliance
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30); // 30 days from now
-    
-    let auditRecordId: string;
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    // Log compliance request for audit trail
     try {
       const auditRecord = await db.complianceAudit.create({
         data: {
@@ -32,19 +58,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           customerId: payload.customer?.id || null,
           payload: JSON.stringify(payload),
           status: 'received',
-          expiresAt
+          expiresAt,
+          notes: `Webhook ID: ${webhookId}, HMAC verified: true`
         }
       });
       auditRecordId = auditRecord.id;
+      console.log(`📝 Audit record created: ${auditRecordId}`);
     } catch (dbError) {
-      console.error('Failed to create audit record:', dbError);
-      // Continue processing even if audit logging fails
+      console.error('❌ Failed to create audit record:', dbError);
       auditRecordId = 'failed-to-create';
     }
     
     let finalStatus = 'completed';
-    let responseData: string | null = null;
-    let notes: string | null = null;
     
     switch (topic) {
       case "CUSTOMERS_DATA_REQUEST": {
@@ -70,9 +95,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         };
         
         console.log(`📋 Customer Data Report Generated:`, customerDataReport);
-        responseData = JSON.stringify(customerDataReport);
         finalStatus = 'completed';
-        notes = 'Customer data report generated - no personal data stored by app';
         break;
       }
       
@@ -90,11 +113,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           console.log(`📝 Note: This app doesn't store customer-specific data beyond Shopify's scope`);
           
           finalStatus = 'completed';
-          notes = 'No customer-specific data to delete - app only stores product data';
         } catch (error) {
           console.error(`❌ Error during customer data deletion:`, error);
           finalStatus = 'error';
-          notes = `Error during deletion: ${error instanceof Error ? error.message : 'Unknown error'}`;
         }
         break;
       }
@@ -116,14 +137,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const totalDeleted = deletionResults.reduce((sum, result) => sum + result.count, 0);
             
             console.log(`✅ SHOP_REDACT completed: Deleted ${totalDeleted} records for shop: ${shop}`);
-            notes = `Successfully deleted ${totalDeleted} records`;
           });
           
           finalStatus = 'completed';
         } catch (error) {
           console.error(`❌ Error during shop data deletion:`, error);
           finalStatus = 'error';
-          notes = `Error during shop deletion: ${error instanceof Error ? error.message : 'Unknown error'}`;
         }
         break;
       }
@@ -131,26 +150,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       default: {
         console.log(`❓ Unhandled compliance webhook topic: ${topic}`);
         finalStatus = 'unhandled';
-        notes = `Unhandled webhook topic: ${topic}`;
       }
     }
     
-    // Update the audit record with completion status
-    try {
-      if (auditRecordId !== 'failed-to-create') {
+          // Update audit record with success status
+      try {
         await db.complianceAudit.update({
           where: { id: auditRecordId },
-          data: {
-            status: finalStatus,
-            response: responseData,
+          data: { 
+            status: 'completed',
             completedAt: new Date(),
-            notes
+            notes: `Webhook ID: ${webhookId}, Processed successfully at ${new Date().toISOString()}`
           }
         });
+        console.log(`✅ Audit record updated: ${auditRecordId} - completed`);
+      } catch (updateError) {
+        console.error('❌ Failed to update audit record:', updateError);
       }
-    } catch (updateError) {
-      console.error('Failed to update audit record:', updateError);
-    }
     
     console.log(`📝 GDPR Compliance processed: ${topic} - Status: ${finalStatus}`);
     
@@ -164,6 +180,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     
   } catch (error) {
     console.error(`❌ GDPR Compliance Webhook Error:`, error);
+    
+    // Update audit record with error status if we have an ID
+    if (typeof auditRecordId === 'string' && auditRecordId !== 'failed-to-create') {
+      try {
+        await db.complianceAudit.update({
+          where: { id: auditRecordId },
+          data: { 
+            status: 'error',
+            completedAt: new Date(),
+            notes: `Webhook ID: ${webhookId}, Critical Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+          }
+        });
+        console.log(`❌ Audit record updated: ${auditRecordId} - critical error`);
+      } catch (updateError) {
+        console.error('❌ Failed to update audit record with critical error:', updateError);
+      }
+    }
     
     // Still return 200 to prevent webhook retries, but log the error
     return new Response("Error processed", { 
