@@ -10,8 +10,6 @@ import {
 import {
   SettingsIcon,
   QuestionCircleIcon,
-  SunIcon,
-  MoonIcon,
 } from "@shopify/polaris-icons";
 import { useTheme } from "../contexts/ThemeContext";
 
@@ -23,29 +21,9 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPreloadComponent }: AppHeaderProps) {
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
 
-  // Theme toggle button
-  const themeToggleButton = (
-    <Tooltip content={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
-      <button
-        className="theme-toggle-button"
-        onClick={toggleTheme}
-        aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          borderRadius: '8px',
-          padding: '8px',
-          cursor: 'pointer',
-          color: theme === 'dark' ? '#b0b0b0' : '#666',
-          transition: 'all 0.3s ease'
-        }}
-      >
-        <Icon source={theme === 'light' ? MoonIcon : SunIcon} />
-      </button>
-    </Tooltip>
-  );
+
 
   // Mobile-friendly settings button - icon only
   const mobileSettingsButton = (
@@ -96,7 +74,6 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
   // Mobile-friendly secondary menu
   const mobileSecondaryMenu = (
     <InlineStack gap="200">
-      {themeToggleButton}
       {mobileSettingsButton}
     </InlineStack>
   );
@@ -196,7 +173,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
   );
 
   const navigationMarkup = (
-    <InlineStack gap="200" align="center">
+    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'nowrap' }}>
       {/* Dashboard Button */}
       <div className={activeTab === "dashboard" ? "nav-button-active" : "nav-button-inactive"} style={{
         background: activeTab === "dashboard" 
@@ -205,7 +182,8 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
         borderRadius: '12px',
         padding: '2px',
         border: activeTab === "dashboard" ? '2px solid #FF204E' : '1px solid transparent',
-        boxShadow: activeTab === "dashboard" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none'
+        boxShadow: activeTab === "dashboard" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none',
+        flexShrink: 0
       }}>
         <Button
           onClick={() => onTabChange("dashboard")}
@@ -218,7 +196,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
       </div>
       
       {/* Product Management with Badge */}
-      <InlineStack gap="100" align="center">
+      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
         <div className={activeTab === "out-of-stock" ? "nav-button-active" : "nav-button-inactive"} style={{
           background: activeTab === "out-of-stock" 
             ? (theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'white')
@@ -261,47 +239,31 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
             </Text>
           </div>
         )}
-      </InlineStack>
+      </div>
       
-      {/* Notifications Button */}
-      <div className={activeTab === "notifications" ? "nav-button-active" : "nav-button-inactive"} style={{
-        background: activeTab === "notifications" 
+      {/* Forecasting Button */}
+      <div className={activeTab === "forecasting" ? "nav-button-active" : "nav-button-inactive"} style={{
+        background: activeTab === "forecasting" 
           ? (theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'white')
           : 'transparent',
         borderRadius: '12px',
         padding: '2px',
-        border: activeTab === "notifications" ? '2px solid #FF204E' : '1px solid transparent',
-        boxShadow: activeTab === "notifications" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none',
-        position: 'relative'
+        border: activeTab === "forecasting" ? '2px solid #FF204E' : '1px solid transparent',
+        boxShadow: activeTab === "forecasting" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none',
+        flexShrink: 0
       }}>
         <Button
-          onClick={() => onTabChange("notifications")}
+          onClick={() => onTabChange("forecasting")}
+          onMouseEnter={() => onPreloadComponent?.('Forecasting')}
           variant="tertiary"
           size="medium"
         >
-          Stock Alerts
+          Forecasting
         </Button>
       </div>
-      
-      {/* Billing Button */}
-      <div className={activeTab === "billing" ? "nav-button-active" : "nav-button-inactive"} style={{
-        background: activeTab === "billing" 
-          ? (theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'white')
-          : 'transparent',
-        borderRadius: '12px',
-        padding: '2px',
-        border: activeTab === "billing" ? '2px solid #FF204E' : '1px solid transparent',
-        boxShadow: activeTab === "billing" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none'
-      }}>
-        <Button
-          onClick={() => onTabChange("billing")}
-          variant="tertiary"
-          size="medium"
-        >
-          Billing
-        </Button>
-      </div>
-    </InlineStack>
+
+
+    </div>
   );
 
   return (
@@ -437,6 +399,19 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
                   .mobile-header { display: block !important; }
                   .desktop-header { display: none !important; }
                 }
+                
+                /* Mobile navigation scrolling */
+                @media (max-width: 767px) {
+                  .mobile-nav-container {
+                    overflow-x: auto !important;
+                    -webkit-overflow-scrolling: touch !important;
+                    scrollbar-width: none !important;
+                    -ms-overflow-style: none !important;
+                  }
+                  .mobile-nav-container::-webkit-scrollbar {
+                    display: none !important;
+                  }
+                }
               `
             }} />
             
@@ -448,12 +423,12 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
             
             {/* Mobile: Navigation on second row */}
             <Box paddingBlockStart="400">
-              <div style={{
+              <div className="mobile-nav-container" style={{
                 background: theme === 'dark'
                   ? 'rgba(42, 42, 42, 0.9)'
                   : 'rgba(255, 255, 255, 0.8)',
                 borderRadius: '12px',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 border: theme === 'dark'
                   ? '1px solid rgba(255, 32, 78, 0.3)'
                   : '1px solid rgba(255, 32, 78, 0.2)',
@@ -463,7 +438,10 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
                 backdropFilter: 'blur(10px)',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 display: 'flex',
-                justifyContent: 'center'
+                gap: '6px',
+                overflowX: 'auto',
+                alignItems: 'center',
+                justifyContent: 'flex-start'
               }}>
                 {navigationMarkup}
               </div>
@@ -473,8 +451,12 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
           {/* Desktop Layout */}
           <div style={{ display: 'none' }} className="desktop-header">
             <InlineStack align="space-between" blockAlign="center">
-              <InlineStack gap="600" align="center">
+              <InlineStack gap="400" align="center">
                 {logoMarkup}
+              </InlineStack>
+              
+              {/* Navigation moved to center-right with more spacing */}
+              <InlineStack gap="200" align="center">
                 <div style={{
                   background: theme === 'dark'
                     ? 'rgba(42, 42, 42, 0.9)'
@@ -487,17 +469,16 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
                   boxShadow: theme === 'dark'
                     ? '0 2px 8px rgba(0,0,0,0.2)'
                     : '0 2px 8px rgba(0,0,0,0.06)',
-                  backdropFilter: 'blur(10px)'
+                  backdropFilter: 'blur(10px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginRight: '40px'
                 }}>
-                  <InlineStack gap="100" align="center">
-                    {navigationMarkup}
-                    {desktopSettingsButton}
-                  </InlineStack>
+                  {navigationMarkup}
+                  {desktopSettingsButton}
                 </div>
               </InlineStack>
-              
-              {/* Empty space - cleaner look */}
-              <div></div>
             </InlineStack>
           </div>
         </Box>
@@ -571,19 +552,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
           }
         }
         
-        /* Theme toggle button styling */
-        .theme-toggle-button:hover {
-          background: rgba(255, 32, 78, 0.1) !important;
-          color: #A0153E !important;
-        }
-        
-        .theme-toggle-button svg {
-          transition: all 0.3s ease !important;
-        }
-        
-        .theme-toggle-button:hover svg {
-          fill: #A0153E !important;
-        }
+
       `}</style>
     </>
   );

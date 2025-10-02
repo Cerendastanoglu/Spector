@@ -1,6 +1,7 @@
 export { AppHeader } from "./AppHeader";
 export { BulkEditHistory } from "./BulkEditHistory";
 export { Dashboard } from "./Dashboard";
+export { ForecastingTab } from "./ForecastingTab";
 export { Help } from "./Help";
 export { PerformanceDashboard } from "./PerformanceDashboard";
 export { ProductManagement } from "./ProductManagement";

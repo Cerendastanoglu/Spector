@@ -38,22 +38,26 @@
 .stepsContainer {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  padding: 20px;
+  gap: 20px;
+  padding: 24px;
   background-color: #f8fafc;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
+  position: relative;
+  isolation: isolate;
 }
 
 /* Three column variant for notifications */
 .stepsContainerThree {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 16px;
-  padding: 20px;
+  gap: 20px;
+  padding: 24px;
   background-color: #f8fafc;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
+  position: relative;
+  isolation: isolate;
 }
 
 /* Tablet responsive for three columns - switch to 2 rows on medium screens */
@@ -83,14 +87,18 @@
   animation: fadeIn 0.5s ease-in-out;
   transition: all 0.3s ease-in-out;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
 }
 
 .stepCard:hover {
   transform: scale(1.01);
+  z-index: 2;
 }
 
 .stepCard.active {
   transform: scale(1.02);
+  z-index: 3;
 }
 
 /* Removed step card content styles - now using Polaris Card component directly */

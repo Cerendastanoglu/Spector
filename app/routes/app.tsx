@@ -55,9 +55,6 @@ export default function App() {
           <Link to="/app/market-analysis">
             Market Analysis
           </Link>
-          <Link to="/app/additional">
-            App Configuration
-          </Link>
         </NavMenu>
         <Outlet />
       </ThemeProvider>

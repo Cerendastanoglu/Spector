@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useNavigate } from "@remix-run/react";
+import { useLoaderData } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -13,6 +13,7 @@ import { authenticate } from "../shopify.server";
 import { AppHeader } from "../components/AppHeader";
 import { WelcomeModal } from "../components/WelcomeModal";
 import { Help } from "../components/Help";
+import { ForecastingTab } from "../components/ForecastingTab";
 import { OptimizedComponents, useComponentPreloader } from "../utils/lazyLoader";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -88,7 +89,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function Index() {
   const { shop } = useLoaderData<typeof loader>();
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [outOfStockCount] = useState(0);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
@@ -155,23 +155,16 @@ export default function Index() {
         );
       case "out-of-stock":
         return <OptimizedComponents.ProductManagement isVisible={true} />;
-      case "notifications":
-        return (
-          <Card>
-            <Text as="p" variant="bodyMd">
-              Notifications feature has been removed.
-            </Text>
-          </Card>
-        );
+
+      case "forecasting":
+        return <ForecastingTab shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} />;
       case "help":
         return <Help isVisible={true} />;
       case "billing":
-        // Redirect to the dedicated billing route
-        navigate('/app/billing');
         return (
           <Card>
-            <Text as="h2" variant="headingMd">
-              Redirecting to Billing...
+            <Text as="p" variant="bodyMd">
+              Billing feature has been removed.
             </Text>
           </Card>
         );
@@ -182,22 +175,23 @@ export default function Index() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingLg">
-                  App Configuration
+                  App Settings
                 </Text>
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Manage your Spector subscription, billing, and app settings.
+                  Manage your Spector app settings and preferences.
                 </Text>
               </BlockStack>
             </Card>
 
-            {/* Subscription & Billing */}
+            {/* App Information */}
             <Card>
               <BlockStack gap="400">
                 <Text as="h3" variant="headingMd">
-                  Subscription & Billing
+                  App Information
                 </Text>
-                
-                {/* Trial Status */}
+                <Text as="p" variant="bodyMd">
+                  Spector helps you manage your Shopify products with advanced analytics and inventory tracking.
+                </Text>
                 <Layout>
                   <Layout.Section variant="oneHalf">
                     <Card background="bg-surface-info">
