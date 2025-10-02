@@ -168,7 +168,7 @@ export function Help({ isVisible }: HelpProps) {
                   <List.Item>Real-time inventory counts</List.Item>
                   <List.Item>Revenue tracking (when order data is available)</List.Item>
                   <List.Item>Product performance metrics</List.Item>
-                  <List.Item>Low stock alerts</List.Item>
+                  <List.Item>AI-powered forecasting insights</List.Item>
                 </List>
               </BlockStack>
             </Grid.Cell>

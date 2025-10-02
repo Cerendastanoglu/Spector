@@ -63,22 +63,22 @@ const slides = [
     ]
   },
   {
-    title: "Automation & Alerts",
-    subtitle: "Stay informed with intelligent monitoring",
+    title: "Analytics & Insights",
+    subtitle: "Harness the power of data-driven decisions",
     centerpiece: {
-      title: "Smart Notification Center",
-      description: "Automated alerts, scheduled reports, and real-time monitoring keep you ahead of inventory challenges"
+      title: "Advanced Analytics Hub",
+      description: "Deep insights into your inventory performance with forecasting tools to optimize stock levels and maximize profitability"
     },
     features: [
       {
-        icon: "🔔",
-        title: "Smart Alerts",
-        description: "Intelligent inventory notifications"
+        icon: "�",
+        title: "Forecasting",
+        description: "AI-powered demand prediction"
       },
       {
-        icon: "📧",
-        title: "Auto Reports",
-        description: "Scheduled email summaries"
+        icon: "�",
+        title: "Insights",
+        description: "Actionable business intelligence"
       },
       {
         icon: "🔒",
