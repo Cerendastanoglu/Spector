@@ -29,7 +29,6 @@ import {
   InfoIcon,
   StarIcon,
   SettingsIcon,
-  NotificationIcon,
   ProductIcon,
   // SearchIcon,
   // FilterIcon,
@@ -476,70 +475,7 @@ export function Help({ isVisible }: HelpProps) {
         </BlockStack>
       </Card>
 
-      {/* Notifications Features */}
-      <Card>
-        <BlockStack gap="400">
-          <InlineStack align="space-between" blockAlign="center">
-            <InlineStack gap="300" blockAlign="center">
-              <Icon source={NotificationIcon} tone="warning" />
-              <Text as="h3" variant="headingMd">Smart Notifications</Text>
-            </InlineStack>
-            <Badge tone="warning">Premium Feature</Badge>
-          </InlineStack>
-          
-          <Text as="p" variant="bodyMd">
-            Automated inventory monitoring with single active notification rule - edit your setting to modify behavior
-          </Text>
-          
-          <Banner tone="info">
-            <Text as="p">
-              <strong>Important:</strong> You can have only 1 active notification rule at a time. Edit your existing rule to modify settings or create a new one to replace it.
-            </Text>
-          </Banner>
-          
-          <Grid>
-            <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
-              <BlockStack gap="300">
-                <Text as="h4" variant="headingSm">Notification Channels</Text>
-                <List type="bullet">
-                  <List.Item>Email alerts for team members</List.Item>
-                  <List.Item>Webflow integration for customer notifications</List.Item>
-                  <List.Item>CSV exports for reporting</List.Item>
-                  <List.Item>Slack/Discord webhooks</List.Item>
-                  <List.Item>Real-time inventory monitoring</List.Item>
-                </List>
-                
-                <Text as="h4" variant="headingSm">Single Rule Management</Text>
-                <List type="bullet">
-                  <List.Item>Only one notification rule can be active</List.Item>
-                  <List.Item>Edit existing rules to modify settings</List.Item>
-                  <List.Item>Create new rule to replace current one</List.Item>
-                  <List.Item>Test rules before activation</List.Item>
-                  <List.Item>Enable/disable as needed</List.Item>
-                </List>
-              </BlockStack>
-            </Grid.Cell>
-            
-            <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
-              <Box padding="400" background="bg-surface-secondary" borderRadius="300">
-                <Text as="p" variant="bodySm" fontWeight="medium">
-                  📹 Video Tutorial
-                </Text>
-                <div style={{ marginTop: '8px' }}>
-                  <Box padding="300" background="bg-surface" borderRadius="200">
-                  <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-                    YouTube Video Placeholder
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-                    "Setting Up Smart Notifications - 6 minutes"
-                  </Text>
-                  </Box>
-                </div>
-              </Box>
-            </Grid.Cell>
-          </Grid>
-        </BlockStack>
-      </Card>
+
 
       {/* Data Retention & Security */}
       <Card>
@@ -653,61 +589,7 @@ export function Help({ isVisible }: HelpProps) {
         </BlockStack>
       </Card>
 
-      <Card>
-        <BlockStack gap="400">
-          <InlineStack align="space-between" blockAlign="center">
-            <InlineStack gap="300" blockAlign="center">
-              <Icon source={NotificationIcon} tone="warning" />
-              <Text as="h3" variant="headingMd">Notification Issues</Text>
-            </InlineStack>
-            <Badge tone="warning">Setup Help</Badge>
-          </InlineStack>
-          
-          <Collapsible
-            open={expandedSections['notification-issues']}
-            id="notification-issues"
-            transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
-          >
-            <BlockStack gap="300">
-              <Text as="h4" variant="headingSm">Notifications Not Working</Text>
-              <List type="number">
-                <List.Item>
-                  <Text as="p" variant="bodyMd" fontWeight="medium">Check notification settings</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Go to Notifications tab and ensure channels are enabled and verified
-                  </Text>
-                </List.Item>
-                <List.Item>
-                  <Text as="p" variant="bodyMd" fontWeight="medium">Verify email addresses</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Make sure email addresses are correct and can receive messages
-                  </Text>
-                </List.Item>
-                <List.Item>
-                  <Text as="p" variant="bodyMd" fontWeight="medium">Test webhook URLs</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Use the "Test Connection" button to verify webhook endpoints
-                  </Text>
-                </List.Item>
-                <List.Item>
-                  <Text as="p" variant="bodyMd" fontWeight="medium">Check product selection</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Ensure you have selected products to monitor and set proper thresholds
-                  </Text>
-                </List.Item>
-              </List>
-            </BlockStack>
-          </Collapsible>
-          
-          <Button
-            onClick={() => toggleSection('notification-issues')}
-            variant="tertiary"
-            icon={expandedSections['notification-issues'] ? ChevronUpIcon : ChevronDownIcon}
-          >
-            {expandedSections['notification-issues'] ? 'Hide Details' : 'Show Notification Issues'}
-          </Button>
-        </BlockStack>
-      </Card>
+
 
       <Card>
         <BlockStack gap="400">

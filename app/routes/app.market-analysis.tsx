@@ -87,7 +87,7 @@ export default function MarketAnalysis() {
               <InlineStack gap="200" blockAlign="center">
                 <Icon source={InfoIcon} tone="info" />
                 <Text as="p" variant="bodySm">
-                  Expected launch: Q1 2026. Sign up for early access notifications in your account settings.
+                  Expected launch: Q1 2026. Stay tuned for updates on this exciting feature.
                 </Text>
               </InlineStack>
             </Box>
