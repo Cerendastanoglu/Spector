@@ -8,7 +8,9 @@ import {
   Icon,
   Box,
   Tooltip,
-  Collapsible
+  Collapsible,
+  Spinner,
+  Banner
 } from "@shopify/polaris";
 import {
   CheckCircleIcon,
@@ -21,7 +23,44 @@ import {
   ChevronDownIcon,
   ChevronRightIcon
 } from "@shopify/polaris-icons";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+interface ForecastItem {
+  id: string;
+  title: string;
+  sku: string;
+  handle: string;
+  currentStock: number;
+  averageDailyDemand: number;
+  forecastDays: number;
+  reorderPoint: number;
+  status: 'critical' | 'low' | 'healthy';
+  vendor: string;
+  category: string;
+  lastOrderDate: string;
+  suggestedReorderQuantity: number;
+  profitMargin: number;
+  leadTime: number;
+  velocity: 'fast' | 'medium' | 'slow';
+  price: number;
+  totalRevenue60Days: number;
+  totalSold60Days: number;
+}
+
+interface InventoryForecastingData {
+  forecastItems: ForecastItem[];
+  summary: {
+    totalProducts: number;
+    criticalItems: number;
+    lowStockItems: number;
+    healthyItems: number;
+    totalRevenue60Days: number;
+    averageDailyRevenue: number;
+    fastMovingItems: number;
+    mediumMovingItems: number;
+    slowMovingItems: number;
+  };
+}
 
 interface ForecastingTabProps {
   shopDomain?: string;
@@ -29,106 +68,96 @@ interface ForecastingTabProps {
 
 export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
   const [showAIMethodology, setShowAIMethodology] = useState(false);
+  const [forecastData, setForecastData] = useState<InventoryForecastingData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data for inventory forecasting (will be replaced with real API calls)
-  const mockInventoryData = [
-    {
-      id: '1',
-      title: 'Premium Cotton T-Shirt',
-      sku: 'TCT-001',
-      handle: 'premium-cotton-t-shirt',
-      currentStock: 5,
-      averageDailyDemand: 2.3,
-      forecastDays: 2,
-      reorderPoint: 15,
-      status: 'critical',
-      vendor: 'Cotton Co.',
-      category: 'Clothing',
-      lastOrderDate: '2024-09-15',
-      suggestedReorderQuantity: 50,
-      profitMargin: 28.5,
-      leadTime: 14,
-      velocity: 'fast'
-    },
-    {
-      id: '2', 
-      title: 'Wireless Bluetooth Headphones',
-      sku: 'WBH-002',
-      handle: 'wireless-bluetooth-headphones',
-      currentStock: 23,
-      averageDailyDemand: 1.8,
-      forecastDays: 13,
-      reorderPoint: 20,
-      status: 'low',
-      vendor: 'Audio Tech',
-      category: 'Electronics',
-      lastOrderDate: '2024-09-10',
-      suggestedReorderQuantity: 30,
-      profitMargin: 45.2,
-      leadTime: 21,
-      velocity: 'medium'
-    },
-    {
-      id: '3',
-      title: 'Organic Face Moisturizer',
-      sku: 'OFM-003',
-      handle: 'organic-face-moisturizer',
-      currentStock: 45,
-      averageDailyDemand: 1.2,
-      forecastDays: 38,
-      reorderPoint: 25,
-      status: 'healthy',
-      vendor: 'Beauty Supply',
-      category: 'Beauty',
-      lastOrderDate: '2024-08-30',
-      suggestedReorderQuantity: 40,
-      profitMargin: 62.1,
-      leadTime: 10,
-      velocity: 'slow'
-    },
-    {
-      id: '4',
-      title: 'Stainless Steel Water Bottle',
-      sku: 'SSWB-004',
-      handle: 'stainless-steel-water-bottle',
-      currentStock: 8,
-      averageDailyDemand: 3.1,
-      forecastDays: 3,
-      reorderPoint: 18,
-      status: 'critical',
-      vendor: 'DrinkWare Ltd',
-      category: 'Home & Garden',
-      lastOrderDate: '2024-09-12',
-      suggestedReorderQuantity: 60,
-      profitMargin: 35.8,
-      leadTime: 12,
-      velocity: 'fast'
-    },
-    {
-      id: '5',
-      title: 'Yoga Mat - Premium',
-      sku: 'YMP-005',
-      handle: 'yoga-mat-premium',
-      currentStock: 15,
-      averageDailyDemand: 0.8,
-      forecastDays: 19,
-      reorderPoint: 12,
-      status: 'low',
-      vendor: 'Fitness Pro',
-      category: 'Sports',
-      lastOrderDate: '2024-09-05',
-      suggestedReorderQuantity: 25,
-      profitMargin: 51.3,
-      leadTime: 7,
-      velocity: 'slow'
-    }
-  ];
+  // Fetch real inventory forecasting data
+  useEffect(() => {
+    const fetchForecastData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await fetch('/app/api/inventory-forecasting');
+        const result = await response.json();
+        
+        if (result.success) {
+          setForecastData(result.data);
+        } else {
+          setError(result.error || 'Failed to fetch forecasting data');
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        console.error('Error fetching forecast data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Get key metrics for overview cards
-  const criticalCount = mockInventoryData.filter(item => item.status === 'critical').length;
-  const lowStockCount = mockInventoryData.filter(item => item.status === 'low').length;
-  const totalValue = mockInventoryData.reduce((sum, item) => sum + (item.currentStock * 25), 0); // Mock price of $25
-  const avgProfitMargin = mockInventoryData.reduce((sum, item) => sum + item.profitMargin, 0) / mockInventoryData.length;
+    fetchForecastData();
+  }, []);
+
+  // Refresh function
+  const handleRefresh = () => {
+    setForecastData(null);
+    setLoading(true);
+    setError(null);
+    // Re-trigger useEffect
+    window.location.reload();
+  };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <Card>
+        <BlockStack gap="400" align="center">
+          <Spinner accessibilityLabel="Loading forecasting data" size="large" />
+          <Text as="p" variant="bodyMd" tone="subdued">
+            Loading inventory forecasting data...
+          </Text>
+          <Text as="p" variant="bodySm" tone="subdued">
+            Analyzing products and orders from the last 60 days
+          </Text>
+        </BlockStack>
+      </Card>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <Card>
+        <Banner tone="critical" title="Failed to load forecasting data">
+          <BlockStack gap="200">
+            <Text as="p">{error}</Text>
+            <Button onClick={handleRefresh} variant="primary">
+              Try Again
+            </Button>
+          </BlockStack>
+        </Banner>
+      </Card>
+    );
+  }
+
+  // Show empty state if no data
+  if (!forecastData || !forecastData.forecastItems.length) {
+    return (
+      <Card>
+        <BlockStack gap="400" align="center">
+          <Text as="h3" variant="headingMd">No forecasting data available</Text>
+          <Text as="p" variant="bodyMd" tone="subdued">
+            No products with inventory or sales data found for the last 60 days.
+          </Text>
+          <Button onClick={handleRefresh} variant="primary">
+            Refresh Data
+          </Button>
+        </BlockStack>
+      </Card>
+    );
+  }
+
+  const { summary, forecastItems } = forecastData;
 
   return (
     <BlockStack gap="500">
@@ -158,7 +187,7 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
             <BlockStack gap="100">
               <Text as="p" variant="bodySm" fontWeight="medium">Inventory Health</Text>
               <Text as="p" variant="bodyMd" fontWeight="bold">
-                {mockInventoryData.length - criticalCount - lowStockCount}/{mockInventoryData.length}
+                {summary.healthyItems}/{summary.totalProducts}
               </Text>
               <Text as="p" variant="bodyXs" tone="subdued">
                 Products well-stocked
@@ -175,7 +204,7 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
             <BlockStack gap="100">
               <Text as="p" variant="bodySm" fontWeight="medium">Critical Actions</Text>
               <Text as="p" variant="bodyMd" fontWeight="bold" tone="critical">
-                {criticalCount + lowStockCount}
+                {summary.criticalItems + summary.lowStockItems}
               </Text>
               <Text as="p" variant="bodyXs" tone="subdued">
                 Need attention
@@ -190,12 +219,12 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
               <Icon source={CashDollarIcon} tone="info" />
             </Box>
             <BlockStack gap="100">
-              <Text as="p" variant="bodySm" fontWeight="medium">Inventory Value</Text>
+              <Text as="p" variant="bodySm" fontWeight="medium">Revenue (60 days)</Text>
               <Text as="p" variant="bodyMd" fontWeight="bold" tone="success">
-                ${totalValue.toLocaleString()}
+                ${summary.totalRevenue60Days.toLocaleString()}
               </Text>
               <Text as="p" variant="bodyXs" tone="subdued">
-                Total investment
+                Last 60 days revenue
               </Text>
             </BlockStack>
           </InlineStack>
@@ -207,12 +236,12 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
               <Icon source={ChartVerticalIcon} tone="success" />
             </Box>
             <BlockStack gap="100">
-              <Text as="p" variant="bodySm" fontWeight="medium">Avg. Profit Margin</Text>
+              <Text as="p" variant="bodySm" fontWeight="medium">Daily Revenue (60d avg)</Text>
               <Text as="p" variant="bodyMd" fontWeight="bold" tone="success">
-                {avgProfitMargin.toFixed(1)}%
+                ${summary.averageDailyRevenue.toFixed(2)}
               </Text>
               <Text as="p" variant="bodyXs" tone="subdued">
-                Weighted average
+                From real orders
               </Text>
             </BlockStack>
           </InlineStack>
@@ -224,9 +253,12 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
         <BlockStack gap="400">
           <InlineStack align="space-between" blockAlign="center">
             <Text as="h3" variant="headingMd" fontWeight="semibold">
-              Inventory Forecast ({mockInventoryData.length} products)
+              Inventory Forecast ({summary.totalProducts} products)
             </Text>
             <InlineStack gap="200">
+              <Button variant="secondary" size="slim" onClick={handleRefresh}>
+                Refresh Data
+              </Button>
               <Button variant="secondary" size="slim">Export Report</Button>
             </InlineStack>
           </InlineStack>
@@ -263,14 +295,14 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
             </div>
 
             {/* Table Rows */}
-            {mockInventoryData.map((item, index) => (
+            {forecastItems.map((item, index) => (
               <div key={item.id} style={{
                 display: 'grid',
                 gridTemplateColumns: '2.5fr 1fr 1fr 1.2fr 1fr 1fr 1.2fr 100px',
                 gap: '16px',
                 padding: '20px',
                 backgroundColor: index % 2 === 0 ? 'white' : '#fafbfc',
-                borderBottom: index < mockInventoryData.length - 1 ? '1px solid #f1f3f4' : 'none',
+                borderBottom: index < forecastItems.length - 1 ? '1px solid #f1f3f4' : 'none',
                 alignItems: 'center',
                 transition: 'all 0.2s ease',
                 cursor: 'pointer'
