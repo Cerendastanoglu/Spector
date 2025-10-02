@@ -20,6 +20,11 @@ api_version = "2024-10"
   topics = [ "app/scopes_update" ]
   uri = "/webhooks/app/scopes_update"
 
+  # Monitor development store upgrades to paid plans
+  [[webhooks.subscriptions]]  
+  topics = [ "shop/update" ]
+  uri = "/webhooks/shop/update"
+
   # Mandatory GDPR Privacy Compliance Webhooks
   # Note: These are configured automatically by Shopify for published apps
   # The handler is already implemented in /app/routes/webhooks.tsx

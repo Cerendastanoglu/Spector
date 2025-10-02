@@ -282,6 +282,25 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
           Stock Alerts
         </Button>
       </div>
+      
+      {/* Billing Button */}
+      <div className={activeTab === "billing" ? "nav-button-active" : "nav-button-inactive"} style={{
+        background: activeTab === "billing" 
+          ? (theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'white')
+          : 'transparent',
+        borderRadius: '12px',
+        padding: '2px',
+        border: activeTab === "billing" ? '2px solid #FF204E' : '1px solid transparent',
+        boxShadow: activeTab === "billing" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none'
+      }}>
+        <Button
+          onClick={() => onTabChange("billing")}
+          variant="tertiary"
+          size="medium"
+        >
+          Billing
+        </Button>
+      </div>
     </InlineStack>
   );
 

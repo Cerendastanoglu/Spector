@@ -265,20 +265,20 @@ export function Help({ isVisible }: HelpProps) {
 
       <Card>
         <BlockStack gap="400">
-          <Text as="h3" variant="headingMd">Step 3: Notification Configuration</Text>
+          <Text as="h3" variant="headingMd">Step 3: Data Export & Reporting</Text>
           <Text as="p" variant="bodyMd">
-            Set up automated alerts for low stock and inventory changes
+            Export your product analytics and inventory data for external analysis
           </Text>
           
           <Grid>
             <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
               <BlockStack gap="300">
-                <Text as="h4" variant="headingSm">Available Notification Types</Text>
+                <Text as="h4" variant="headingSm">Available Export Types</Text>
                 <List type="bullet">
-                  <List.Item>Email alerts for team members</List.Item>
-                  <List.Item>Webflow integration for customer notifications</List.Item>
-                  <List.Item>CSV exports for reporting</List.Item>
-                  <List.Item>Slack/Discord webhooks</List.Item>
+                  <List.Item>CSV reports for analytics data</List.Item>
+                  <List.Item>Product performance reports</List.Item>
+                  <List.Item>Inventory status exports</List.Item>
+                  <List.Item>Custom date range reporting</List.Item>
                 </List>
               </BlockStack>
             </Grid.Cell>
@@ -294,7 +294,7 @@ export function Help({ isVisible }: HelpProps) {
                     YouTube Video Placeholder
                   </Text>
                   <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-                    "Setting Up Notifications - 5 minutes"
+                    "Exporting Data - 3 minutes"
                   </Text>
                   </Box>
                 </div>

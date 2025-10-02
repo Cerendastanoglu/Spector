@@ -85,7 +85,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           customerId,
           customerEmail,
           dataFound: {
-            notifications: "No customer-specific notification data stored",
             analytics: "No customer-specific analytics data stored", 
             bulkEdits: "No customer-specific bulk edit data stored",
             note: "This app only stores product and inventory data, no personal customer information"
@@ -127,7 +126,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           await db.$transaction(async (tx) => {
             const deletionResults = await Promise.all([
               tx.session.deleteMany({ where: { shop } }),
-              tx.notificationRule.deleteMany({ where: { shop } }),
               tx.analyticsSnapshot.deleteMany({ where: { shop } }),
               tx.productAnalytics.deleteMany({ where: { shop } }),
               tx.dataRetentionPolicy.deleteMany({ where: { shop } }),
