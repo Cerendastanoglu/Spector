@@ -12,48 +12,6 @@ import process from 'process';
 const WEBHOOK_SECRET = 'test-webhook-secret-for-gdpr-testing';
 const HTTPS_ENDPOINT = 'https://kenny-encouraged-placed-elliott.trycloudflare.com/webhooks';
 
-// Test webhook payloads matching Shopify's webhook structure
-const testWebhooks = {
-  'customers/data_request': {
-    payload: {
-      shop_id: 12345,
-      shop_domain: 'test-store.myshopify.com',
-      orders_requested: ['1234567', '2345678'],
-      customer: {
-        id: 987654321,
-        email: 'customer@example.com',
-        phone: '+1234567890'
-      },
-      data_request: {
-        id: 42
-      }
-    },
-    expectedResponse: 200
-  },
-  
-  'customers/redact': {
-    payload: {
-      shop_id: 12345,
-      shop_domain: 'test-store.myshopify.com',
-      customer: {
-        id: 987654321,
-        email: 'customer@example.com',
-        phone: '+1234567890'
-      },
-      orders_to_redact: ['1234567', '2345678']
-    },
-    expectedResponse: 200
-  },
-  
-  'shop/redact': {
-    payload: {
-      shop_id: 12345,
-      shop_domain: 'test-store.myshopify.com'
-    },
-    expectedResponse: 200
-  }
-};
-
 // HMAC generation matching Shopify's webhook signature format
 function generateTestHMAC(payload, secret = WEBHOOK_SECRET) {
   return crypto
@@ -68,7 +26,7 @@ async function testTLSCertificate() {
   
   try {
     // Test HTTPS connectivity and certificate validation
-    const response = await fetch(HTTPS_ENDPOINT.replace('/webhooks', '/'), {
+    await fetch(HTTPS_ENDPOINT.replace('/webhooks', '/'), {
       method: 'GET'
     });
     

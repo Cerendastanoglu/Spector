@@ -35,7 +35,7 @@ export default function App() {
   // Initialize performance optimizations
   const { markPerformanceMilestone } = useAppBridgePerformance({
     enableMetrics: true,
-    preloadResources: ['/app/products', '/app/notifications'],
+    preloadResources: ['/app/products'],
     loadingStrategy: 'auto'
   });
 
@@ -54,6 +54,9 @@ export default function App() {
           </Link>
           <Link to="/app/market-analysis">
             Market Analysis
+          </Link>
+          <Link to="/app/additional">
+            App Configuration
           </Link>
         </NavMenu>
         <Outlet />

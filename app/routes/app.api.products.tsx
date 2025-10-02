@@ -334,7 +334,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
-  // New action for notifications: Fetch products with variants and inventory locations
+  // Fetch products with variants and inventory locations
   if (actionType === "fetch-products-with-variants-and-locations") {
     try {
       const response = await admin.graphql(
@@ -420,7 +420,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
-  // New action for notifications: Fetch collections
+  // Fetch collections
   if (actionType === "fetch-collections") {
     try {
       const response = await admin.graphql(
@@ -467,7 +467,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
-  // New action for notifications: Fetch locations
+  // Fetch locations
   if (actionType === "fetch-locations") {
     try {
       // Use mock locations since the app doesn't have access to the locations API

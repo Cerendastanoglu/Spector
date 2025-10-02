@@ -14,7 +14,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const webhookRequest = request.clone();
     
     // authenticate.webhook automatically verifies HMAC signature
-    const { shop, session, topic, payload } = await authenticate.webhook(webhookRequest);
+    const { shop, topic, payload } = await authenticate.webhook(webhookRequest);
 
     console.log(`✅ Verified webhook: ${topic} for shop: ${shop}`);
     console.log(`🔐 HMAC signature verified successfully`);
@@ -28,9 +28,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const sessionsDeleted = await tx.session.deleteMany({ where: { shop } });
         console.log(`🗑️ Deleted ${sessionsDeleted.count} sessions`);
 
-        // 2. Delete notification system data (rules cascade to channels and logs)
-        const notificationRulesDeleted = await tx.notificationRule.deleteMany({ where: { shop } });
-        console.log(`🗑️ Deleted ${notificationRulesDeleted.count} notification rules (cascades to channels and logs)`);
+        // 2. Delete analytics and product data
 
         // 3. Delete analytics snapshots and product analytics
         const analyticsSnapshotsDeleted = await tx.analyticsSnapshot.deleteMany({ where: { shop } });
@@ -51,7 +49,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         console.log(`✅ COMPLETE DATA CLEANUP SUCCESSFUL for shop: ${shop}`);
         console.log(`📊 Total records cleaned: ${
           sessionsDeleted.count + 
-          notificationRulesDeleted.count + 
           analyticsSnapshotsDeleted.count + 
           productAnalyticsDeleted.count + 
           retentionPoliciesDeleted.count + 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData, useNavigate } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -11,7 +11,6 @@ import {
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { AppHeader } from "../components/AppHeader";
-import { Notifications } from "../components/Notifications";
 import { WelcomeModal } from "../components/WelcomeModal";
 import { Help } from "../components/Help";
 import { OptimizedComponents, useComponentPreloader } from "../utils/lazyLoader";
@@ -89,6 +88,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function Index() {
   const { shop } = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [outOfStockCount] = useState(0);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
@@ -156,9 +156,25 @@ export default function Index() {
       case "out-of-stock":
         return <OptimizedComponents.ProductManagement isVisible={true} />;
       case "notifications":
-        return <Notifications isVisible={true} />;
+        return (
+          <Card>
+            <Text as="p" variant="bodyMd">
+              Notifications feature has been removed.
+            </Text>
+          </Card>
+        );
       case "help":
         return <Help isVisible={true} />;
+      case "billing":
+        // Redirect to the dedicated billing route
+        navigate('/app/billing');
+        return (
+          <Card>
+            <Text as="h2" variant="headingMd">
+              Redirecting to Billing...
+            </Text>
+          </Card>
+        );
       case "settings":
         return (
           <BlockStack gap="500">
@@ -212,7 +228,6 @@ export default function Index() {
                           • Basic inventory tracking
                           • Product analytics dashboard
                           • Bulk product operations
-                          • Email notifications
                           • Performance monitoring
                         </Text>
                       </BlockStack>

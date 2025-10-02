@@ -7,7 +7,6 @@ export const DEFAULT_RETENTION_POLICIES = {
   analytics: 90,      // Keep analytics data for 90 days
   logs: 30,          // Keep logs for 30 days
   products: 180,     // Keep product data for 180 days
-  notifications: 60, // Keep notification logs for 60 days
 } as const;
 
 export type DataType = keyof typeof DEFAULT_RETENTION_POLICIES;
@@ -117,22 +116,12 @@ export async function cleanupExpiredData(dataType: DataType, shop?: string): Pro
       }
 
       case 'logs': {
-        const logsResult = await prisma.notificationLog.deleteMany({
-          where: {
-            ...(shop && { shop }),
-            sentAt: {
-              lt: new Date(now.getTime() - (await getRetentionPolicy(shop || '', 'logs')) * 24 * 60 * 60 * 1000),
-            },
-          },
-        });
-        deletedCount += logsResult.count;
+        // No specific log cleanup needed currently
+        deletedCount = 0;
         break;
       }
 
-      case 'notifications': {
-        // Notification logs are handled in the 'logs' case above
-        break;
-      }
+
 
       default:
         console.warn(`Unknown data type for cleanup: ${dataType}`);
@@ -174,11 +163,12 @@ export async function getDataUsageStats(shop: string): Promise<{
   totalSize: number;
 }> {
   try {
-    const [analyticsCount, productsCount, logsCount] = await Promise.all([
+    const [analyticsCount, productsCount] = await Promise.all([
       prisma.analyticsSnapshot.count({ where: { shop } }),
       prisma.productAnalytics.count({ where: { shop } }),
-      prisma.notificationLog.count({ where: { rule: { shop } } }),
     ]);
+    
+    const logsCount = 0; // No logs currently tracked
 
     // Estimate size (rough calculation)
     const totalSize = (analyticsCount * 1024) + (productsCount * 512) + (logsCount * 256);
