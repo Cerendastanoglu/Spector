@@ -354,15 +354,14 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                 {/* OOS Accordion Header Row */}
                 <div 
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: '2.5fr 1fr 1fr 1.2fr 1fr 1fr 1.2fr 100px',
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: '16px',
-                    padding: '20px',
+                    padding: '18px 24px',
                     backgroundColor: '#fef2f2',
                     borderBottom: showOutOfStock ? 'none' : '1px solid #fecaca',
-                    alignItems: 'center',
                     cursor: 'pointer',
-                    transition: 'all 0.2s ease'
+                    transition: 'background-color 0.15s ease'
                   }}
                   onClick={() => setShowOutOfStock(!showOutOfStock)}
                   onMouseEnter={(e) => {
@@ -372,37 +371,21 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                     e.currentTarget.style.backgroundColor = '#fef2f2';
                   }}
                 >
-                  <div>
-                    <InlineStack gap="200" blockAlign="center">
-                      <Icon source={showOutOfStock ? ChevronDownIcon : ChevronRightIcon} tone="critical" />
-                      <Text as="p" variant="bodyMd" fontWeight="bold" tone="critical">
-                        ⚠️ Out of Stock Items
-                      </Text>
-                    </InlineStack>
+                  <Icon source={showOutOfStock ? ChevronDownIcon : ChevronRightIcon} tone="critical" />
+                  
+                  <Text as="p" variant="headingSm" fontWeight="semibold" tone="critical">
+                    Out of Stock Products
+                  </Text>
+                  
+                  <Badge tone="critical">{summary.outOfStockItems.toString()}</Badge>
+                  
+                  <Badge tone="critical">Needs Restock</Badge>
+                  
+                  <div style={{ marginLeft: 'auto' }}>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      Click to view {summary.outOfStockItems} products needing restock
+                      Click to {showOutOfStock ? 'hide' : 'view'} details
                     </Text>
                   </div>
-
-                  <div>
-                    <Badge tone="critical" size="large">{summary.outOfStockItems.toString()}</Badge>
-                    <Text as="p" variant="bodyXs" tone="subdued">products</Text>
-                  </div>
-
-                  <div>
-                    <Text as="p" variant="bodyMd" tone="critical" fontWeight="semibold">
-                      Urgent
-                    </Text>
-                  </div>
-
-                  <div>
-                    <Badge tone="critical">Restock Now</Badge>
-                  </div>
-
-                  <div></div>
-                  <div></div>
-                  <div></div>
-                  <div></div>
                 </div>
 
                 {/* OOS Expanded Content */}
@@ -429,8 +412,8 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                         {/* OOS Sub-header */}
                         <div style={{
                           display: 'grid',
-                          gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1fr 0.8fr 100px',
-                          gap: '12px',
+                          gridTemplateColumns: '2.5fr 1.2fr 1fr 1fr 0.8fr 100px',
+                          gap: '16px',
                           padding: '12px 16px',
                           backgroundColor: '#fef2f2',
                           borderBottom: '1px solid #fecaca',
@@ -441,9 +424,8 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                         }}>
                           <Text as="span" variant="bodyXs" fontWeight="semibold">Product</Text>
                           <Text as="span" variant="bodyXs" fontWeight="semibold">Last Order</Text>
-                          <Text as="span" variant="bodyXs" fontWeight="semibold">60d Sales</Text>
-                          <Text as="span" variant="bodyXs" fontWeight="semibold">Daily Demand</Text>
-                          <Text as="span" variant="bodyXs" fontWeight="semibold">Velocity</Text>
+                          <Text as="span" variant="bodyXs" fontWeight="semibold">Sales (60d)</Text>
+                          <Text as="span" variant="bodyXs" fontWeight="semibold">Daily Avg</Text>
                           <Text as="span" variant="bodyXs" fontWeight="semibold">Priority</Text>
                           <Text as="span" variant="bodyXs" fontWeight="semibold">Actions</Text>
                         </div>
@@ -459,8 +441,8 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                               key={item.id}
                               style={{
                                 display: 'grid',
-                                gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1fr 0.8fr 100px',
-                                gap: '12px',
+                                gridTemplateColumns: '2.5fr 1.2fr 1fr 1fr 0.8fr 100px',
+                                gap: '16px',
                                 padding: '14px 16px',
                                 backgroundColor: idx % 2 === 0 ? 'white' : '#fffbfb',
                                 borderBottom: idx < forecastItems.filter(i => i.isOutOfStock).length - 1 ? '1px solid #fee2e2' : 'none',
@@ -474,7 +456,7 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
 
                               <div>
                                 <Text as="p" variant="bodySm" fontWeight="semibold">
-                                  {new Date(item.lastOrderDate).toLocaleDateString()}
+                                  {new Date(item.lastOrderDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </Text>
                                 <Text as="p" variant="bodyXs" tone="critical">
                                   {daysSinceLastOrder}d ago
@@ -488,22 +470,12 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
 
                               <div>
                                 <Text as="p" variant="bodyMd" fontWeight="semibold">{item.averageDailyDemand}</Text>
-                                <Text as="p" variant="bodyXs" tone="subdued">per day</Text>
-                              </div>
-
-                              <div>
-                                <Badge 
-                                  tone={item.velocity === 'fast' ? 'critical' : item.velocity === 'medium' ? 'warning' : 'attention'}
-                                  size="small"
-                                >
-                                  {item.velocity}
-                                </Badge>
+                                <Text as="p" variant="bodyXs" tone="subdued">/day</Text>
                               </div>
 
                               <div>
                                 <Badge 
                                   tone={item.velocity === 'fast' ? 'critical' : item.velocity === 'medium' ? 'warning' : 'info'}
-                                  size="small"
                                 >
                                   {item.velocity === 'fast' ? 'High' : item.velocity === 'medium' ? 'Med' : 'Low'}
                                 </Badge>
@@ -586,55 +558,69 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                     tone={item.status === 'critical' ? 'critical' : item.status === 'low' ? 'caution' : undefined}>
                     {item.currentStock}
                   </Text>
-                  <Text as="p" variant="bodyXs" tone="subdued">units</Text>
+                  <Text as="p" variant="bodyXs" tone="subdued">in stock</Text>
                 </div>
 
                 {/* Daily Demand */}
                 <div>
                   <Text as="p" variant="bodyMd" fontWeight="semibold">{item.averageDailyDemand}</Text>
-                  <Text as="p" variant="bodyXs" tone="subdued">per day</Text>
+                  <Text as="p" variant="bodyXs" tone="subdued">/day</Text>
                 </div>
 
                 {/* Status with Days Remaining */}
                 <div>
-                  <Badge 
-                    tone={item.status === 'critical' ? 'critical' : item.status === 'low' ? 'warning' : 'success'}
-                    size="small"
-                  >
-                    {item.forecastDays === 0 ? 'Out of Stock' : 
-                     item.forecastDays >= 999 ? 'No demand data' : 
-                     `${item.forecastDays} days left`}
-                  </Badge>
-                  <Box paddingBlockStart="100">
-                    <Text as="p" variant="bodyXs" tone="subdued">
-                      {item.status === 'critical' ? 'Reorder now' : 
-                       item.status === 'low' ? 'Plan reorder' : 'Well stocked'}
-                    </Text>
-                  </Box>
+                  {item.forecastDays === 0 ? (
+                    <>
+                      <Badge tone="critical">OOS</Badge>
+                      <Box paddingBlockStart="100">
+                        <Text as="p" variant="bodyXs" tone="critical">Out of stock</Text>
+                      </Box>
+                    </>
+                  ) : item.forecastDays >= 999 ? (
+                    <>
+                      <Badge tone="info">N/A</Badge>
+                      <Box paddingBlockStart="100">
+                        <Text as="p" variant="bodyXs" tone="subdued">No data</Text>
+                      </Box>
+                    </>
+                  ) : (
+                    <>
+                      <Badge 
+                        tone={item.status === 'critical' ? 'critical' : item.status === 'low' ? 'warning' : 'success'}
+                      >
+                        {`${item.forecastDays}d`}
+                      </Badge>
+                      <Box paddingBlockStart="100">
+                        <Text as="p" variant="bodyXs" tone="subdued">
+                          {item.status === 'critical' ? 'Urgent' : 
+                           item.status === 'low' ? 'Soon' : 'Good'}
+                        </Text>
+                      </Box>
+                    </>
+                  )}
                 </div>
 
                 {/* Lead Time */}
                 <div>
-                  <Text as="p" variant="bodyMd" fontWeight="medium">{item.leadTime}</Text>
-                  <Text as="p" variant="bodyXs" tone="subdued">days</Text>
+                  <Text as="p" variant="bodyMd" fontWeight="medium">{item.leadTime}d</Text>
+                  <Text as="p" variant="bodyXs" tone="subdued">lead time</Text>
                 </div>
 
                 {/* Velocity */}
                 <div>
                   <Badge 
                     tone={item.velocity === 'fast' ? 'success' : item.velocity === 'medium' ? 'info' : 'attention'}
-                    size="small"
                   >
-                    {item.velocity}
+                    {item.velocity === 'fast' ? 'Fast' : item.velocity === 'medium' ? 'Med' : 'Slow'}
                   </Badge>
                 </div>
 
                 {/* Profit Margin */}
                 <div>
                   <Text as="p" variant="bodyMd" fontWeight="semibold" tone="success">
-                    {item.profitMargin.toFixed(1)}%
+                    {item.profitMargin.toFixed(0)}%
                   </Text>
-                  <Text as="p" variant="bodyXs" tone="subdued">margin</Text>
+                  <Text as="p" variant="bodyXs" tone="subdued">profit</Text>
                 </div>
 
                 {/* Actions */}
@@ -653,11 +639,8 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                       variant="tertiary"
                       size="micro"
                       onClick={() => {
-                        // Open product's online store page
                         if (shopDomain && item.handle) {
                           window.open(`https://${shopDomain}/products/${item.handle}`, '_blank');
-                        } else {
-                          console.log('Product handle or shop domain not available for:', item.id);
                         }
                       }}
                     />
@@ -668,11 +651,8 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                       variant="tertiary"
                       size="micro"
                       onClick={() => {
-                        // Open product in Shopify admin
                         if (shopDomain && item.id) {
                           window.open(`https://${shopDomain}/admin/products/${item.id}`, '_blank');
-                        } else {
-                          console.log('Product ID or shop domain not available for:', item.id);
                         }
                       }}
                     />
