@@ -24,6 +24,7 @@ import {
   ChevronRightIcon
 } from "@shopify/polaris-icons";
 import { useState, useEffect } from "react";
+import { useFetcher } from "@remix-run/react";
 
 interface ForecastItem {
   id: string;
@@ -90,46 +91,54 @@ interface ForecastingTabProps {
 
 export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
   const [showAIMethodology, setShowAIMethodology] = useState(false);
-  const [forecastData, setForecastData] = useState<InventoryForecastingData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [showOutOfStock, setShowOutOfStock] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  // Use Remix fetcher for better authentication handling
+  const fetcher = useFetcher<{
+    success: boolean;
+    data?: InventoryForecastingData;
+    error?: string;
+  }>();
 
   // Fetch real inventory forecasting data
   useEffect(() => {
-    const fetchForecastData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const response = await fetch('/app/api/inventory-forecasting');
-        const result = await response.json();
-        
-        if (result.success) {
-          setForecastData(result.data);
-        } else {
-          setError(result.error || 'Failed to fetch forecasting data');
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-        console.error('Error fetching forecast data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchForecastData();
+    console.log('🔍 Fetching forecasting data with useFetcher...');
+    fetcher.load('/app/api/inventory-forecasting');
   }, []);
 
   // Refresh function
   const handleRefresh = () => {
-    setForecastData(null);
-    setLoading(true);
-    setError(null);
-    // Re-trigger useEffect
-    window.location.reload();
+    console.log('🔄 Refreshing forecasting data...');
+    fetcher.load('/app/api/inventory-forecasting');
   };
+
+  // Get data and loading/error states from fetcher
+  const loading = fetcher.state === 'loading';
+  
+  // Enhanced error handling
+  let error = null;
+  if (fetcher.data?.success === false) {
+    error = fetcher.data.error;
+  } else if (fetcher.state === 'idle' && !fetcher.data && fetcher.formData === undefined) {
+    // Check if we have a fetch error (like HTML response)
+    console.log('🔍 Fetcher state:', { state: fetcher.state, data: fetcher.data });
+  }
+  
+  const forecastData = fetcher.data?.success === true ? fetcher.data.data : null;
+
+  // Debug fetcher data
+  useEffect(() => {
+    console.log('🔍 Fetcher debug:', {
+      state: fetcher.state,
+      data: fetcher.data,
+      hasData: !!fetcher.data,
+      success: fetcher.data?.success,
+      error: fetcher.data?.error,
+    });
+  }, [fetcher.state, fetcher.data]);
 
   // Toggle expanded item details
   const toggleItemExpansion = (itemId: string) => {
@@ -210,97 +219,80 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
         </BlockStack>
       </Card>
 
-      {/* Executive Summary Cards - Compact */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-        gap: '12px' 
-      }}>
-        <Card>
-          <InlineStack gap="200" blockAlign="center">
-            <Box background="bg-fill-success-secondary" padding="150" borderRadius="100">
+      {/* Compact Summary Header */}
+      <Card>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+          gap: '20px',
+          padding: '4px 0'
+        }}>
+          {/* Inventory Health */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Box background="bg-fill-success-secondary" padding="100" borderRadius="100">
               <Icon source={CheckCircleIcon} tone="success" />
             </Box>
-            <BlockStack gap="100">
-              <Text as="p" variant="bodySm" fontWeight="medium">Inventory Health</Text>
-              <Text as="p" variant="bodyMd" fontWeight="bold">
+            <div>
+              <Text as="p" variant="headingMd" fontWeight="bold">
                 {summary.healthyItems}/{summary.totalProducts}
               </Text>
-              <Text as="p" variant="bodyXs" tone="subdued">
-                Products well-stocked
-              </Text>
-            </BlockStack>
-          </InlineStack>
-        </Card>
+              <Text as="p" variant="bodySm" tone="subdued">Healthy</Text>
+            </div>
+          </div>
 
-        <Card>
-          <InlineStack gap="200" blockAlign="center">
-            <Box background="bg-fill-critical-secondary" padding="150" borderRadius="100">
+          {/* Critical + Low Stock */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Box background="bg-fill-critical-secondary" padding="100" borderRadius="100">
               <Icon source={AlertTriangleIcon} tone="critical" />
             </Box>
-            <BlockStack gap="100">
-              <Text as="p" variant="bodySm" fontWeight="medium">Critical Actions</Text>
-              <Text as="p" variant="bodyMd" fontWeight="bold" tone="critical">
+            <div>
+              <Text as="p" variant="headingMd" fontWeight="bold" tone="critical">
                 {summary.criticalItems + summary.lowStockItems}
               </Text>
-              <Text as="p" variant="bodyXs" tone="subdued">
-                Need attention
-              </Text>
-            </BlockStack>
-          </InlineStack>
-        </Card>
+              <Text as="p" variant="bodySm" tone="subdued">Urgent</Text>
+            </div>
+          </div>
 
-        <Card>
-          <InlineStack gap="200" blockAlign="center">
-            <Box background="bg-fill-critical-secondary" padding="150" borderRadius="100">
+          {/* Out of Stock */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Box background="bg-fill-critical-secondary" padding="100" borderRadius="100">
               <Icon source={ClockIcon} tone="critical" />
             </Box>
-            <BlockStack gap="100">
-              <Text as="p" variant="bodySm" fontWeight="medium">Out of Stock</Text>
-              <Text as="p" variant="bodyMd" fontWeight="bold" tone="critical">
+            <div>
+              <Text as="p" variant="headingMd" fontWeight="bold" tone="critical">
                 {summary.outOfStockItems}
               </Text>
-              <Text as="p" variant="bodyXs" tone="subdued">
-                Requires restocking
-              </Text>
-            </BlockStack>
-          </InlineStack>
-        </Card>
+              <Text as="p" variant="bodySm" tone="subdued">Out of Stock</Text>
+            </div>
+          </div>
 
-        <Card>
-          <InlineStack gap="200" blockAlign="center">
-            <Box background="bg-fill-info-secondary" padding="150" borderRadius="100">
+          {/* Total Revenue */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Box background="bg-fill-info-secondary" padding="100" borderRadius="100">
               <Icon source={CashDollarIcon} tone="info" />
             </Box>
-            <BlockStack gap="100">
-              <Text as="p" variant="bodySm" fontWeight="medium">Revenue (60 days)</Text>
-              <Text as="p" variant="bodyMd" fontWeight="bold" tone="success">
-                ${summary.totalRevenue60Days.toLocaleString()}
+            <div>
+              <Text as="p" variant="headingMd" fontWeight="bold" tone="success">
+                ${(summary.totalRevenue60Days / 1000).toFixed(1)}k
               </Text>
-              <Text as="p" variant="bodyXs" tone="subdued">
-                Last 60 days revenue
-              </Text>
-            </BlockStack>
-          </InlineStack>
-        </Card>
+              <Text as="p" variant="bodySm" tone="subdued">60d Revenue</Text>
+            </div>
+          </div>
 
-        <Card>
-          <InlineStack gap="200" blockAlign="center">
-            <Box background="bg-fill-success-secondary" padding="150" borderRadius="100">
+          {/* Daily Average */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Box background="bg-fill-success-secondary" padding="100" borderRadius="100">
               <Icon source={ChartVerticalIcon} tone="success" />
             </Box>
-            <BlockStack gap="100">
-              <Text as="p" variant="bodySm" fontWeight="medium">Daily Revenue (60d avg)</Text>
-              <Text as="p" variant="bodyMd" fontWeight="bold" tone="success">
-                ${summary.averageDailyRevenue.toFixed(2)}
+            <div>
+              <Text as="p" variant="headingMd" fontWeight="bold" tone="success">
+                ${summary.averageDailyRevenue.toFixed(0)}
               </Text>
-              <Text as="p" variant="bodyXs" tone="subdued">
-                From real orders
-              </Text>
-            </BlockStack>
-          </InlineStack>
-        </Card>
-      </div>
+              <Text as="p" variant="bodySm" tone="subdued">Daily Avg</Text>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       {/* Professional Inventory Table */}
       <Card>
@@ -324,30 +316,6 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
             overflow: 'hidden',
             backgroundColor: 'white'
           }}>
-            {/* Table Header */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '2.5fr 1fr 1fr 1.2fr 1fr 1fr 1.2fr 100px',
-              gap: '16px',
-              padding: '16px 20px',
-              backgroundColor: '#f8f9fa',
-              borderBottom: '1px solid #e1e3e5',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#4a5568',
-              textTransform: 'uppercase',
-              letterSpacing: '0.8px'
-            }}>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Product & SKU</Text>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Current Stock</Text>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Daily Demand</Text>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Forecast Status</Text>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Lead Time</Text>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Velocity</Text>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Profit Margin</Text>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Actions</Text>
-            </div>
-
             {/* OUT OF STOCK ACCORDION ROW - First row in table */}
             {summary.outOfStockItems > 0 && (
               <div>
@@ -513,8 +481,38 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
               </div>
             )}
 
-            {/* Table Rows - In Stock Items Only */}
-            {forecastItems.filter(item => !item.isOutOfStock).map((item, index) => {
+            {/* Table Header - Below OOS Accordion */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '2.5fr 1fr 1fr 1.2fr 1fr 1fr 1.2fr 100px',
+              gap: '16px',
+              padding: '16px 20px',
+              backgroundColor: '#f8f9fa',
+              borderBottom: '1px solid #e1e3e5',
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#4a5568',
+              textTransform: 'uppercase',
+              letterSpacing: '0.8px'
+            }}>
+              <Text as="span" variant="bodyXs" fontWeight="semibold">Product & SKU</Text>
+              <Text as="span" variant="bodyXs" fontWeight="semibold">Current Stock</Text>
+              <Text as="span" variant="bodyXs" fontWeight="semibold">Daily Demand</Text>
+              <Text as="span" variant="bodyXs" fontWeight="semibold">Forecast Status</Text>
+              <Text as="span" variant="bodyXs" fontWeight="semibold">Lead Time</Text>
+              <Text as="span" variant="bodyXs" fontWeight="semibold">Velocity</Text>
+              <Text as="span" variant="bodyXs" fontWeight="semibold">Profit Margin</Text>
+              <Text as="span" variant="bodyXs" fontWeight="semibold">Actions</Text>
+            </div>
+
+            {/* Table Rows - In Stock Items Only - Paginated */}
+            {(() => {
+              const inStockItems = forecastItems.filter(item => !item.isOutOfStock);
+              const startIndex = (currentPage - 1) * itemsPerPage;
+              const endIndex = startIndex + itemsPerPage;
+              const currentItems = inStockItems.slice(startIndex, endIndex);
+              
+              return currentItems.map((item, index) => {
               const isExpanded = expandedItems.has(item.id);
               return (
                 <div key={item.id}>
@@ -787,8 +785,50 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
               )}
             </div>
             );
-            })}
+              });
+            })()}
           </div>
+
+          {/* Pagination Controls */}
+          {(() => {
+            const inStockItems = forecastItems.filter(item => !item.isOutOfStock);
+            const totalPages = Math.ceil(inStockItems.length / itemsPerPage);
+            
+            if (totalPages <= 1) return null;
+            
+            return (
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                gap: '12px',
+                padding: '20px 0',
+                borderTop: '1px solid #f1f3f4'
+              }}>
+                <Button
+                  variant="secondary"
+                  size="slim"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                >
+                  Previous
+                </Button>
+                
+                <Text as="p" variant="bodySm">
+                  Page {currentPage} of {totalPages} ({inStockItems.length} items)
+                </Text>
+                
+                <Button
+                  variant="secondary"
+                  size="slim"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            );
+          })()}
         </BlockStack>
       </Card>
 

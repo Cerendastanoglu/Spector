@@ -4,6 +4,7 @@ import { openInNewTab } from "../utils/browserUtils";
 import { ProductConstants } from "../utils/scopedConstants";
 import { ProductTable } from "./ProductTable";
 import { BulkEditHistory } from "./BulkEditHistory";
+import { OperationNamingModal } from "./OperationNamingModal";
 import styles from "./StepsUI.module.css";
 import {
   Card,
@@ -198,11 +199,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [availableCollections, setAvailableCollections] = useState<{id: string, title: string}[]>([]);
   const [collectionSearchQuery] = useState('');
   
-  // Current Ads Management State
+  // Selected Products Details State
   const [showCurrentAds, setShowCurrentAds] = useState<{[key: number]: boolean}>({});
-  const [currentAds, setCurrentAds] = useState<any[]>([]);
-  const [adsLoaded, setAdsLoaded] = useState<{[key: number]: boolean}>({});
-  const [fetchingAds, setFetchingAds] = useState(false);
+  
+  // History reload trigger
+  const [historyReloadKey, setHistoryReloadKey] = useState(0);
   
   // Description Management State  
   const [descriptionOperation, setDescriptionOperation] = useState<'prefix' | 'suffix' | 'replace'>('prefix');
@@ -248,6 +249,16 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   }>({ show: false, message: '' });
   
   const [tagOperation, setTagOperation] = useState<'add' | 'remove' | 'replace'>('add');
+  
+  // Bulk Operation Tracking State
+  const [pendingOperation, setPendingOperation] = useState<{
+    operationType: string;
+    changes: any[];
+    totalProducts: number;
+    totalVariants: number;
+  } | null>(null);
+  const [showNamingModal, setShowNamingModal] = useState(false);
+  const [, setRecentlyUpdatedVariants] = useState<Set<string>>(new Set());
   const [tagValue, setTagValue] = useState('');
   const [tagRemoveValue, setTagRemoveValue] = useState('');
   
@@ -691,6 +702,52 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     // Clear bulk messages functionality
   };
 
+  // Save bulk operation to history
+  const handleSaveOperationName = async (name: string, description: string) => {
+    if (!pendingOperation) return;
+    
+    try {
+      console.log(`💾 Saving operation "${name}" with ${pendingOperation.changes.length} changes`);
+      console.log('Changes being saved:', pendingOperation.changes);
+      
+      const formData = new FormData();
+      formData.append('action', 'create');
+      formData.append('data', JSON.stringify({
+        operationType: pendingOperation.operationType,
+        operationName: name,
+        description,
+        changes: pendingOperation.changes,
+        totalProducts: pendingOperation.totalProducts,
+        totalVariants: pendingOperation.totalVariants
+      }));
+      
+      const response = await fetch('/app/api/bulk-history', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Operation saved to history:', name);
+        setShowNamingModal(false);
+        setPendingOperation(null);
+        setSuccess(`Operation "${name}" saved to history. You can revert it from Recent Activity.`);
+        
+        // Reload history to show the new entry
+        setHistoryReloadKey(prev => prev + 1);
+        
+        // Scroll to top to show Recent Activity
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        throw new Error(result.error || 'Failed to save operation');
+      }
+    } catch (error) {
+      console.error('Failed to save operation:', error);
+      setError(`Failed to save operation to history: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
 
 
 
@@ -818,6 +875,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     
     const failed: string[] = [];
     const successful: string[] = [];
+    const changesLog: any[] = []; // NEW: Track changes for history
     
     try {
       // Process each selected variant individually
@@ -849,6 +907,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           let newComparePrice: string | null = null;
           const currentPrice = parseFloat(targetVariant.price || '0');
           const currentComparePrice = targetVariant.compareAtPrice ? parseFloat(targetVariant.compareAtPrice) : null;
+          
+          // NEW: Store old values BEFORE calculation
+          const oldPrice = targetVariant.price;
           
           if (currentPrice === 0 && priceOperation !== 'set') {
             failed.push(`${targetProduct.title} (${targetVariant.title}): No current price found. Please set a fixed price first.`);
@@ -926,6 +987,20 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
             compareAtPrice: newComparePrice
           });
           
+          // NEW: Track this change for history
+          const change = {
+            productId: targetProduct.id,
+            variantId: targetVariant.id,
+            productTitle: targetProduct.title,
+            variantTitle: targetVariant.title,
+            fieldChanged: 'price',
+            oldValue: oldPrice,
+            newValue: newPrice.toFixed(2),
+            changeType: priceOperation
+          };
+          console.log(`📝 Logging change for ${targetProduct.title}:`, change);
+          changesLog.push(change);
+          
           successful.push(`${targetProduct.title} (${targetVariant.title})`);
           
         } catch (error) {
@@ -955,6 +1030,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       
       // Update UI immediately with new prices
       if (result.success) {
+        console.log('💰 Updating UI with new prices...', result.results);
+        
         setProducts(prevProducts => 
           prevProducts.map(product => {
             return {
@@ -964,6 +1041,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 edges: product.variants.edges.map(edge => {
                   const variantUpdate = result.results.find((r: any) => r.variantId === edge.node.id);
                   if (variantUpdate && variantUpdate.success) {
+                    console.log(`✓ Updated ${product.title}: ${edge.node.price} → ${variantUpdate.newPrice}`);
                     return {
                       ...edge,
                       node: {
@@ -979,6 +1057,22 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
             };
           })
         );
+        
+        // Mark variants as recently updated for visual feedback
+        const updatedVariantIds = result.results
+          .filter((r: any) => r.success)
+          .map((r: any) => r.variantId);
+        setRecentlyUpdatedVariants(new Set(updatedVariantIds));
+        
+        // Clear the highlight after 3 seconds
+        setTimeout(() => {
+          setRecentlyUpdatedVariants(new Set());
+        }, 3000);
+        
+        // Force a re-render to show updated prices
+        setTimeout(() => {
+          console.log('🔄 UI refresh complete');
+        }, 100);
       }
       
       // Handle results
@@ -992,7 +1086,35 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       }
       
       if (apiSuccessful.length > 0) {
-        console.log(`✅ Successfully updated pricing for ${apiSuccessful.length} products!`);
+        console.log(`✅ Successfully updated pricing for ${apiSuccessful.length} variants!`);
+        
+        // Filter changes to only include successful updates
+        console.log(`🔍 Filtering changesLog (${changesLog.length} items) against API results (${result.results.length} items)`);
+        console.log('changesLog:', changesLog);
+        console.log('result.results:', result.results);
+        
+        const successfulChanges = changesLog.filter(change => 
+          result.results.find((r: any) => r.variantId === change.variantId && r.success)
+        );
+        
+        console.log(`✅ Filtered to ${successfulChanges.length} successful changes`);
+        
+        // Show success feedback immediately
+        setSuccess(`✨ Successfully updated ${apiSuccessful.length} variant${apiSuccessful.length !== 1 ? 's' : ''}! Prices are now live in your store.`);
+        
+        // Show naming modal if we have changes to track
+        if (successfulChanges.length > 0) {
+          console.log(`📝 Setting pendingOperation with ${successfulChanges.length} changes:`, successfulChanges);
+          setPendingOperation({
+            operationType: 'pricing',
+            changes: successfulChanges,
+            totalProducts: new Set(successfulChanges.map(c => c.productId)).size,
+            totalVariants: successfulChanges.length
+          });
+          setShowNamingModal(true);
+        } else {
+          console.warn('⚠️ No successful changes to track!');
+        }
       }
       
       if (failed.length > 0) {
@@ -1774,56 +1896,12 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   };
 
   // Handler for fetching current ads with lazy loading
-  const handleFetchCurrentAds = async (tabIndex: number) => {
-    if (selectedProducts.length === 0) {
-      alert('Please select products first');
-      return;
-    }
-
-    // If ads are already loaded for this tab, don't fetch again
-    if (adsLoaded[tabIndex]) {
-      return;
-    }
-
-    setFetchingAds(true);
-    try {
-      const productIds = selectedProducts;
-      const response = await fetch('/app/api/product-analytics', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          productIds,
-          action: 'getCurrentAds'
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch current ads');
-      }
-
-      const result = await response.json();
-      if (result.success) {
-        setCurrentAds(result.ads || []);
-        setAdsLoaded(prev => ({ ...prev, [tabIndex]: true }));
-      } else {
-        throw new Error(result.error || 'Failed to fetch ads');
-      }
-    } catch (error) {
-      console.error('Error fetching current ads:', error);
-      alert('Failed to fetch current ads. Please try again.');
-    } finally {
-      setFetchingAds(false);
-    }
-  };
-
-  // Reusable function to render Current Ads section
+  // Reusable function to render Selected Products Overview section
   const renderCurrentAdsSection = () => (
     <Card>
       <BlockStack gap="300">
         <InlineStack align="space-between" blockAlign="center">
-          <Text as="h4" variant="headingSm">Current Product Ads</Text>
+          <Text as="h4" variant="headingSm">Selected Products ({selectedProducts.length})</Text>
           <Button
             variant="plain"
             onClick={() => {
@@ -1832,15 +1910,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 ...prev,
                 [activeBulkTab]: !isCurrentlyOpen
               }));
-              // Lazy load ads when opening
-              if (!isCurrentlyOpen) {
-                handleFetchCurrentAds(activeBulkTab);
-              }
             }}
             icon={showCurrentAds[activeBulkTab] ? ChevronUpIcon : ChevronDownIcon}
-            loading={fetchingAds}
           >
-{`${showCurrentAds[activeBulkTab] ? 'Hide' : 'Show'} Ads (${selectedProducts.length} products)`}
+            {showCurrentAds[activeBulkTab] ? 'Hide' : 'Show'} Details
           </Button>
         </InlineStack>
         
@@ -1850,37 +1923,55 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           transition={{duration: '200ms', timingFunction: 'ease-in-out'}}
           expandOnPrint
         >
-          <BlockStack gap="300">
-            {selectedProducts.length > 0 && products.filter(p => selectedProducts.includes(p.id)).map((product) => (
-              <Box key={product.id} padding="300" background="bg-surface-secondary" borderRadius="200">
-                <BlockStack gap="200">
-                  <InlineStack align="space-between" blockAlign="center">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">{product.title}</Text>
-                    <Badge tone={product.status === 'ACTIVE' ? 'success' : 'attention'}>
-                      {product.status}
-                    </Badge>
-                  </InlineStack>
-                  
-                  {/* Mock ad data - in real implementation, fetch from ads API */}
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Current Ad Campaigns: {fetchingAds ? 'Loading...' : (currentAds.length > 0 ? `${currentAds.length} active campaigns` : 'No active campaigns')}
-                  </Text>
-                  
-                  {!fetchingAds && currentAds.length > 0 && (
-                    <InlineStack gap="100">
-                      {currentAds.slice(0, 3).map((ad: any, adIndex: number) => (
-                        <Badge key={adIndex} tone="info">
-                          {ad.platform || `Campaign ${adIndex + 1}`}
+          <BlockStack gap="200">
+            {selectedProducts.length > 0 ? (
+              products.filter(p => selectedProducts.includes(p.id)).map((product) => {
+                const totalVariants = product.variants?.edges?.length || 0;
+                const avgPrice = product.variants?.edges?.length > 0
+                  ? (product.variants.edges.reduce((sum, v) => sum + parseFloat(v.node.price), 0) / product.variants.edges.length).toFixed(2)
+                  : '0.00';
+                const totalInventory = product.variants?.edges?.reduce((sum, v) => {
+                  const inv = v.node.inventoryQuantity || 0;
+                  return sum + inv;
+                }, 0) || 0;
+                
+                return (
+                  <Box key={product.id} padding="300" background="bg-surface-secondary" borderRadius="200">
+                    <BlockStack gap="200">
+                      <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                        <Text as="p" variant="bodyMd" fontWeight="semibold" truncate>{product.title}</Text>
+                        <Badge tone={product.status === 'ACTIVE' ? 'success' : 'attention'}>
+                          {product.status}
                         </Badge>
-                      ))}
-                      {currentAds.length > 3 && (
-                        <Badge>{`+${currentAds.length - 3} more`}</Badge>
-                      )}
-                    </InlineStack>
-                  )}
-                </BlockStack>
+                      </InlineStack>
+                      
+                      <InlineStack gap="300" wrap={true}>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {totalVariants} variant{totalVariants !== 1 ? 's' : ''}
+                        </Text>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Avg: ${avgPrice}
+                        </Text>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Stock: {totalInventory}
+                        </Text>
+                        {product.tags && product.tags.length > 0 && (
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            {product.tags.length} tag{product.tags.length !== 1 ? 's' : ''}
+                          </Text>
+                        )}
+                      </InlineStack>
+                    </BlockStack>
+                  </Box>
+                );
+              })
+            ) : (
+              <Box padding="400">
+                <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+                  No products selected. Select products from the table above to see details.
+                </Text>
               </Box>
-            ))}
+            )}
           </BlockStack>
         </Collapsible>
       </BlockStack>
@@ -2314,8 +2405,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
             </div>
           </div>
 
-          {/* Selected Products Preview - Lightweight for up to 10K products */}
-          {selectedVariants.length > 0 && (
+          {/* Recent Activity - Only visible in Step 1 */}
+          {activeMainTab === 0 && (
+            <BulkEditHistory key={historyReloadKey} isVisible={true} />
+          )}
+
+          {/* Selected Products Preview - Lightweight for up to 10K products - Only show in Step 1 */}
+          {selectedVariants.length > 0 && activeMainTab === 0 && (
             <div style={{
               padding: '12px 16px',
               backgroundColor: '#f8fafc',
@@ -2492,9 +2588,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
             </div>
           )}
       </BlockStack>
-
-      {/* Bulk Edit History - Always visible thin collapsible */}
-      <BulkEditHistory isVisible={true} />
 
       {/* Step Content */}
       {activeMainTab === 0 ? (
@@ -3023,7 +3116,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         </Card>
       ) : (
         /* Step 2: Bulk Edit - Complete Interface */
-        <BlockStack gap="200">
+        <BlockStack gap="400">
           {/* Bulk Edit Content */}
           {selectedVariants.length === 0 ? (
             <Card>
@@ -3060,7 +3153,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       Update pricing for {selectedVariants.length} selected variants.
                     </Text>
 
-                    {/* Current Ads Section */}
+                    {/* Selected Products Section */}
                     {renderCurrentAdsSection()}
 
                     {/* Price Management Category */}
@@ -3211,9 +3304,41 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                             ((priceOperation === 'increase' || priceOperation === 'decrease') && !pricePercentage)
                           }
                           loading={isLoading}
+                          size="large"
                         >
-                          Apply Price Changes
+                          {isLoading ? 'Updating Prices...' : `Apply to ${selectedVariants.length} Variant${selectedVariants.length !== 1 ? 's' : ''}`}
                         </Button>
+                        
+                        {/* Price Change Preview */}
+                        {selectedVariants.length > 0 && (priceOperation === 'set' || pricePercentage !== '0') && (
+                          <div style={{
+                            padding: '16px',
+                            backgroundColor: '#f0f9ff',
+                            borderRadius: '8px',
+                            border: '1px solid #bae6fd'
+                          }}>
+                            <BlockStack gap="200">
+                              <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                Preview: {selectedVariants.length} variant{selectedVariants.length !== 1 ? 's' : ''} will be updated
+                              </Text>
+                              {priceOperation === 'increase' && pricePercentage && (
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                  Example: $10.00 → ${(10 * (1 + parseFloat(pricePercentage) / 100)).toFixed(2)} (+{pricePercentage}%)
+                                </Text>
+                              )}
+                              {priceOperation === 'decrease' && pricePercentage && (
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                  Example: $10.00 → ${(10 * (1 - parseFloat(pricePercentage) / 100)).toFixed(2)} (-{pricePercentage}%)
+                                </Text>
+                              )}
+                              {priceOperation === 'set' && priceValue && (
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                  All selected variants will be set to ${priceValue}
+                                </Text>
+                              )}
+                            </BlockStack>
+                          </div>
+                        )}
                       </BlockStack>
 
 
@@ -3241,7 +3366,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                         </Text>
                       </Text>
 
-                      {/* Current Ads Section */}
+                      {/* Selected Products Section */}
                       {renderCurrentAdsSection()}
 
                       <div>
@@ -3358,7 +3483,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       Manage tags for {selectedProducts.length} selected {selectedProducts.length === 1 ? 'product' : 'products'}.
                     </Text>
 
-                    {/* Current Ads Section */}
+                    {/* Selected Products Section */}
                     {renderCurrentAdsSection()}
 
                     <div>
@@ -3423,7 +3548,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       Update content for {selectedProducts.length} selected {selectedProducts.length === 1 ? 'product' : 'products'}.
                     </Text>
 
-                    {/* Current Ads Section */}
+                    {/* Selected Products Section */}
                     {renderCurrentAdsSection()}
 
                     {/* Content Sub-tabs */}
@@ -3822,7 +3947,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       Manage inventory for {selectedVariants.length} selected variant{selectedVariants.length === 1 ? '' : 's'} across {selectedProducts.length} product{selectedProducts.length === 1 ? '' : 's'}.
                     </Text>
 
-                    {/* Current Ads Section */}
+                    {/* Selected Products Section */}
                     {renderCurrentAdsSection()}
 
                     {/* Inventory Operation Buttons */}
@@ -3978,7 +4103,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       Manage variants across {selectedProducts.length} selected product{selectedProducts.length === 1 ? '' : 's'}. This helps with common variant operations that are tedious to do one-by-one.
                     </Text>
 
-                    {/* Current Ads Section */}
+                    {/* Selected Products Section */}
                     {renderCurrentAdsSection()}
 
                     {/* Variant Operations */}
@@ -4095,6 +4220,19 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           duration={4000}
         />
       )}
+
+      {/* Operation Naming Modal */}
+      <OperationNamingModal
+        isOpen={showNamingModal}
+        operationType={pendingOperation?.operationType || ''}
+        totalProducts={pendingOperation?.totalProducts || 0}
+        totalVariants={pendingOperation?.totalVariants || 0}
+        onSave={handleSaveOperationName}
+        onCancel={() => {
+          setShowNamingModal(false);
+          setPendingOperation(null);
+        }}
+      />
     </BlockStack>
     </>
   );

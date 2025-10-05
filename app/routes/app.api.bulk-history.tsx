@@ -27,6 +27,11 @@ export async function loader({ request }: ActionFunctionArgs) {
       take: 50, // Limit to last 50 batches
     });
 
+    console.log(`📊 Bulk History Loader: Found ${batches.length} batches`);
+    batches.forEach((batch, idx) => {
+      console.log(`  Batch ${idx + 1}: ${batch.operationName} - ${batch.items.length} items`);
+    });
+
     return json({ success: true, batches });
   } catch (error) {
     console.error("Error fetching bulk edit history:", error);
@@ -41,6 +46,56 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     const formData = await request.formData();
     const action = formData.get("action") as string;
+
+    // Create new bulk edit record
+    if (action === "create") {
+      const data = JSON.parse(formData.get("data") as string);
+      const { operationType, operationName, description, changes, totalProducts, totalVariants } = data;
+      
+      if (!operationType || !operationName || !changes || !Array.isArray(changes)) {
+        return json({ 
+          success: false, 
+          error: "Invalid data: operationType, operationName, and changes array are required" 
+        }, { status: 400 });
+      }
+      
+      // Create batch with all items in single transaction
+      const batch = await db.bulkEditBatch.create({
+        data: {
+          shop,
+          operationType,
+          operationName,
+          description: description || null,
+          totalProducts: totalProducts || 0,
+          totalVariants: totalVariants || 0,
+          canRevert: true,
+          isReverted: false,
+          items: {
+            create: changes.map((change: any) => ({
+              productId: change.productId,
+              variantId: change.variantId || null,
+              productTitle: change.productTitle,
+              variantTitle: change.variantTitle || null,
+              fieldChanged: change.fieldChanged,
+              oldValue: change.oldValue || null,
+              newValue: change.newValue || null,
+              changeType: change.changeType,
+            }))
+          }
+        },
+        include: {
+          items: true
+        }
+      });
+      
+      console.log(`✅ Created bulk edit batch: ${operationName} (${batch.id}) with ${changes.length} items`);
+      
+      return json({ 
+        success: true, 
+        batch,
+        message: `Operation "${operationName}" saved to history`
+      });
+    }
 
     if (action === "revert") {
       const batchId = formData.get("batchId") as string;
@@ -140,93 +195,155 @@ async function revertItems(admin: any, items: any[], operationType: string) {
 }
 
 async function revertPricing(admin: any, items: any[]) {
-  const variantUpdates = items
-    .filter(item => item.variantId)
-    .map(item => ({
-      id: item.variantId,
-      ...(item.fieldChanged === 'price' && { price: item.oldValue }),
-      ...(item.fieldChanged === 'compareAtPrice' && { 
-        compareAtPrice: item.oldValue === 'null' ? null : item.oldValue 
-      }),
-    }));
-
-  if (variantUpdates.length > 0) {
-    const mutation = `
-      mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-        productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-          productVariants {
-            id
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `;
-
-    // Group by product
-    const variantsByProduct = new Map<string, any[]>();
-    for (const item of items) {
-      if (!variantsByProduct.has(item.productId)) {
-        variantsByProduct.set(item.productId, []);
-      }
-      const productVariants = variantsByProduct.get(item.productId);
-      const variantUpdate = variantUpdates.find(v => v.id === item.variantId);
-      if (productVariants && variantUpdate) {
-        productVariants.push(variantUpdate);
-      }
+  console.log(`🔄 Reverting pricing for ${items.length} items`);
+  
+  for (const item of items) {
+    if (!item.variantId || !item.oldValue) {
+      console.log(`⚠️ Skipping item: missing variantId or oldValue`, item);
+      continue;
     }
-
-    for (const [productId, variants] of variantsByProduct) {
-      await admin.graphql(mutation, {
-        variables: {
-          productId: `gid://shopify/Product/${productId}`,
-          variants
+    
+    try {
+      const mutation = `
+        mutation productVariantUpdate($input: ProductVariantInput!) {
+          productVariantUpdate(input: $input) {
+            productVariant {
+              id
+              price
+              compareAtPrice
+            }
+            userErrors {
+              field
+              message
+            }
+          }
         }
+      `;
+      
+      // Construct the input based on field changed
+      const input: any = {
+        id: `gid://shopify/ProductVariant/${item.variantId}`,
+      };
+      
+      if (item.fieldChanged === 'price') {
+        input.price = item.oldValue;
+      } else if (item.fieldChanged === 'compareAtPrice') {
+        input.compareAtPrice = item.oldValue === 'null' ? null : item.oldValue;
+      }
+      
+      console.log(`🔄 Reverting ${item.fieldChanged} for variant ${item.variantId}: ${item.newValue} → ${item.oldValue}`);
+      
+      const response = await admin.graphql(mutation, {
+        variables: { input }
       });
+      
+      const result = await response.json();
+      if (result.data?.productVariantUpdate?.userErrors?.length > 0) {
+        console.error(`❌ GraphQL errors for variant ${item.variantId}:`, result.data.productVariantUpdate.userErrors);
+        throw new Error(`GraphQL errors: ${result.data.productVariantUpdate.userErrors.map((e: any) => e.message).join(', ')}`);
+      }
+      
+      console.log(`✅ Successfully reverted ${item.fieldChanged} for variant ${item.variantId}`);
+    } catch (error) {
+      console.error(`❌ Failed to revert variant ${item.variantId}:`, error);
+      throw error;
     }
   }
 }
 
 async function revertInventory(admin: any, items: any[]) {
-  const inventoryAdjustments = items
-    .filter(item => item.variantId && item.fieldChanged === 'inventoryQuantity')
-    .map(item => {
+  console.log(`🔄 Reverting inventory for ${items.length} items`);
+  
+  const inventoryItems = items.filter(item => item.variantId && item.fieldChanged === 'inventoryQuantity');
+  
+  if (inventoryItems.length === 0) {
+    console.log('📦 No inventory items to revert');
+    return;
+  }
+  
+  // First, get the inventory item IDs for each variant
+  const variantIds = inventoryItems.map(item => `gid://shopify/ProductVariant/${item.variantId}`);
+  const variantQuery = `
+    query getVariants($ids: [ID!]!) {
+      nodes(ids: $ids) {
+        ... on ProductVariant {
+          id
+          inventoryItem {
+            id
+          }
+        }
+      }
+    }
+  `;
+  
+  try {
+    const response = await admin.graphql(variantQuery, {
+      variables: { ids: variantIds }
+    });
+    
+    const result = await response.json();
+    const variants = result.data?.nodes || [];
+    
+    const inventoryAdjustments = [];
+    
+    for (const item of inventoryItems) {
+      const variantGid = `gid://shopify/ProductVariant/${item.variantId}`;
+      const variant = variants.find((v: any) => v.id === variantGid);
+      
+      if (!variant?.inventoryItem?.id) {
+        console.log(`⚠️ No inventory item found for variant ${item.variantId}`);
+        continue;
+      }
+      
       const oldQty = parseInt(item.oldValue || '0');
       const newQty = parseInt(item.newValue || '0');
       const adjustment = oldQty - newQty; // Calculate reverse adjustment
       
-      return {
-        inventoryItemId: `gid://shopify/InventoryItem/${item.variantId}`, // This needs to be inventory item ID
-        availableDelta: adjustment
-      };
-    })
-    .filter(adj => adj.availableDelta !== 0);
+      if (adjustment !== 0) {
+        inventoryAdjustments.push({
+          inventoryItemId: variant.inventoryItem.id,
+          availableDelta: adjustment
+        });
+        
+        console.log(`🔄 Inventory adjustment for variant ${item.variantId}: ${adjustment} (${newQty} → ${oldQty})`);
+      }
+    }
 
-  if (inventoryAdjustments.length > 0) {
-    const mutation = `
-      mutation inventoryAdjustQuantities($input: InventoryAdjustQuantitiesInput!) {
-        inventoryAdjustQuantities(input: $input) {
-          inventoryAdjustmentGroup {
-            id
-          }
-          userErrors {
-            field
-            message
+    if (inventoryAdjustments.length > 0) {
+      const mutation = `
+        mutation inventoryAdjustQuantities($input: InventoryAdjustQuantitiesInput!) {
+          inventoryAdjustQuantities(input: $input) {
+            inventoryAdjustmentGroup {
+              id
+            }
+            userErrors {
+              field
+              message
+            }
           }
         }
-      }
-    `;
+      `;
 
-    await admin.graphql(mutation, {
-      variables: {
-        input: {
-          name: "Bulk Edit Revert",
-          changes: inventoryAdjustments
+      const adjustResponse = await admin.graphql(mutation, {
+        variables: {
+          input: {
+            name: "Bulk Edit Revert",
+            changes: inventoryAdjustments
+          }
         }
+      });
+      
+      const adjustResult = await adjustResponse.json();
+      if (adjustResult.data?.inventoryAdjustQuantities?.userErrors?.length > 0) {
+        console.error(`❌ Inventory adjustment errors:`, adjustResult.data.inventoryAdjustQuantities.userErrors);
+        throw new Error(`Inventory errors: ${adjustResult.data.inventoryAdjustQuantities.userErrors.map((e: any) => e.message).join(', ')}`);
       }
-    });
+      
+      console.log(`✅ Successfully reverted inventory for ${inventoryAdjustments.length} items`);
+    }
+  } catch (error) {
+    console.error(`❌ Failed to revert inventory:`, error);
+    throw error;
   }
 }
 
