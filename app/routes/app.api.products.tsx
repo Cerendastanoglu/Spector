@@ -588,6 +588,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           if (data.data?.productVariantsBulkUpdate?.userErrors?.length > 0) {
             results.push({
               productId: update.productId,
+              variantId: update.variantId,
               success: false,
               error: data.data.productVariantsBulkUpdate.userErrors[0].message
             });
@@ -595,13 +596,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const updatedVariant = data.data?.productVariantsBulkUpdate?.product?.variants?.edges?.[0]?.node;
             results.push({
               productId: update.productId,
+              variantId: update.variantId,
               success: true,
-              newPrice: updatedVariant?.price
+              newPrice: updatedVariant?.price || update.price,
+              newCompareAtPrice: updatedVariant?.compareAtPrice || update.compareAtPrice
             });
           }
         } catch (error) {
           results.push({
             productId: update.productId,
+            variantId: update.variantId,
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error'
           });
