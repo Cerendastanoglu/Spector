@@ -13,6 +13,9 @@ import {
   Badge,
   Tabs,
   Button,
+  Tooltip,
+  Select,
+  ButtonGroup,
 } from "@shopify/polaris";
 import { RefreshIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
@@ -62,6 +65,42 @@ export default function MarketAnalysis() {
   const [activeTab, setActiveTab] = useState(0);
   const [analysis, setAnalysis] = useState<StoreAnalysis | null>(null);
   const fetcher = useFetcher<{ success: boolean; data?: StoreAnalysis; error?: string }>();
+  
+  // Competitor research state
+  const [competitorRegion, setCompetitorRegion] = useState('worldwide');
+  const [competitorSize, setCompetitorSize] = useState('all');
+  const [competitorLocality, setCompetitorLocality] = useState('national');
+  const [competitorType, setCompetitorType] = useState('hybrid');
+  const [isLoadingCompetitors, setIsLoadingCompetitors] = useState(false);
+  const [competitorData, setCompetitorData] = useState<any[]>([]);
+
+  // Real-time competitor research function
+  const fetchCompetitors = async () => {
+    setIsLoadingCompetitors(true);
+    try {
+      const response = await fetch('/app/api/competitor-research', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storeClassification: analysis?.primaryCategories?.[0] || 'General Retail',
+          region: competitorRegion,
+          size: competitorSize,
+          locality: competitorLocality,
+          storeType: competitorType
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCompetitorData(data.competitors || []);
+      }
+    } catch (error) {
+      console.error('Error fetching competitors:', error);
+      setCompetitorData([]);
+    } finally {
+      setIsLoadingCompetitors(false);
+    }
+  };
 
   // Load market analysis on component mount
   useEffect(() => {
@@ -299,17 +338,150 @@ export default function MarketAnalysis() {
                 </BlockStack>
               )}
 
-              {/* Competitor Examples */}
-              {analysis?.marketInsights.competitorExamples && analysis.marketInsights.competitorExamples.length > 0 && (
-                <BlockStack gap="300">
-                  <Text as="h3" variant="headingMd">Key Competitors</Text>
-                  <InlineStack gap="200" wrap={true}>
-                    {analysis.marketInsights.competitorExamples.slice(0, 6).map((competitor, index) => (
-                      <Badge key={index} tone="info">{competitor}</Badge>
-                    ))}
+              {/* Real-time Competitor Research */}
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="center">
+                  <Text as="h3" variant="headingMd">Competitive Intelligence</Text>
+                  <InlineStack gap="200">
+                    <Badge tone="info">{`${competitorData.length} competitors found`}</Badge>
+                    <Button 
+                      size="micro" 
+                      onClick={fetchCompetitors} 
+                      loading={isLoadingCompetitors}
+                    >
+                      {competitorData.length === 0 ? 'Research Competitors' : 'Refresh Research'}
+                    </Button>
                   </InlineStack>
-                </BlockStack>
-              )}
+                </InlineStack>
+
+                {/* Competitor Filters */}
+                <InlineStack gap="400" wrap={true}>
+                  <div>
+                    <Text as="p" variant="bodySm" tone="subdued">Region:</Text>
+                    <ButtonGroup variant="segmented">
+                      <Button
+                        pressed={competitorRegion === 'worldwide'}
+                        onClick={() => setCompetitorRegion('worldwide')}
+                      >
+                        Global
+                      </Button>
+                      <Button
+                        pressed={competitorRegion === 'north-america'}
+                        onClick={() => setCompetitorRegion('north-america')}
+                      >
+                        North America
+                      </Button>
+                      <Button
+                        pressed={competitorRegion === 'europe'}
+                        onClick={() => setCompetitorRegion('europe')}
+                      >
+                        Europe
+                      </Button>
+                    </ButtonGroup>
+                  </div>
+                  
+                  <div>
+                    <Text as="p" variant="bodySm" tone="subdued">Market Reach:</Text>
+                    <ButtonGroup variant="segmented">
+                      <Button
+                        pressed={competitorLocality === 'national'}
+                        onClick={() => setCompetitorLocality('national')}
+                      >
+                        National
+                      </Button>
+                      <Button
+                        pressed={competitorLocality === 'local'}
+                        onClick={() => setCompetitorLocality('local')}
+                      >
+                        Local
+                      </Button>
+                    </ButtonGroup>
+                  </div>
+
+                  <div>
+                    <Text as="p" variant="bodySm" tone="subdued">Store Type:</Text>
+                    <ButtonGroup variant="segmented">
+                      <Button
+                        pressed={competitorType === 'web'}
+                        onClick={() => setCompetitorType('web')}
+                      >
+                        Online
+                      </Button>
+                      <Button
+                        pressed={competitorType === 'physical'}
+                        onClick={() => setCompetitorType('physical')}
+                      >
+                        Physical
+                      </Button>
+                      <Button
+                        pressed={competitorType === 'hybrid'}
+                        onClick={() => setCompetitorType('hybrid')}
+                      >
+                        Hybrid
+                      </Button>
+                    </ButtonGroup>
+                  </div>
+                </InlineStack>
+
+                {/* Competitor Results */}
+                {competitorData.length > 0 && (
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+                    gap: '16px' 
+                  }}>
+                    {competitorData.slice(0, 8).map((competitor, index) => (
+                      <div key={index} style={{
+                        padding: '16px',
+                        backgroundColor: 'var(--p-color-bg-surface-secondary)',
+                        borderRadius: '8px',
+                        border: '1px solid var(--p-color-border-subdued)'
+                      }}>
+                        <BlockStack gap="200">
+                          <InlineStack align="space-between">
+                            <Text as="h4" variant="headingSm">{competitor.name}</Text>
+                            <Badge tone="info">{competitor.storeType}</Badge>
+                          </InlineStack>
+                          <Text as="p" variant="bodySm">{competitor.description}</Text>
+                          <InlineStack gap="200" wrap={true}>
+                            <Badge>{`Revenue: ${competitor.revenue}`}</Badge>
+                            <Badge>{`Founded: ${competitor.founded}`}</Badge>
+                          </InlineStack>
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            <strong>Specialty:</strong> {competitor.specialty}
+                          </Text>
+                          {competitor.strengths && (
+                            <div>
+                              <Text as="p" variant="bodySm" tone="success">
+                                <strong>Strengths:</strong> {competitor.strengths.join(', ')}
+                              </Text>
+                            </div>
+                          )}
+                        </BlockStack>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {competitorData.length === 0 && (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '40px',
+                    backgroundColor: 'var(--p-color-bg-surface-secondary)',
+                    borderRadius: '8px',
+                    border: '1px dashed var(--p-color-border-subdued)'
+                  }}>
+                    <BlockStack gap="200" align="center">
+                      <Text as="p" variant="bodyMd" tone="subdued">
+                        Click "Research Competitors" to discover real-time competitive intelligence
+                      </Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        We'll analyze your store category and find relevant competitors with current market data
+                      </Text>
+                    </BlockStack>
+                  </div>
+                )}
+              </BlockStack>
             </BlockStack>
           </div>
         </Card>

@@ -907,4 +907,3 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
   );
 }
 
-export default ForecastingTab;
