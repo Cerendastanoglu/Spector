@@ -89,7 +89,7 @@ export function ProductTable({
   onExpandProduct,
   onViewProduct,
   onEditProduct,
-  onContinueToBulkEdit,
+  onContinueToBulkEdit: _onContinueToBulkEdit,
   shopCurrency = '$',
   showVariantSelection = false,
   totalCount,
@@ -553,16 +553,20 @@ export function ProductTable({
                                 alignItems: 'center'
                               }}>
                                 {product.tags && product.tags.length > 0 ? (
-                                  <InlineStack gap="100" wrap={false}>
-                                    {product.tags.slice(0, 2).map((tag, index) => (
-                                      <Badge key={index} size="small" tone="info">{tag}</Badge>
-                                    ))}
-                                    {product.tags.length > 2 && (
-                                      <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
-                                        +{product.tags.length - 2}
-                                      </Text>
-                                    )}
-                                  </InlineStack>
+                                  <div style={{
+                                    maxWidth: '200px',
+                                    overflowX: 'auto',
+                                    whiteSpace: 'nowrap',
+                                    scrollbarWidth: 'none', /* Firefox */
+                                    msOverflowStyle: 'none', /* IE/Edge */
+                                    padding: '4px 0'
+                                  }}>
+                                    <InlineStack gap="100">
+                                      {product.tags.map((tag, index) => (
+                                        <Badge key={index} size="small" tone="info">{tag}</Badge>
+                                      ))}
+                                    </InlineStack>
+                                  </div>
                                 ) : (
                                   <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
                                     No tags
@@ -704,25 +708,6 @@ export function ProductTable({
           <Text as="p" variant="bodyXs" tone="subdued">
             Showing {products.length}{totalCount ? ` of ${totalCount}` : ''} products
           </Text>
-        </div>
-      )}
-      
-      {/* Continue to Bulk Edit Button */}
-      {selectedProducts.length > 0 && (
-        <div style={{ 
-          padding: '16px', 
-          borderTop: '1px solid #e5e7eb',
-          backgroundColor: '#f8fafc',
-          textAlign: 'center'
-        }}>
-          <Button
-            variant="primary"
-            size="large"
-            onClick={onContinueToBulkEdit}
-            disabled={selectedProducts.length === 0}
-          >
-            {`Continue with ${selectedProducts.length} selected product${selectedProducts.length !== 1 ? 's' : ''} →`}
-          </Button>
         </div>
       )}
     </div>

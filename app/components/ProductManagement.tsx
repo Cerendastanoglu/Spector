@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useFetcher } from "@remix-run/react";
+import { useFetcher, useNavigate } from "@remix-run/react";
 import { openInNewTab } from "../utils/browserUtils";
 import { ProductConstants } from "../utils/scopedConstants";
 import { ProductTable } from "./ProductTable";
@@ -22,6 +22,7 @@ import {
   Collapsible,
   Toast,
   Divider,
+  Modal,
 } from '@shopify/polaris';
 // Import only the icons we actually use
 import { 
@@ -156,6 +157,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   }, []);
 
   const fetcher = useFetcher<{ products: Product[]; hasNextPage: boolean; endCursor?: string; error?: string }>();
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
@@ -245,6 +247,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     show: boolean;
     message: string;
     error?: boolean;
+    actionLabel?: string;
+    onAction?: () => void;
   }>({ show: false, message: '' });
   
   const [tagOperation, setTagOperation] = useState<'add' | 'remove' | 'replace'>('add');
@@ -304,6 +308,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
   
   // Bulk operations modal state
+  const [showBulkOperationModal, setShowBulkOperationModal] = useState(false);
+  const [bulkOperationName, setBulkOperationName] = useState('');
+  const [bulkOperationDescription, setBulkOperationDescription] = useState('');
+  const [pendingBulkOperation, setPendingBulkOperation] = useState<{
+    type: 'price' | 'collection' | 'tags' | 'inventory' | 'content';
+    data: any;
+  } | null>(null);
 
   
   // Helper function to toggle product expansion
@@ -813,6 +824,44 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       }
     }
     
+    // Instead of applying changes right away, set up the pending operation and show the modal
+    const operationData = {
+      priceOperation,
+      priceValue,
+      pricePercentage,
+      applyCompareChanges,
+      compareOperation,
+      compareValue,
+      comparePercentage,
+      selectedVariants: [...selectedVariants]
+    };
+    
+    // Set a default name for the operation
+    const defaultName = `${priceOperation === 'set' ? 'Set' : priceOperation === 'increase' ? 'Increase' : priceOperation === 'decrease' ? 'Decrease' : 'Round'} Price ${new Date().toLocaleDateString()}`;
+    setBulkOperationName(defaultName);
+    setBulkOperationDescription(`${selectedVariants.length} variants affected`);
+    setPendingBulkOperation({ type: 'price', data: operationData });
+    setShowBulkOperationModal(true);
+  };
+  
+  // This function is called after the user confirms the batch name
+  const applyPriceChanges = async () => {
+    if (!pendingBulkOperation || pendingBulkOperation.type !== 'price') {
+      setError("No pending price operation found.");
+      return;
+    }
+    
+    const { 
+      priceOperation, 
+      priceValue, 
+      pricePercentage, 
+      applyCompareChanges,
+      compareOperation,
+      compareValue,
+      comparePercentage,
+      selectedVariants 
+    } = pendingBulkOperation.data;
+    
     setIsLoading(true);
     clearBulkMessages();
     
@@ -822,6 +871,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     try {
       // Process each selected variant individually
       const variantUpdates = [];
+      
+      // Add batch information
+      const batchInfo = {
+        operationName: bulkOperationName || `Price Update ${new Date().toLocaleDateString()}`,
+        description: bulkOperationDescription || `${selectedVariants.length} variants affected`,
+        type: 'pricing'
+      };
       
       for (let i = 0; i < selectedVariants.length; i++) {
         const variantId = selectedVariants[i];
@@ -941,6 +997,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       const formData = new FormData();
       formData.append('action', 'update-product-prices');
       formData.append('updates', JSON.stringify(variantUpdates));
+      formData.append('batchInfo', JSON.stringify(batchInfo));
       
       const response = await fetch('/app/api/products', {
         method: 'POST',
@@ -1009,6 +1066,35 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         setCompareValue('');
         setComparePercentage('0');
         setApplyCompareChanges(false);
+        
+        // Show success notification with link to recent activity
+        setNotification({
+          show: true,
+          message: `Successfully updated prices for ${apiSuccessful.length} products`,
+          error: false,
+          actionLabel: "View in Recent Activity",
+          onAction: () => {
+            // Set activeMainTab to 0 (Step 1) where Recent Activity is visible
+            setActiveMainTab(0);
+            // Refresh and expand the Recent Activity
+            const historyElement = document.querySelector('[data-testid="bulk-edit-history"]');
+            if (historyElement) {
+              historyElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            // Force recent activity component to refresh and expand
+            const historyRefreshBtn = document.querySelector('[data-testid="bulk-edit-history-refresh"]') as HTMLButtonElement;
+            const historyExpandBtn = document.querySelector('[data-testid="bulk-edit-history-expand"]') as HTMLButtonElement;
+            if (historyRefreshBtn) {
+              historyRefreshBtn.click();
+            }
+            setTimeout(() => {
+              if (historyExpandBtn) {
+                historyExpandBtn.click();
+              }
+            }, 300);
+          }
+        });
+        
         // Note: Keeping selectedProducts so users can perform multiple operations on the same selection
         
         // Show info about compare price operations
@@ -1110,7 +1196,27 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         setNotification({
           show: true,
           message: `Successfully ${actionText} ${collectionNames} for ${successful.length} product${successful.length > 1 ? 's' : ''}`,
-          error: false
+          error: false,
+          actionLabel: "View in Recent Activity",
+          onAction: () => {
+            // Set activeMainTab to 0 (Step 1) where Recent Activity is visible
+            setActiveMainTab(0);
+            // Navigate to and expand the Recent Activity section
+            const historyElement = document.querySelector('[data-testid="bulk-edit-history"]');
+            if (historyElement) {
+              historyElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            const historyRefreshBtn = document.querySelector('[data-testid="bulk-edit-history-refresh"]') as HTMLButtonElement;
+            const historyExpandBtn = document.querySelector('[data-testid="bulk-edit-history-expand"]') as HTMLButtonElement;
+            if (historyRefreshBtn) {
+              historyRefreshBtn.click();
+            }
+            setTimeout(() => {
+              if (historyExpandBtn) {
+                historyExpandBtn.click();
+              }
+            }, 300);
+          }
         });
       }
       
@@ -1153,12 +1259,39 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       return;
     }
     
-    setIsLoading(true);
     setError("");
     
+    // Store the pending operation
+    setPendingBulkOperation({
+      type: 'tags',
+      data: {
+        productIds: selectedProducts,
+        tagOperation,
+        tagValue: tagOperation === 'add' ? tagValue : undefined,
+        tagRemoveValue: tagOperation === 'remove' ? tagRemoveValue : undefined,
+      }
+    });
+    
+    // Show the modal to name the operation
+    setShowBulkOperationModal(true);
+  };
+  
+  // This function is called after the modal confirmation for tag operations
+  const applyTagChanges = async () => {
+    const {
+      productIds,
+      tagOperation,
+      tagValue,
+      tagRemoveValue
+    } = pendingBulkOperation?.data || {};
+    
+    if (!productIds || productIds.length === 0) {
+      return;
+    }
+    
+    setIsLoading(true);
+    
     try {
-      const productIds = selectedProducts; // selectedProducts is already an array of IDs
-      
       const response = await fetch('/app/api/products', {
         method: 'POST',
         headers: {
@@ -1170,6 +1303,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           tagOperation,
           tagValue: tagOperation === 'add' ? tagValue : undefined,
           tagRemoveValue: tagOperation === 'remove' ? tagRemoveValue : undefined,
+          operationName: bulkOperationName,
+          operationDescription: bulkOperationDescription
         }),
       });
 
@@ -1215,15 +1350,40 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       
       const actionText = tagOperation === 'add' ? 'added tags to' : 
                         tagOperation === 'remove' ? 'removed tags from' : 'updated tags for';
-      const tagNames = tagOperation === 'add' ? tagValue : tagRemoveValue;
       
-      if (successful.length > 0) {
-        console.log(`✅ Successfully ${actionText} ${successful.length} products! Tags: ${tagNames}`);
+      // Record the operation in history for Recent Activity
+      if (result.bulkOperationId) {
+        // Show success notification with link to recent activity
+        setNotification({
+          show: true,
+          message: `Successfully ${actionText} ${successful.length} products!`,
+          error: false,
+          actionLabel: "View in Recent Activity",
+          onAction: () => {
+            // Use navigation to go to the activity page with the operation highlighted
+            navigate({
+              pathname: '/app/activity',
+              search: `?highlight=${result.bulkOperationId}`
+            });
+          }
+        });
+      } else if (successful.length > 0) {
+        setNotification({
+          show: true,
+          message: `Successfully ${actionText} ${successful.length} products!`,
+          error: false
+        });
       }
       
       if (failed.length > 0) {
         console.log(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
         console.log("Failed operations:", failed);
+        
+        setNotification({
+          show: true,
+          message: `${successful.length} products updated, ${failed.length} failed. See console for details.`,
+          error: true
+        });
       }
       
       // Clear form only if completely successful
@@ -1773,46 +1933,37 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
   };
 
-  // Handler for fetching current ads with lazy loading
-  const handleFetchCurrentAds = async (tabIndex: number) => {
+  // Handler for fetching product details with lazy loading
+  const handleFetchProductDetails = async (tabIndex: number) => {
     if (selectedProducts.length === 0) {
-      alert('Please select products first');
+      setNotification({
+        show: true,
+        message: 'Please select products first',
+        error: true
+      });
       return;
     }
 
-    // If ads are already loaded for this tab, don't fetch again
+    // If details are already loaded for this tab, don't fetch again
     if (adsLoaded[tabIndex]) {
       return;
     }
 
     setFetchingAds(true);
     try {
-      const productIds = selectedProducts;
-      const response = await fetch('/app/api/product-analytics', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          productIds,
-          action: 'getCurrentAds'
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch current ads');
-      }
-
-      const result = await response.json();
-      if (result.success) {
-        setCurrentAds(result.ads || []);
-        setAdsLoaded(prev => ({ ...prev, [tabIndex]: true }));
-      } else {
-        throw new Error(result.error || 'Failed to fetch ads');
-      }
+      // Use the selected products that we already have in memory
+      const selectedProductDetails = products.filter(p => selectedProducts.includes(p.id));
+      
+      // Set the product details directly without an API call
+      setCurrentAds(selectedProductDetails);
+      setAdsLoaded(prev => ({ ...prev, [tabIndex]: true }));
     } catch (error) {
-      console.error('Error fetching current ads:', error);
-      alert('Failed to fetch current ads. Please try again.');
+      console.error('Error loading product details:', error);
+      setNotification({
+        show: true,
+        message: 'Failed to load product details. Please try again.',
+        error: true
+      });
     } finally {
       setFetchingAds(false);
     }
@@ -1823,7 +1974,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     <Card>
       <BlockStack gap="300">
         <InlineStack align="space-between" blockAlign="center">
-          <Text as="h4" variant="headingSm">Current Product Ads</Text>
+          <Text as="h4" variant="headingSm">Selected Product Details</Text>
           <Button
             variant="plain"
             onClick={() => {
@@ -1832,15 +1983,15 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                 ...prev,
                 [activeBulkTab]: !isCurrentlyOpen
               }));
-              // Lazy load ads when opening
+              // Lazy load product details when opening
               if (!isCurrentlyOpen) {
-                handleFetchCurrentAds(activeBulkTab);
+                handleFetchProductDetails(activeBulkTab);
               }
             }}
             icon={showCurrentAds[activeBulkTab] ? ChevronUpIcon : ChevronDownIcon}
             loading={fetchingAds}
           >
-{`${showCurrentAds[activeBulkTab] ? 'Hide' : 'Show'} Ads (${selectedProducts.length} products)`}
+{`${showCurrentAds[activeBulkTab] ? 'Hide' : 'Show'} Details (${selectedProducts.length} products)`}
           </Button>
         </InlineStack>
         
@@ -1861,22 +2012,43 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                     </Badge>
                   </InlineStack>
                   
-                  {/* Mock ad data - in real implementation, fetch from ads API */}
+                  {/* Product details information */}
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Current Ad Campaigns: {fetchingAds ? 'Loading...' : (currentAds.length > 0 ? `${currentAds.length} active campaigns` : 'No active campaigns')}
+                    Product Information: {fetchingAds ? 'Loading...' : 'Available'}
                   </Text>
                   
                   {!fetchingAds && currentAds.length > 0 && (
-                    <InlineStack gap="100">
-                      {currentAds.slice(0, 3).map((ad: any, adIndex: number) => (
-                        <Badge key={adIndex} tone="info">
-                          {ad.platform || `Campaign ${adIndex + 1}`}
-                        </Badge>
-                      ))}
-                      {currentAds.length > 3 && (
-                        <Badge>{`+${currentAds.length - 3} more`}</Badge>
-                      )}
-                    </InlineStack>
+                    <BlockStack gap="200">
+                      <InlineStack gap="100">
+                        <Text as="span" variant="bodyMd">Price:</Text>
+                        <Text as="span" variant="bodyMd" fontWeight="semibold">
+                          {product.variants && product.variants.edges && product.variants.edges.length > 0 
+                            ? `$${product.variants.edges[0].node.price}`
+                            : '$0.00'}
+                        </Text>
+                      </InlineStack>
+                      
+                      <InlineStack gap="100" wrap={false} blockAlign="start">
+                        <Text as="span" variant="bodyMd">Tags:</Text>
+                        <div style={{
+                          maxWidth: '300px',
+                          overflowX: 'auto',
+                          whiteSpace: 'nowrap',
+                          scrollbarWidth: 'none',
+                          msOverflowStyle: 'none',
+                          padding: '4px 0'
+                        }}>
+                          <InlineStack gap="100">
+                            {product.tags && product.tags.length > 0 ? 
+                              product.tags.map((tag, index) => (
+                                <Badge key={index} tone="info" size="small">{tag}</Badge>
+                              )) : 
+                              <Text as="span" variant="bodyMd" tone="subdued">No tags</Text>
+                            }
+                          </InlineStack>
+                        </div>
+                      </InlineStack>
+                    </BlockStack>
                   )}
                 </BlockStack>
               </Box>
@@ -2493,8 +2665,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           )}
       </BlockStack>
 
-      {/* Bulk Edit History - Always visible thin collapsible */}
-      <BulkEditHistory isVisible={true} />
+      {/* Bulk Edit History - Only visible in Step 1 */}
+      {activeMainTab === 0 && <BulkEditHistory isVisible={true} />}
 
       {/* Step Content */}
       {activeMainTab === 0 ? (
@@ -4093,8 +4265,79 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           error={notification.error}
           onDismiss={() => setNotification({ show: false, message: '' })}
           duration={4000}
+          action={notification.actionLabel ? {
+            content: notification.actionLabel,
+            onAction: notification.onAction
+          } : undefined}
         />
       )}
+
+      {/* Bulk Operation Naming Modal */}
+      <Modal
+        open={showBulkOperationModal}
+        onClose={() => setShowBulkOperationModal(false)}
+        title="Save Bulk Operation to History"
+        primaryAction={{
+          content: 'Apply Changes',
+          onAction: () => {
+            setShowBulkOperationModal(false);
+            if (pendingBulkOperation?.type === 'price') {
+              applyPriceChanges();
+            } else if (pendingBulkOperation?.type === 'tags') {
+              applyTagChanges();
+            }
+          }
+        }}
+        secondaryActions={[
+          {
+            content: 'Cancel',
+            onAction: () => {
+              setShowBulkOperationModal(false);
+              setPendingBulkOperation(null);
+            }
+          }
+        ]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text as="p">
+              Name this bulk operation for history tracking. This will allow you to revert these changes later if needed.
+            </Text>
+            
+            <TextField
+              label="Operation Name"
+              value={bulkOperationName}
+              onChange={setBulkOperationName}
+              autoComplete="off"
+              helpText="A descriptive name for this set of changes"
+            />
+            
+            <TextField
+              label="Description (Optional)"
+              value={bulkOperationDescription}
+              onChange={setBulkOperationDescription}
+              multiline={2}
+              autoComplete="off"
+              helpText="Additional details about these changes"
+            />
+            
+            <Box
+              background="bg-fill-info-secondary"
+              padding="300"
+              borderRadius="100"
+            >
+              <BlockStack gap="200">
+                <Text variant="bodySm" fontWeight="semibold" as="p">
+                  � Change History Tracking
+                </Text>
+                <Text variant="bodySm" as="p">
+                  Your changes will be saved in history, so you can easily undo them later if needed.
+                </Text>
+              </BlockStack>
+            </Box>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
     </BlockStack>
     </>
   );
