@@ -23,6 +23,8 @@ import {
 
 interface BulkEditItem {
   id: string;
+  productId: string;
+  variantId?: string;
   productTitle: string;
   variantTitle?: string;
   fieldChanged: string;
@@ -129,71 +131,6 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
     return <Badge tone="success">Active</Badge>;
   };
 
-  // Mock data with descriptions for details
-  const mockBatches: BulkEditBatch[] = [
-    {
-      id: "1",
-      operationType: "pricing",
-      operationName: "Winter Sale Pricing",
-      description: "Applied 15% discount to seasonal products for holiday promotion",
-      totalProducts: 24,
-      totalVariants: 48,
-      createdAt: "2025-09-29T10:30:00Z",
-      canRevert: true,
-      isReverted: false,
-      items: []
-    },
-    {
-      id: "2", 
-      operationType: "tags",
-      operationName: "Holiday Tags Update",
-      description: "Added 'holiday-2025' and 'gift-item' tags to seasonal products",
-      totalProducts: 18,
-      totalVariants: 0,
-      createdAt: "2025-09-28T14:15:00Z",
-      canRevert: true,
-      isReverted: false,
-      items: []
-    },
-    {
-      id: "3",
-      operationType: "content",
-      operationName: "SEO Meta Update",
-      description: "Updated product titles and descriptions for better search visibility",
-      totalProducts: 32,
-      totalVariants: 0,
-      createdAt: "2025-09-27T09:45:00Z",
-      canRevert: true,
-      isReverted: true,
-      revertedAt: "2025-09-27T16:20:00Z",
-      items: []
-    },
-    {
-      id: "4",
-      operationType: "inventory",
-      operationName: "Inventory Sync",
-      description: "Adjusted inventory levels based on physical warehouse count",
-      totalProducts: 56,
-      totalVariants: 112,
-      createdAt: "2025-09-26T11:20:00Z",
-      canRevert: false,
-      isReverted: false,
-      items: []
-    },
-    {
-      id: "5",
-      operationType: "collections",
-      operationName: "Collection Update",
-      description: "Added products to 'Fall 2025' and 'Autumn Essentials' collections",
-      totalProducts: 28,
-      totalVariants: 0,
-      createdAt: "2025-09-25T16:10:00Z",
-      canRevert: true,
-      isReverted: false,
-      items: []
-    }
-  ];
-
   const renderHistory = () => {
     if (historyFetcher.state === 'loading') {
       return (
@@ -206,10 +143,25 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
       );
     }
 
-    if (mockBatches.length === 0) {
+    // Use real data from API
+    const batches = historyFetcher.data?.batches || [];
+    
+    console.log(`🎨 BulkEditHistory Component: Rendering ${batches.length} batches`);
+    batches.forEach((batch, idx) => {
+      console.log(`  Batch ${idx + 1}: ${batch.operationName}`);
+      console.log(`    - items array:`, batch.items);
+      console.log(`    - items length:`, batch.items?.length || 0);
+    });
+    
+    // Find the latest non-reverted batch (can only revert the most recent change)
+    const latestNonRevertedBatch = batches.find(b => !b.isReverted);
+
+    if (batches.length === 0) {
       return (
         <Box padding="200">
-          <Text as="p" tone="subdued" variant="bodySm">No recent activity</Text>
+          <Text as="p" tone="subdued" variant="bodySm">
+            No bulk edit history yet. Your named operations will appear here.
+          </Text>
         </Box>
       );
     }
@@ -226,10 +178,10 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
 
     // Slider functionality - show 2 items at a time
     const itemsPerSlide = 2;
-    const totalSlides = Math.ceil(mockBatches.length / itemsPerSlide);
+    const totalSlides = Math.ceil(batches.length / itemsPerSlide);
     const startIndex = currentSlide * itemsPerSlide;
     const endIndex = startIndex + itemsPerSlide;
-    const currentBatches = mockBatches.slice(startIndex, endIndex);
+    const currentBatches = batches.slice(startIndex, endIndex);
 
     const nextSlide = () => {
       setCurrentSlide((prev) => (prev + 1) % totalSlides);
@@ -334,10 +286,13 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
                         variant="tertiary"
                         tone="critical"
                         loading={revertingBatchId === batch.id}
-                        disabled={revertingBatchId !== null}
+                        disabled={
+                          revertingBatchId !== null || 
+                          (latestNonRevertedBatch !== undefined && latestNonRevertedBatch.id !== batch.id)
+                        }
                         onClick={() => handleRevert(batch)}
                       >
-                        Revert
+                        {latestNonRevertedBatch?.id === batch.id ? 'Revert' : 'Revert Latest First'}
                       </Button>
                     )}
                   </InlineStack>
@@ -357,7 +312,8 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
                     background="bg-surface"
                     borderRadius="200"
                   >
-                  <BlockStack gap="200">
+                  <BlockStack gap="300">
+                    {/* Summary Stats */}
                     <InlineStack gap="300">
                       <Text variant="bodySm" as="span" tone="subdued">
                         {batch.totalProducts} products affected
@@ -373,6 +329,74 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
                       <Text variant="bodySm" tone="subdued" as="p">
                         {batch.description}
                       </Text>
+                    )}
+
+                    {/* Product List */}
+                    {batch.items && batch.items.length > 0 && (
+                      <div style={{
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        padding: '12px',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '8px',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <BlockStack gap="200">
+                          <Text variant="bodyMd" as="p" fontWeight="semibold">
+                            Affected Products:
+                          </Text>
+                          {/* Group by product */}
+                          {(() => {
+                            const productMap = new Map<string, any[]>();
+                            batch.items.forEach(item => {
+                              if (!productMap.has(item.productId)) {
+                                productMap.set(item.productId, []);
+                              }
+                              productMap.get(item.productId)?.push(item);
+                            });
+                            
+                            return Array.from(productMap.entries()).map(([productId, items]) => (
+                              <div key={productId} style={{
+                                padding: '8px',
+                                backgroundColor: 'white',
+                                borderRadius: '6px',
+                                border: '1px solid #e5e7eb'
+                              }}>
+                                <BlockStack gap="100">
+                                  <Text variant="bodySm" as="p" fontWeight="semibold">
+                                    {items[0].productTitle}
+                                  </Text>
+                                  {items.map((item) => (
+                                    <div key={item.id} style={{ paddingLeft: '12px' }}>
+                                      <Text variant="bodyXs" as="p" tone="subdued">
+                                        {item.variantTitle && item.variantTitle !== 'Default' ? `• ${item.variantTitle}: ` : '• '}
+                                        {item.fieldChanged === 'price' && item.oldValue && item.newValue && (
+                                          <span>
+                                            ${item.oldValue} → ${item.newValue}
+                                            <span style={{ 
+                                              marginLeft: '4px',
+                                              color: parseFloat(item.newValue) > parseFloat(item.oldValue) ? '#16a34a' : '#dc2626',
+                                              fontWeight: 600
+                                            }}>
+                                              ({parseFloat(item.newValue) > parseFloat(item.oldValue) ? '+' : ''}
+                                              {((parseFloat(item.newValue) - parseFloat(item.oldValue)) / parseFloat(item.oldValue) * 100).toFixed(1)}%)
+                                            </span>
+                                          </span>
+                                        )}
+                                        {item.fieldChanged !== 'price' && (
+                                          <span>
+                                            {item.oldValue || 'None'} → {item.newValue || 'None'}
+                                          </span>
+                                        )}
+                                      </Text>
+                                    </div>
+                                  ))}
+                                </BlockStack>
+                              </div>
+                            ));
+                          })()}
+                        </BlockStack>
+                      </div>
                     )}
 
                     {batch.isReverted && batch.revertedAt && (
@@ -411,7 +435,7 @@ export function BulkEditHistory({ isVisible }: BulkEditHistoryProps) {
           </BlockStack>
           <InlineStack gap="200" align="center">
             <Badge tone="info" size="small">
-              {mockBatches.length.toString()}
+              {(historyFetcher.data?.batches?.length || 0).toString()}
             </Badge>
             <Button
               variant="tertiary"
