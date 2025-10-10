@@ -1,10 +1,8 @@
 export { AppHeader } from "./AppHeader";
-export { BulkEditHistory } from "./BulkEditHistory";
 export { Dashboard } from "./Dashboard";
-export { ForecastingTab } from "./ForecastingTab";
-export { Help } from "./Help";
-export { PerformanceDashboard } from "./PerformanceDashboard";
 export { ProductManagement } from "./ProductManagement";
-export { ProductTable } from "./ProductTable";
 export { WebVitals } from "./WebVitals";
+export { PerformanceDashboard } from "./PerformanceDashboard";
 export { WelcomeModal } from "./WelcomeModal";
+export { ProductTable } from "./ProductTable";
+export { IntelligenceDashboard } from "./IntelligenceDashboard";

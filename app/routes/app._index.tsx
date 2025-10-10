@@ -7,7 +7,6 @@ import {
   Text,
   Card,
   BlockStack,
-  Button,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { AppHeader } from "../components/AppHeader";
@@ -134,10 +133,6 @@ export default function Index() {
     }
   };
 
-  const handleOpenHelp = () => {
-    setActiveTab("help");
-  };
-
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
   };
@@ -178,32 +173,32 @@ export default function Index() {
                   App Settings
                 </Text>
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Manage your Spector app settings and preferences.
+                  Manage your Spector app settings and subscription details.
                 </Text>
               </BlockStack>
             </Card>
 
-            {/* App Information */}
+            {/* Subscription & Plan Information */}
             <Card>
-              <BlockStack gap="400">
+              <BlockStack gap="500">
                 <Text as="h3" variant="headingMd">
-                  App Information
-                </Text>
-                <Text as="p" variant="bodyMd">
-                  Spector helps you manage your Shopify products with advanced analytics and inventory tracking.
+                  Subscription & Plan
                 </Text>
                 <Layout>
                   <Layout.Section variant="oneHalf">
-                    <Card background="bg-surface-info">
+                    <Card>
                       <BlockStack gap="300">
                         <Text as="h4" variant="headingSm">
                           Free Trial Active
                         </Text>
                         <Text as="p" variant="bodyMd">
-                          You're currently on a 3-day free trial. Access to all available features until your trial expires.
+                          <strong>3-Day Trial</strong>
                         </Text>
                         <Text as="p" variant="bodySm" tone="subdued">
-                          Trial ends: October 2, 2025
+                          • Full access to all features
+                          • No payment required
+                          • Export capabilities included
+                          • Trial ends: October 8, 2025
                         </Text>
                       </BlockStack>
                     </Card>
@@ -216,7 +211,7 @@ export default function Index() {
                           Current Plan
                         </Text>
                         <Text as="p" variant="bodyMd">
-                          <strong>Spector Limited Plan - Trial</strong>
+                          <strong>Basic Plan</strong>
                         </Text>
                         <Text as="p" variant="bodySm" tone="subdued">
                           • Basic inventory tracking
@@ -229,57 +224,7 @@ export default function Index() {
                   </Layout.Section>
                 </Layout>
 
-                {/* Post-Trial Options */}
-                <Card background="bg-surface-secondary">
-                  <BlockStack gap="400">
-                    <Text as="h4" variant="headingSm">
-                      Continue with Spector Limited Plan
-                    </Text>
-                    <Text as="p" variant="bodyMd">
-                      <strong>$14.99/month</strong> - Introductory pricing for early adopters
-                    </Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      This is our beginning price as we're a new app. More advanced plans with additional features will be added in the future.
-                    </Text>
-                    
-                    <Layout>
-                      <Layout.Section variant="oneHalf">
-                        <Card>
-                          <BlockStack gap="300">
-                            <Text as="h5" variant="headingSm">
-                              Continue with Spector Pro
-                            </Text>
-                            <Text as="p" variant="bodyLg" fontWeight="semibold">
-                              $29.99/month
-                            </Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                              Full access to all features, unlimited monitoring, priority support
-                            </Text>
-                            <Button variant="primary" size="large">
-                              Subscribe Now
-                            </Button>
-                          </BlockStack>
-                        </Card>
-                      </Layout.Section>
-                      
-                      <Layout.Section variant="oneHalf">
-                        <Card>
-                          <BlockStack gap="300">
-                            <Text as="h5" variant="headingSm">
-                              Not Ready to Subscribe?
-                            </Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                              You can uninstall the app anytime. Your data will be safely removed from our servers.
-                            </Text>
-                            <Button variant="secondary" tone="critical" size="large">
-                              Uninstall App
-                            </Button>
-                          </BlockStack>
-                        </Card>
-                      </Layout.Section>
-                    </Layout>
-                  </BlockStack>
-                </Card>
+
               </BlockStack>
             </Card>
 
@@ -323,7 +268,7 @@ export default function Index() {
                         Installed On
                       </Text>
                       <Text as="p" variant="bodyMd">
-                        September 16, 2025
+                        October 5, 2025
                       </Text>
                     </BlockStack>
                   </Layout.Section>
@@ -334,7 +279,7 @@ export default function Index() {
                         Support
                       </Text>
                       <Text as="p" variant="bodyMd">
-                        support@spector.app
+                        hello@spector-app.com
                       </Text>
                     </BlockStack>
                   </Layout.Section>
@@ -409,7 +354,6 @@ export default function Index() {
         <WelcomeModal 
           isOpen={showWelcomeModal} 
           onClose={handleWelcomeModalClose}
-          onOpenHelp={handleOpenHelp}
         />
       )}
     </Page>
