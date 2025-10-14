@@ -16,7 +16,6 @@ import {
   CashDollarIcon,
   ChartVerticalIcon,
   AlertCircleIcon,
-  InfoIcon,
   CheckIcon,
   AlertTriangleIcon,
   XIcon,
@@ -312,9 +311,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     return formatCurrency(amount);
   };
 
-  const formatPercentage = (value: number) => {
-    return `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
-  };
+
 
 
 
@@ -519,7 +516,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
               <BlockStack gap="050">
                 <Text as="p" variant="bodySm" tone="subdued">Catalog Health</Text>
                 <Text as="span" variant="headingLg" fontWeight="bold">
-                  {formatPercentage(productAnalyticsData?.catalogHealth || 0)}
+                  {(productAnalyticsData?.catalogHealth || 0).toFixed(1)}%
                 </Text>
                 <Text as="p" variant="bodyXs" tone="subdued">
                   Stock adequacy score
@@ -676,20 +673,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
               )}
               </InlineStack>
               
-              {/* Order Data Status Note */}
-              {productAnalyticsData?.priceAnalysis?.priceDistribution && (
-                <Box padding="300" background="bg-surface-info" borderRadius="200" borderWidth="025" borderColor="border-info">
-                  <InlineStack gap="200" blockAlign="start">
-                    <Box paddingBlockStart="050">
-                      <Icon source={InfoIcon} tone="info" />
-                    </Box>
-                    <Text as="p" variant="bodyXs">
-                      <strong>Orders Data:</strong> Shows actual order quantities from your store's order history. 
-                      Ranges showing 0 orders have no recent sales. This data updates as new orders are placed.
-                    </Text>
-                  </InlineStack>
-                </Box>
-              )}
+
             </BlockStack>
             
             {productAnalyticsData?.priceAnalysis?.priceDistribution ? (

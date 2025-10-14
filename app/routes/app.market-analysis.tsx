@@ -13,8 +13,6 @@ import {
   Badge,
   Tabs,
   Button,
-  Tooltip,
-  Select,
   ButtonGroup,
 } from "@shopify/polaris";
 import { RefreshIcon } from "@shopify/polaris-icons";
@@ -68,7 +66,8 @@ export default function MarketAnalysis() {
   
   // Competitor research state
   const [competitorRegion, setCompetitorRegion] = useState('worldwide');
-  const [competitorSize, setCompetitorSize] = useState('all');
+  // Using competitorSize directly without setter as it's not being modified yet
+  const competitorSize = 'all';
   const [competitorLocality, setCompetitorLocality] = useState('national');
   const [competitorType, setCompetitorType] = useState('hybrid');
   const [isLoadingCompetitors, setIsLoadingCompetitors] = useState(false);

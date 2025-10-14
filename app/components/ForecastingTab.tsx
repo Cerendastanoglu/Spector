@@ -10,18 +10,19 @@ import {
   Tooltip,
   Collapsible,
   Spinner,
-  Banner
+  Banner,
+  Tabs
 } from "@shopify/polaris";
 import {
   CheckCircleIcon,
-  AlertTriangleIcon,
   CashDollarIcon,
   ChartVerticalIcon,
   ViewIcon,
   EditIcon,
   ClockIcon,
   ChevronDownIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  ChevronUpIcon
 } from "@shopify/polaris-icons";
 import { useState, useEffect } from "react";
 
@@ -71,6 +72,20 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
   const [forecastData, setForecastData] = useState<InventoryForecastingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTab, setSelectedTab] = useState(0);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const toggleRowExpansion = (itemId: string) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  };
 
   // Fetch real inventory forecasting data
   useEffect(() => {
@@ -159,268 +174,444 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
 
   const { summary, forecastItems } = forecastData;
 
-  return (
-    <BlockStack gap="500">
-      {/* Page Header */}
-      <Card>
-        <BlockStack gap="300">
-          <Text as="h1" variant="headingLg">
-            Inventory Forecasting & Demand Planning
-          </Text>
-          <Text as="p" variant="bodyMd" tone="subdued">
-            AI-powered inventory forecasting to optimize stock levels and prevent stockouts
-          </Text>
-        </BlockStack>
-      </Card>
+  // Filter items by category
+  const outOfStockItems = forecastItems.filter(item => item.currentStock === 0);
+  const slowMovingItems = forecastItems.filter(item => item.velocity === 'slow' && item.currentStock > 0);
+  const activeInventoryItems = forecastItems.filter(item => 
+    item.currentStock > 0 && item.velocity !== 'slow'
+  );
 
-      {/* Executive Summary Cards - Compact */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-        gap: '12px' 
-      }}>
-        <Card>
-          <InlineStack gap="200" blockAlign="center">
-            <Box background="bg-fill-success-secondary" padding="150" borderRadius="100">
-              <Icon source={CheckCircleIcon} tone="success" />
-            </Box>
-            <BlockStack gap="100">
-              <Text as="p" variant="bodySm" fontWeight="medium">Inventory Health</Text>
-              <Text as="p" variant="bodyMd" fontWeight="bold">
-                {summary.healthyItems}/{summary.totalProducts}
-              </Text>
-              <Text as="p" variant="bodyXs" tone="subdued">
-                Products well-stocked
-              </Text>
-            </BlockStack>
-          </InlineStack>
-        </Card>
+  const tabs = [
+    {
+      id: 'out-of-stock',
+      content: `Out of Stock (${outOfStockItems.length})`,
+      badge: outOfStockItems.length > 0 ? String(outOfStockItems.length) : undefined,
+      panelID: 'out-of-stock-panel',
+    },
+    {
+      id: 'slow-moving',
+      content: `Slow Moving (${slowMovingItems.length})`,
+      badge: slowMovingItems.length > 0 ? String(slowMovingItems.length) : undefined,
+      panelID: 'slow-moving-panel',
+    },
+    {
+      id: 'active-inventory',
+      content: `Active Inventory (${activeInventoryItems.length})`,
+      panelID: 'active-inventory-panel',
+    },
+  ];
 
-        <Card>
-          <InlineStack gap="200" blockAlign="center">
-            <Box background="bg-fill-critical-secondary" padding="150" borderRadius="100">
-              <Icon source={AlertTriangleIcon} tone="critical" />
-            </Box>
-            <BlockStack gap="100">
-              <Text as="p" variant="bodySm" fontWeight="medium">Critical Actions</Text>
-              <Text as="p" variant="bodyMd" fontWeight="bold" tone="critical">
-                {summary.criticalItems + summary.lowStockItems}
-              </Text>
-              <Text as="p" variant="bodyXs" tone="subdued">
-                Need attention
-              </Text>
-            </BlockStack>
-          </InlineStack>
-        </Card>
+  // Helper function to render product table
+  const renderProductTable = (items: ForecastItem[], emptyMessage: string) => {
+    if (items.length === 0) {
+      return (
+        <Box padding="800">
+          <BlockStack gap="300" inlineAlign="center">
+            <Icon source={CheckCircleIcon} tone="success" />
+            <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
+              {emptyMessage}
+            </Text>
+          </BlockStack>
+        </Box>
+      );
+    }
 
-        <Card>
-          <InlineStack gap="200" blockAlign="center">
-            <Box background="bg-fill-info-secondary" padding="150" borderRadius="100">
-              <Icon source={CashDollarIcon} tone="info" />
-            </Box>
-            <BlockStack gap="100">
-              <Text as="p" variant="bodySm" fontWeight="medium">Revenue (60 days)</Text>
-              <Text as="p" variant="bodyMd" fontWeight="bold" tone="success">
-                ${summary.totalRevenue60Days.toLocaleString()}
-              </Text>
-              <Text as="p" variant="bodyXs" tone="subdued">
-                Last 60 days revenue
-              </Text>
-            </BlockStack>
-          </InlineStack>
-        </Card>
+    return (
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ 
+              borderBottom: '2px solid #e1e3e5',
+              backgroundColor: '#f8f9fa'
+            }}>
+              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6d7175' }}>
+                PRODUCT
+              </th>
+              <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: '#6d7175' }}>
+                CURRENT STOCK
+              </th>
+              <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: '#6d7175' }}>
+                DAILY DEMAND
+              </th>
+              <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: '#6d7175' }}>
+                DAYS LEFT
+              </th>
+              <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: '#6d7175' }}>
+                VELOCITY
+              </th>
+              <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: '#6d7175' }}>
+                ACTIONS
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, index) => {
+              const isExpanded = expandedRows.has(item.id);
+              return (
+                <>
+                  <tr 
+                    key={item.id}
+                    style={{
+                      borderBottom: isExpanded ? 'none' : '1px solid #f1f3f4',
+                      backgroundColor: index % 2 === 0 ? '#ffffff' : '#fafbfc'
+                    }}
+                  >
+                    <td style={{ padding: '16px' }}>
+                      <BlockStack gap="100">
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">
+                          {item.title}
+                        </Text>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {item.vendor}
+                        </Text>
+                      </BlockStack>
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <Text 
+                        as="p" 
+                        variant="bodyLg" 
+                        fontWeight="bold"
+                        tone={item.status === 'critical' ? 'critical' : item.status === 'low' ? 'caution' : undefined}
+                      >
+                        {item.currentStock}
+                      </Text>
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <Text as="p" variant="bodyMd" fontWeight="semibold">
+                        {item.averageDailyDemand.toFixed(1)}
+                      </Text>
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <Badge
+                        tone={item.status === 'critical' ? 'critical' : item.status === 'low' ? 'warning' : 'success'}
+                      >
+                        {item.forecastDays >= 999 ? 'N/A' : `${item.forecastDays} days`}
+                      </Badge>
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <Badge
+                        tone={item.velocity === 'fast' ? 'success' : item.velocity === 'medium' ? 'info' : 'attention'}
+                      >
+                        {item.velocity}
+                      </Badge>
+                    </td>
+                    <td style={{ padding: '16px' }}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', alignItems: 'center' }}>
+                        <Tooltip content="View store page">
+                          <Button
+                            icon={ViewIcon}
+                            size="micro"
+                            onClick={() => {
+                              if (shopDomain && item.handle) {
+                                window.open(`https://${shopDomain}/products/${item.handle}`, '_blank');
+                              }
+                            }}
+                          />
+                        </Tooltip>
+                        <Tooltip content="Edit in Shopify">
+                          <Button
+                            icon={EditIcon}
+                            variant="primary"
+                            size="micro"
+                            onClick={() => {
+                              if (shopDomain && item.id) {
+                                const productId = item.id.split('/').pop();
+                                window.open(`https://admin.shopify.com/store/${shopDomain.split('.')[0]}/products/${productId}`, '_blank');
+                              }
+                            }}
+                          />
+                        </Tooltip>
+                        <Tooltip content={isExpanded ? "Hide details" : "Show details"}>
+                          <Button
+                            icon={isExpanded ? ChevronUpIcon : ChevronDownIcon}
+                            size="micro"
+                            onClick={() => toggleRowExpansion(item.id)}
+                          />
+                        </Tooltip>
+                      </div>
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr 
+                      key={`${item.id}-details`}
+                      style={{
+                        borderBottom: '1px solid #f1f3f4',
+                        backgroundColor: index % 2 === 0 ? '#fafbfc' : '#ffffff'
+                      }}
+                    >
+                      <td colSpan={6} style={{ padding: '0' }}>
+                        <Box padding="500" background="bg-surface-secondary">
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '24px'
+                          }}>
+                            {/* Left Column - Product Info & Inventory */}
+                            <BlockStack gap="400">
+                              <Box background="bg-surface" padding="400" borderRadius="300" borderWidth="025" borderColor="border">
+                                <BlockStack gap="300">
+                                  <Text as="h4" variant="headingMd" fontWeight="bold">
+                                    Product Details
+                                  </Text>
+                                  <div style={{ display: 'grid', gap: '12px' }}>
+                                    <InlineStack align="space-between">
+                                      <Text as="p" variant="bodySm" tone="subdued">SKU</Text>
+                                      <Badge size="medium">{item.sku}</Badge>
+                                    </InlineStack>
+                                    <InlineStack align="space-between">
+                                      <Text as="p" variant="bodySm" tone="subdued">Reorder Quantity</Text>
+                                      <Text as="p" variant="bodyMd" fontWeight="bold" tone="success">
+                                        {item.suggestedReorderQuantity} units
+                                      </Text>
+                                    </InlineStack>
+                                    <InlineStack align="space-between">
+                                      <Text as="p" variant="bodySm" tone="subdued">Reorder Point</Text>
+                                      <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                        {item.reorderPoint} units
+                                      </Text>
+                                    </InlineStack>
+                                    <InlineStack align="space-between">
+                                      <Text as="p" variant="bodySm" tone="subdued">Lead Time</Text>
+                                      <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                        {item.leadTime} days
+                                      </Text>
+                                    </InlineStack>
+                                  </div>
+                                </BlockStack>
+                              </Box>
 
-        <Card>
-          <InlineStack gap="200" blockAlign="center">
-            <Box background="bg-fill-success-secondary" padding="150" borderRadius="100">
-              <Icon source={ChartVerticalIcon} tone="success" />
-            </Box>
-            <BlockStack gap="100">
-              <Text as="p" variant="bodySm" fontWeight="medium">Daily Revenue (60d avg)</Text>
-              <Text as="p" variant="bodyMd" fontWeight="bold" tone="success">
-                ${summary.averageDailyRevenue.toFixed(2)}
-              </Text>
-              <Text as="p" variant="bodyXs" tone="subdued">
-                From real orders
-              </Text>
-            </BlockStack>
-          </InlineStack>
-        </Card>
+                              <Box background="bg-surface" padding="400" borderRadius="300" borderWidth="025" borderColor="border">
+                                <BlockStack gap="300">
+                                  <InlineStack gap="200" blockAlign="center">
+                                    <Icon source={CashDollarIcon} tone="success" />
+                                    <Text as="h4" variant="headingMd" fontWeight="bold">
+                                      Financial Performance
+                                    </Text>
+                                  </InlineStack>
+                                  <div style={{ display: 'grid', gap: '12px' }}>
+                                    <InlineStack align="space-between">
+                                      <Text as="p" variant="bodySm" tone="subdued">Revenue (60 days)</Text>
+                                      <Text as="p" variant="headingSm" fontWeight="bold">
+                                        ${item.totalRevenue60Days.toFixed(2)}
+                                      </Text>
+                                    </InlineStack>
+                                    <InlineStack align="space-between">
+                                      <Text as="p" variant="bodySm" tone="subdued">Units Sold</Text>
+                                      <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                        {item.totalSold60Days}
+                                      </Text>
+                                    </InlineStack>
+                                    <InlineStack align="space-between">
+                                      <Text as="p" variant="bodySm" tone="subdued">Profit Margin</Text>
+                                      <Text as="p" variant="headingSm" fontWeight="bold" tone="success">
+                                        {item.profitMargin.toFixed(1)}%
+                                      </Text>
+                                    </InlineStack>
+                                  </div>
+                                </BlockStack>
+                              </Box>
+                            </BlockStack>
+
+                            {/* Right Column - Order Statistics */}
+                            <Box background="bg-surface" padding="400" borderRadius="300" borderWidth="025" borderColor="border">
+                              <BlockStack gap="400">
+                                <InlineStack gap="200" blockAlign="center">
+                                  <Icon source={ChartVerticalIcon} tone="info" />
+                                  <Text as="h4" variant="headingMd" fontWeight="bold">
+                                    Order Trends
+                                  </Text>
+                                </InlineStack>
+                                <div style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: '1fr 1fr',
+                                  gap: '16px'
+                                }}>
+                                  <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                                    <BlockStack gap="100" inlineAlign="center">
+                                      <Text as="p" variant="bodyXs" tone="subdued">Daily</Text>
+                                      <Text as="p" variant="headingLg" fontWeight="bold">
+                                        {item.averageDailyDemand.toFixed(1)}
+                                      </Text>
+                                      <Text as="p" variant="bodyXs" tone="subdued">orders/day</Text>
+                                    </BlockStack>
+                                  </Box>
+                                  <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                                    <BlockStack gap="100" inlineAlign="center">
+                                      <Text as="p" variant="bodyXs" tone="subdued">Weekly</Text>
+                                      <Text as="p" variant="headingLg" fontWeight="bold">
+                                        {(item.averageDailyDemand * 7).toFixed(1)}
+                                      </Text>
+                                      <Text as="p" variant="bodyXs" tone="subdued">orders/week</Text>
+                                    </BlockStack>
+                                  </Box>
+                                  <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                                    <BlockStack gap="100" inlineAlign="center">
+                                      <Text as="p" variant="bodyXs" tone="subdued">Monthly</Text>
+                                      <Text as="p" variant="headingLg" fontWeight="bold">
+                                        {(item.averageDailyDemand * 30).toFixed(0)}
+                                      </Text>
+                                      <Text as="p" variant="bodyXs" tone="subdued">orders/month</Text>
+                                    </BlockStack>
+                                  </Box>
+                                  <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                                    <BlockStack gap="100" inlineAlign="center">
+                                      <Text as="p" variant="bodyXs" tone="subdued">Yearly</Text>
+                                      <Text as="p" variant="headingLg" fontWeight="bold">
+                                        {(item.averageDailyDemand * 365).toFixed(0)}
+                                      </Text>
+                                      <Text as="p" variant="bodyXs" tone="subdued">projected</Text>
+                                    </BlockStack>
+                                  </Box>
+                                </div>
+                                <Box paddingBlockStart="200">
+                                  <Text as="p" variant="bodyXs" tone="subdued" alignment="center">
+                                    Based on 60-day sales history
+                                  </Text>
+                                </Box>
+                              </BlockStack>
+                            </Box>
+                          </div>
+                        </Box>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
+    );
+  };
 
-      {/* Professional Inventory Table */}
+  return (
+    <BlockStack gap="400">
+      {/* Page Header with Tabs */}
       <Card>
         <BlockStack gap="400">
-          <InlineStack align="space-between" blockAlign="center">
-            <Text as="h3" variant="headingMd" fontWeight="semibold">
-              Inventory Forecast ({summary.totalProducts} products)
-            </Text>
-            <InlineStack gap="200">
-              <Button variant="secondary" size="slim" onClick={handleRefresh}>
+          {/* Header Section */}
+          <BlockStack gap="400">
+            <InlineStack align="space-between" blockAlign="center">
+              <BlockStack gap="200">
+                <Text as="h1" variant="headingLg" fontWeight="bold">
+                  Inventory Forecasting & Demand Planning
+                </Text>
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  AI-powered forecasting based on 60 days of sales data • {summary.totalProducts} products analyzed
+                </Text>
+              </BlockStack>
+              <Button onClick={handleRefresh} variant="secondary">
                 Refresh Data
               </Button>
-              <Button variant="secondary" size="slim">Export Report</Button>
             </InlineStack>
-          </InlineStack>
 
-          {/* Advanced Table */}
-          <div style={{ 
-            border: '1px solid #e1e3e5',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            backgroundColor: 'white'
-          }}>
-            {/* Table Header */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '2.5fr 1fr 1fr 1.2fr 1fr 1fr 1.2fr 100px',
-              gap: '16px',
-              padding: '16px 20px',
-              backgroundColor: '#f8f9fa',
-              borderBottom: '1px solid #e1e3e5',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#4a5568',
-              textTransform: 'uppercase',
-              letterSpacing: '0.8px'
-            }}>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Product & SKU</Text>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Current Stock</Text>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Daily Demand</Text>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Forecast Status</Text>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Lead Time</Text>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Velocity</Text>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Profit Margin</Text>
-              <Text as="span" variant="bodyXs" fontWeight="semibold">Actions</Text>
-            </div>
-
-            {/* Table Rows */}
-            {forecastItems.map((item, index) => (
-              <div key={item.id} style={{
-                display: 'grid',
-                gridTemplateColumns: '2.5fr 1fr 1fr 1.2fr 1fr 1fr 1.2fr 100px',
-                gap: '16px',
-                padding: '20px',
-                backgroundColor: index % 2 === 0 ? 'white' : '#fafbfc',
-                borderBottom: index < forecastItems.length - 1 ? '1px solid #f1f3f4' : 'none',
-                alignItems: 'center',
-                transition: 'all 0.2s ease',
-                cursor: 'pointer'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f8f9fa';
-                e.currentTarget.style.transform = 'translateX(2px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : '#fafbfc';
-                e.currentTarget.style.transform = 'translateX(0)';
-              }}
-              >
-                {/* Product Info */}
-                <div>
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">
-                    {item.title}
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    SKU: {item.sku} • {item.vendor}
-                  </Text>
+            {/* Tabs and Stats Row Combined */}
+            <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+              <InlineStack align="space-between" blockAlign="center">
+                <div style={{ flex: 1 }}>
+                  <Tabs tabs={tabs} selected={selectedTab} onSelect={setSelectedTab} />
                 </div>
-
-                {/* Current Stock with visual indicator */}
-                <div>
-                  <Text as="p" variant="bodyLg" fontWeight="bold" 
-                    tone={item.status === 'critical' ? 'critical' : item.status === 'low' ? 'caution' : undefined}>
-                    {item.currentStock}
-                  </Text>
-                  <Text as="p" variant="bodyXs" tone="subdued">units</Text>
-                </div>
-
-                {/* Daily Demand */}
-                <div>
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">{item.averageDailyDemand}</Text>
-                  <Text as="p" variant="bodyXs" tone="subdued">per day</Text>
-                </div>
-
-                {/* Status with Days Remaining */}
-                <div>
-                  <Badge 
-                    tone={item.status === 'critical' ? 'critical' : item.status === 'low' ? 'warning' : 'success'}
-                    size="small"
-                  >
-                    {`${item.forecastDays} days left`}
-                  </Badge>
-                  <Box paddingBlockStart="100">
-                    <Text as="p" variant="bodyXs" tone="subdued">
-                      {item.status === 'critical' ? 'Reorder now' : 
-                       item.status === 'low' ? 'Plan reorder' : 'Well stocked'}
+                <InlineStack gap="400">
+                  <BlockStack gap="050" inlineAlign="center">
+                    <Text as="p" variant="bodyXs" tone="subdued">Critical</Text>
+                    <Text as="p" variant="headingMd" fontWeight="bold" tone="critical">
+                      {summary.criticalItems}
                     </Text>
+                  </BlockStack>
+                  <Box borderInlineStartWidth="025" borderColor="border" paddingInlineStart="400">
+                    <BlockStack gap="050" inlineAlign="center">
+                      <Text as="p" variant="bodyXs" tone="subdued">Low Stock</Text>
+                      <Text as="p" variant="headingMd" fontWeight="bold" tone="caution">
+                        {summary.lowStockItems}
+                      </Text>
+                    </BlockStack>
                   </Box>
-                </div>
-
-                {/* Lead Time */}
-                <div>
-                  <Text as="p" variant="bodyMd" fontWeight="medium">{item.leadTime}</Text>
-                  <Text as="p" variant="bodyXs" tone="subdued">days</Text>
-                </div>
-
-                {/* Velocity */}
-                <div>
-                  <Badge 
-                    tone={item.velocity === 'fast' ? 'success' : item.velocity === 'medium' ? 'info' : 'attention'}
-                    size="small"
-                  >
-                    {item.velocity}
-                  </Badge>
-                </div>
-
-                {/* Profit Margin */}
-                <div>
-                  <Text as="p" variant="bodyMd" fontWeight="semibold" tone="success">
-                    {item.profitMargin.toFixed(1)}%
-                  </Text>
-                  <Text as="p" variant="bodyXs" tone="subdued">margin</Text>
-                </div>
-
-                {/* Actions */}
-                <InlineStack gap="100">
-                  <Tooltip content="View online store">
-                    <Button
-                      icon={ViewIcon}
-                      variant="tertiary"
-                      size="micro"
-                      onClick={() => {
-                        // Open product's online store page
-                        if (shopDomain && item.handle) {
-                          window.open(`https://${shopDomain}/products/${item.handle}`, '_blank');
-                        } else {
-                          console.log('Product handle or shop domain not available for:', item.id);
-                        }
-                      }}
-                    />
-                  </Tooltip>
-                  <Tooltip content="Edit product">
-                    <Button
-                      icon={EditIcon}
-                      variant="tertiary"
-                      size="micro"
-                      onClick={() => {
-                        // Open product in Shopify admin
-                        if (shopDomain && item.id) {
-                          window.open(`https://${shopDomain}/admin/products/${item.id}`, '_blank');
-                        } else {
-                          console.log('Product ID or shop domain not available for:', item.id);
-                        }
-                      }}
-                    />
-                  </Tooltip>
+                  <Box borderInlineStartWidth="025" borderColor="border" paddingInlineStart="400">
+                    <BlockStack gap="050" inlineAlign="center">
+                      <Text as="p" variant="bodyXs" tone="subdued">Healthy</Text>
+                      <Text as="p" variant="headingMd" fontWeight="bold" tone="success">
+                        {summary.healthyItems}
+                      </Text>
+                    </BlockStack>
+                  </Box>
                 </InlineStack>
-              </div>
-            ))}
-          </div>
+              </InlineStack>
+            </Box>
+          </BlockStack>
+
+          {/* Tab Content */}
+          <Box paddingBlockStart="400">
+            {/* Out of Stock Tab */}
+            {selectedTab === 0 && (
+                  <BlockStack gap="300">
+                    {outOfStockItems.length > 0 && (
+                      <Banner tone="critical">
+                        <BlockStack gap="200">
+                          <Text as="p" variant="bodyMd">
+                            <strong>{outOfStockItems.length} products</strong> are completely out of stock and need immediate reordering.
+                          </Text>
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            These items are currently unavailable for purchase and may be losing sales.
+                          </Text>
+                        </BlockStack>
+                      </Banner>
+                    )}
+                    {renderProductTable(
+                      outOfStockItems,
+                      'Great! No products are out of stock. All items are available for purchase.'
+                    )}
+                  </BlockStack>
+                )}
+
+                {/* Slow Moving Tab */}
+                {selectedTab === 1 && (
+                  <BlockStack gap="300">
+                    {slowMovingItems.length > 0 && (
+                      <Banner tone="warning">
+                        <BlockStack gap="200">
+                          <Text as="p" variant="bodyMd">
+                            <strong>{slowMovingItems.length} slow-moving products</strong> detected. Consider these strategies:
+                          </Text>
+                          <ul style={{ marginLeft: '20px', marginTop: '8px' }}>
+                            <li><strong>Promotional Campaigns:</strong> Run discounts or special offers to boost sales</li>
+                            <li><strong>Product Bundling:</strong> Bundle with popular fast-moving products</li>
+                            <li><strong>Pricing Review:</strong> Evaluate if pricing is competitive</li>
+                            <li><strong>Content Optimization:</strong> Improve product descriptions, images, and SEO</li>
+                            <li><strong>Marketing Push:</strong> Feature in email campaigns or social media</li>
+                            <li><strong>Customer Feedback:</strong> Review reviews and adjust based on feedback</li>
+                            <li><strong>Discontinuation:</strong> Consider removing if consistently underperforming</li>
+                          </ul>
+                        </BlockStack>
+                      </Banner>
+                    )}
+                    {renderProductTable(
+                      slowMovingItems,
+                      'Excellent! No slow-moving products detected. All items are selling at a healthy pace.'
+                    )}
+                  </BlockStack>
+                )}
+
+                {/* Active Inventory Tab */}
+                {selectedTab === 2 && (
+                  <BlockStack gap="300">
+                    {activeInventoryItems.length > 0 && (
+                      <Banner tone="success">
+                        <Text as="p" variant="bodyMd">
+                          <strong>{activeInventoryItems.length} products</strong> are in stock and selling well. Monitor inventory levels and reorder as needed based on forecasts.
+                        </Text>
+                      </Banner>
+                    )}
+                    {renderProductTable(
+                      activeInventoryItems,
+                      'No active inventory items to display.'
+                    )}
+                  </BlockStack>
+                )}
+          </Box>
         </BlockStack>
       </Card>
 
-      {/* Forecasting Methodology - Accordion */}
+      {/* AI Methodology Section */}
       <Card>
         <Box background="bg-surface-secondary" padding="300" borderRadius="200">
           <Button

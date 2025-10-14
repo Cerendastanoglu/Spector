@@ -17,8 +17,6 @@
     "prisma": "prisma",
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",
-    "cleanup": "node scripts/cleanup-data.js",
-    "cleanup:shop": "node scripts/cleanup-data.js",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy"
   },

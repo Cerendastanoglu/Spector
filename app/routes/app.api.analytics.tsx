@@ -1,169 +1,88 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
+import { ActionFunctionArgs, LoaderFunctionArgs, json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { PrismaClient } from "@prisma/client";
-import { encryptData, decryptData } from "../utils/encryption";
+import { encryptData } from "../utils/encryption";
 import { getRetentionPolicy, calculateExpirationDate } from "../utils/dataRetention";
 
 const prisma = new PrismaClient();
 
-interface AnalyticsData {
+// Maximum number of products to analyze
+const MAX_PRODUCTS = 250;
+
+// Define types for analytics data
+type AnalyticsData = {
   totalRevenue: number;
   totalOrders: number;
   avgOrderValue: number;
   outOfStockCount: number;
   lowStockCount: number;
-  topProducts: Array<{
-    name: string;
-    quantity: number;
-    price: number;
-  }>;
-  recentActivity: Array<{
-    id: string;
-    name: string;
-    type: 'product' | 'inventory';
-    value: number;
-    date: string;
-  }>;
-  dataSource: 'live' | 'cached';
+  topProducts: Array<{ name: string; quantity: number; price: number; }>;
+  recentActivity: Array<{}>;  // Empty array as functionality removed
+  dataSource: string;
   lastUpdated: string;
-}
+};
 
+// Handler for GET requests to fetch analytics
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { admin, session } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const shop = session.shop;
 
   try {
-    // Check for cached data first
-    const cachedData = await prisma.analyticsSnapshot.findFirst({
-      where: {
-        shop,
-        dataType: 'analytics',
-        expiresAt: {
-          gt: new Date(),
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+    // Get analytics data from Shopify APIs
+    const client = new authenticate.admin.rest.RestClient({
+      session,
+      apiVersion: "2024-07"
     });
 
-    // If we have recent cached data (less than 1 hour old), use it
-    if (cachedData && (Date.now() - cachedData.createdAt.getTime()) < 60 * 60 * 1000) {
-      console.log("Using cached analytics data");
-      const decryptedData = decryptData(cachedData.encryptedData);
-      return json({ 
-        success: true, 
-        data: {
-          ...decryptedData,
-          dataSource: 'cached' as const,
-          lastUpdated: cachedData.createdAt.toISOString(),
-        }
-      });
-    }
-
-    console.log("Fetching fresh analytics data from Shopify");
-
-    // Fetch products data only (no orders due to Protected Customer Data requirements)
-    const productsResponse = await admin.graphql(
-      `#graphql
-      query getProducts($first: Int!) {
-        products(first: $first) {
-          edges {
-            node {
-              id
-              title
-              totalInventory
-              status
-              createdAt
-              updatedAt
-              variants(first: 10) {
-                edges {
-                  node {
-                    id
-                    title
-                    price
-                    inventoryQuantity
-                    sku
-                  }
-                }
-              }
-            }
-          }
-        }
-      }`,
-      {
-        variables: {
-          first: 50,
-        },
-      }
-    );
-
-    const productsData: any = await productsResponse.json();
-
-    if (productsData.errors) {
-      console.error("GraphQL errors:", productsData.errors);
-      throw new Error(`GraphQL Error: ${productsData.errors[0]?.message || "Unknown error"}`);
-    }
-
-    // Process products data
-    const products = productsData.data?.products?.edges || [];
     const now = new Date();
-    
-    // Calculate analytics from product data only
+    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+    // Fetch products (limited to MAX_PRODUCTS)
+    const response = await client.get({
+      path: `products.json?limit=${MAX_PRODUCTS}&status=any&fields=id,title,status,updated_at,variants`
+    });
+
+    const products = response.body.products;
+    console.log(`📊 Analyzing ${products.length} products...`);
+
     let totalInventoryValue = 0;
     let outOfStockCount = 0;
     let lowStockCount = 0;
-    const recentActivity: Array<{
-      id: string;
-      name: string;
-      type: 'product' | 'inventory';
-      value: number;
-      date: string;
-    }> = [];
 
+    // Process products
     const topProducts = products
-      .map((productEdge: any) => {
-        const product = productEdge.node;
-        const variants = product.variants?.edges || [];
+      .map((product: any) => {
+        // Track inventory stats
         let totalQuantity = 0;
         let avgPrice = 0;
         let hasVariants = false;
 
-        variants.forEach((variantEdge: any) => {
-          const variant = variantEdge.node;
-          const quantity = variant?.inventoryQuantity || 0;
-          const price = parseFloat(variant?.price || "0");
+        const variants = product.variants || [];
+        
+        variants.forEach((variant: any) => {
+          const quantity = variant.inventory_quantity || 0;
+          const price = parseFloat(variant.price) || 0;
           
+          // Update counters
           totalQuantity += quantity;
           avgPrice += price;
-          hasVariants = true;
           
-          // Track inventory value
-          totalInventoryValue += quantity * price;
-          
-          // Count stock levels
           if (quantity === 0) {
             outOfStockCount++;
-          } else if (quantity < 5) {
+          } else if (quantity <= 5) {
             lowStockCount++;
+          }
+          
+          // Add to total inventory value
+          totalInventoryValue += price * quantity;
+
+          if (variants.length > 1) {
+            hasVariants = true;
           }
         });
 
         if (hasVariants) {
           avgPrice = avgPrice / variants.length;
-        }
-
-        // Add to recent activity (based on recent updates)
-        const updatedAt = new Date(product.updatedAt);
-        if (updatedAt.getTime() > (now.getTime() - 7 * 24 * 60 * 60 * 1000)) { // Last 7 days
-          recentActivity.push({
-            id: product.id,
-            name: product.title,
-            type: 'product',
-            value: totalQuantity,
-            date: updatedAt.toLocaleDateString(),
-          });
         }
 
         return {
@@ -176,9 +95,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
       .sort((a: any, b: any) => b.quantity - a.quantity)
       .slice(0, 10);
 
-    // Sort recent activity by date
-    recentActivity.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
     const analyticsData: AnalyticsData = {
       totalRevenue: totalInventoryValue, // Using inventory value as proxy
       totalOrders: 0, // No order data available
@@ -186,7 +102,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       outOfStockCount,
       lowStockCount,
       topProducts,
-      recentActivity: recentActivity.slice(0, 10),
+      recentActivity: [], // Recent activity functionality removed
       dataSource: 'live',
       lastUpdated: now.toISOString(),
     };
@@ -199,32 +115,58 @@ export async function loader({ request }: LoaderFunctionArgs) {
       await prisma.analyticsSnapshot.create({
         data: {
           shop,
-          dataType: 'analytics',
-          encryptedData: encryptData(analyticsData),
+          dataType: 'dashboard',
+          encryptedData: encryptData(JSON.stringify(analyticsData)),
           expiresAt,
-        },
+        }
       });
       
       console.log(`Analytics data cached for ${retentionDays} days`);
-    } catch (cacheError) {
-      console.error("Failed to cache analytics data:", cacheError);
-      // Continue without caching
+    } catch (error) {
+      console.error('Failed to cache analytics data:', error);
     }
 
-    return json({ success: true, data: analyticsData });
-  } catch (error) {
-    console.error("Analytics API Error:", error);
-    return json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : "Failed to fetch analytics data" 
-      },
-      { status: 500 }
-    );
-  }
-}
+    return json(analyticsData);
+    
+  } catch (error: any) {
+    console.error('Error fetching analytics:', error.message);
+    
+    // Try to return cached data if available
+    try {
+      const latestSnapshot = await prisma.analyticsSnapshot.findFirst({
+        where: {
+          shop,
+          dataType: 'dashboard',
+          expiresAt: { gt: new Date() }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  // Handle POST requests (same as loader for now)
-  return loader({ request, params, context: {} });
+      if (latestSnapshot) {
+        // Return cached data with source indicator
+        const cachedData = JSON.parse(latestSnapshot.encryptedData);
+        return json({
+          ...cachedData,
+          dataSource: 'cached',
+          error: error.message
+        });
+      }
+    } catch (cacheError) {
+      console.error('Error fetching cached analytics:', cacheError);
+    }
+
+    // Return error response if no cached data available
+    return json({ 
+      error: 'Failed to fetch analytics data',
+      dataSource: 'error',
+      totalRevenue: 0,
+      totalOrders: 0,
+      avgOrderValue: 0,
+      outOfStockCount: 0,
+      lowStockCount: 0,
+      topProducts: [],
+      recentActivity: [],
+      lastUpdated: new Date().toISOString(),
+    }, { status: 500 });
+  }
 }

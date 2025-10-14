@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { useFetcher, useNavigate } from "@remix-run/react";
+import { useFetcher } from "@remix-run/react";
 import { openInNewTab } from "../utils/browserUtils";
 import { ProductConstants } from "../utils/scopedConstants";
 import { ProductTable } from "./ProductTable";
-import { BulkEditHistory } from "./BulkEditHistory";
 import styles from "./StepsUI.module.css";
 import {
   Card,
@@ -22,7 +21,7 @@ import {
   Collapsible,
   Toast,
   Divider,
-  Modal,
+  Banner,
 } from '@shopify/polaris';
 // Import only the icons we actually use
 import { 
@@ -157,7 +156,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   }, []);
 
   const fetcher = useFetcher<{ products: Product[]; hasNextPage: boolean; endCursor?: string; error?: string }>();
-  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
@@ -308,9 +306,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
   
   // Bulk operations modal state
-  const [showBulkOperationModal, setShowBulkOperationModal] = useState(false);
-  const [bulkOperationName, setBulkOperationName] = useState('');
-  const [bulkOperationDescription, setBulkOperationDescription] = useState('');
+  // Removed state variables related to the bulk operation modal
   const [pendingBulkOperation, setPendingBulkOperation] = useState<{
     type: 'price' | 'collection' | 'tags' | 'inventory' | 'content';
     data: any;
@@ -836,12 +832,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       selectedVariants: [...selectedVariants]
     };
     
-    // Set a default name for the operation
-    const defaultName = `${priceOperation === 'set' ? 'Set' : priceOperation === 'increase' ? 'Increase' : priceOperation === 'decrease' ? 'Decrease' : 'Round'} Price ${new Date().toLocaleDateString()}`;
-    setBulkOperationName(defaultName);
-    setBulkOperationDescription(`${selectedVariants.length} variants affected`);
+    // Directly apply changes without showing a modal
     setPendingBulkOperation({ type: 'price', data: operationData });
-    setShowBulkOperationModal(true);
+    applyPriceChanges(); // Apply changes immediately
   };
   
   // This function is called after the user confirms the batch name
@@ -874,8 +867,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       
       // Add batch information
       const batchInfo = {
-        operationName: bulkOperationName || `Price Update ${new Date().toLocaleDateString()}`,
-        description: bulkOperationDescription || `${selectedVariants.length} variants affected`,
+        operationName: `Price Update ${new Date().toLocaleDateString()}`,
+        description: `${selectedVariants.length} variants affected`,
         type: 'pricing'
       };
       
@@ -999,15 +992,24 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       formData.append('updates', JSON.stringify(variantUpdates));
       formData.append('batchInfo', JSON.stringify(batchInfo));
       
-      const response = await fetch('/app/api/products', {
-        method: 'POST',
-        body: formData
-      });
+      // Use a timeout to prevent "no frame" error by allowing UI to update before API call
+      await new Promise(resolve => setTimeout(resolve, 100));
       
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update prices');
+      let result;
+      try {
+        const response = await fetch('/app/api/products', {
+          method: 'POST',
+          body: formData
+        });
+        
+        result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to update prices');
+        }
+      } catch (apiError) {
+        console.error('API call error:', apiError);
+        throw new Error(`Failed to communicate with server: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
       }
       
       // Update UI immediately with new prices
@@ -1067,32 +1069,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         setComparePercentage('0');
         setApplyCompareChanges(false);
         
-        // Show success notification with link to recent activity
+        // Show success notification
         setNotification({
           show: true,
           message: `Successfully updated prices for ${apiSuccessful.length} products`,
-          error: false,
-          actionLabel: "View in Recent Activity",
-          onAction: () => {
-            // Set activeMainTab to 0 (Step 1) where Recent Activity is visible
-            setActiveMainTab(0);
-            // Refresh and expand the Recent Activity
-            const historyElement = document.querySelector('[data-testid="bulk-edit-history"]');
-            if (historyElement) {
-              historyElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-            // Force recent activity component to refresh and expand
-            const historyRefreshBtn = document.querySelector('[data-testid="bulk-edit-history-refresh"]') as HTMLButtonElement;
-            const historyExpandBtn = document.querySelector('[data-testid="bulk-edit-history-expand"]') as HTMLButtonElement;
-            if (historyRefreshBtn) {
-              historyRefreshBtn.click();
-            }
-            setTimeout(() => {
-              if (historyExpandBtn) {
-                historyExpandBtn.click();
-              }
-            }, 300);
-          }
+          error: false
         });
         
         // Note: Keeping selectedProducts so users can perform multiple operations on the same selection
@@ -1196,27 +1177,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
         setNotification({
           show: true,
           message: `Successfully ${actionText} ${collectionNames} for ${successful.length} product${successful.length > 1 ? 's' : ''}`,
-          error: false,
-          actionLabel: "View in Recent Activity",
-          onAction: () => {
-            // Set activeMainTab to 0 (Step 1) where Recent Activity is visible
-            setActiveMainTab(0);
-            // Navigate to and expand the Recent Activity section
-            const historyElement = document.querySelector('[data-testid="bulk-edit-history"]');
-            if (historyElement) {
-              historyElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-            const historyRefreshBtn = document.querySelector('[data-testid="bulk-edit-history-refresh"]') as HTMLButtonElement;
-            const historyExpandBtn = document.querySelector('[data-testid="bulk-edit-history-expand"]') as HTMLButtonElement;
-            if (historyRefreshBtn) {
-              historyRefreshBtn.click();
-            }
-            setTimeout(() => {
-              if (historyExpandBtn) {
-                historyExpandBtn.click();
-              }
-            }, 300);
-          }
+          error: false
         });
       }
       
@@ -1272,8 +1233,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       }
     });
     
-    // Show the modal to name the operation
-    setShowBulkOperationModal(true);
+    // Apply changes immediately without showing modal
+    applyTagChanges();
   };
   
   // This function is called after the modal confirmation for tag operations
@@ -1303,8 +1264,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           tagOperation,
           tagValue: tagOperation === 'add' ? tagValue : undefined,
           tagRemoveValue: tagOperation === 'remove' ? tagRemoveValue : undefined,
-          operationName: bulkOperationName,
-          operationDescription: bulkOperationDescription
+          operationName: `Tag Update ${new Date().toLocaleDateString()}`,
+          operationDescription: `${productIds.length} products affected`
         }),
       });
 
@@ -1351,21 +1312,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       const actionText = tagOperation === 'add' ? 'added tags to' : 
                         tagOperation === 'remove' ? 'removed tags from' : 'updated tags for';
       
-      // Record the operation in history for Recent Activity
+      // Process the operation result
       if (result.bulkOperationId) {
-        // Show success notification with link to recent activity
+        // Show success notification
         setNotification({
           show: true,
           message: `Successfully ${actionText} ${successful.length} products!`,
-          error: false,
-          actionLabel: "View in Recent Activity",
-          onAction: () => {
-            // Use navigation to go to the activity page with the operation highlighted
-            navigate({
-              pathname: '/app/activity',
-              search: `?highlight=${result.bulkOperationId}`
-            });
-          }
+          error: false
         });
       } else if (successful.length > 0) {
         setNotification({
@@ -2665,8 +2618,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
           )}
       </BlockStack>
 
-      {/* Bulk Edit History - Only visible in Step 1 */}
-      {activeMainTab === 0 && <BulkEditHistory isVisible={true} />}
+      {/* Bulk Edit History removed */}
 
       {/* Step Content */}
       {activeMainTab === 0 ? (
@@ -4260,84 +4212,36 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       )}
 
       {notification.show && (
-        <Toast
-          content={notification.message}
-          error={notification.error}
-          onDismiss={() => setNotification({ show: false, message: '' })}
-          duration={4000}
-          action={notification.actionLabel ? {
-            content: notification.actionLabel,
-            onAction: notification.onAction
-          } : undefined}
-        />
+        <>
+          <Toast
+            content={notification.message}
+            error={notification.error}
+            onDismiss={() => setNotification({ show: false, message: '' })}
+            duration={4000}
+            action={notification.actionLabel ? {
+              content: notification.actionLabel,
+              onAction: notification.onAction
+            } : undefined}
+          />
+          {/* Fallback banner in case Toast fails with frame error */}
+          {notification.message && (
+            <div style={{ 
+              position: 'fixed', 
+              bottom: '20px', 
+              right: '20px',
+              zIndex: 9999, 
+              display: 'none'
+            }}
+            className="toast-fallback">
+              <Banner tone={notification.error ? "critical" : "success"}>
+                <Text as="p">{notification.message}</Text>
+              </Banner>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Bulk Operation Naming Modal */}
-      <Modal
-        open={showBulkOperationModal}
-        onClose={() => setShowBulkOperationModal(false)}
-        title="Save Bulk Operation to History"
-        primaryAction={{
-          content: 'Apply Changes',
-          onAction: () => {
-            setShowBulkOperationModal(false);
-            if (pendingBulkOperation?.type === 'price') {
-              applyPriceChanges();
-            } else if (pendingBulkOperation?.type === 'tags') {
-              applyTagChanges();
-            }
-          }
-        }}
-        secondaryActions={[
-          {
-            content: 'Cancel',
-            onAction: () => {
-              setShowBulkOperationModal(false);
-              setPendingBulkOperation(null);
-            }
-          }
-        ]}
-      >
-        <Modal.Section>
-          <BlockStack gap="400">
-            <Text as="p">
-              Name this bulk operation for history tracking. This will allow you to revert these changes later if needed.
-            </Text>
-            
-            <TextField
-              label="Operation Name"
-              value={bulkOperationName}
-              onChange={setBulkOperationName}
-              autoComplete="off"
-              helpText="A descriptive name for this set of changes"
-            />
-            
-            <TextField
-              label="Description (Optional)"
-              value={bulkOperationDescription}
-              onChange={setBulkOperationDescription}
-              multiline={2}
-              autoComplete="off"
-              helpText="Additional details about these changes"
-            />
-            
-            <Box
-              background="bg-fill-info-secondary"
-              padding="300"
-              borderRadius="100"
-            >
-              <BlockStack gap="200">
-                <Text variant="bodySm" fontWeight="semibold" as="p">
-                  � Change History Tracking
-                </Text>
-                <Text variant="bodySm" as="p">
-                  Your changes will be saved in history, so you can easily undo them later if needed.
-                </Text>
-              </BlockStack>
-            </Box>
-          </BlockStack>
-        </Modal.Section>
-      </Modal>
+      {/* Bulk Operation Modal removed - changes now apply directly */}
     </BlockStack>
     </>
   );
