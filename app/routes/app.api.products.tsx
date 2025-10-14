@@ -334,7 +334,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
-  // Fetch products with variants and inventory locations
+  // New action for notifications: Fetch products with variants and inventory locations
   if (actionType === "fetch-products-with-variants-and-locations") {
     try {
       const response = await admin.graphql(
@@ -420,7 +420,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
-  // Fetch collections
+  // New action for notifications: Fetch collections
   if (actionType === "fetch-collections") {
     try {
       const response = await admin.graphql(
@@ -467,7 +467,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
-  // Fetch locations
+  // New action for notifications: Fetch locations
   if (actionType === "fetch-locations") {
     try {
       // Use mock locations since the app doesn't have access to the locations API
@@ -533,10 +533,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (actionType === "update-product-prices") {
     try {
       let updates;
+      let batchInfo;
+      
       if (requestData instanceof FormData) {
         updates = JSON.parse(requestData.get("updates") as string);
+        const batchInfoStr = requestData.get("batchInfo");
+        if (batchInfoStr) {
+          batchInfo = JSON.parse(batchInfoStr as string);
+        }
       } else {
         updates = requestData.updates;
+        batchInfo = requestData.batchInfo;
       }
       
       if (!Array.isArray(updates) || updates.length === 0) {
@@ -545,8 +552,54 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       const results = [];
       
+      // First, get the current prices for all variants being updated
+      const variantIds = updates.map(update => update.variantId);
+      const variantPrices = new Map();
+      
+      // Get current prices in batches
+      for (let i = 0; i < variantIds.length; i += 10) {
+        const batch = variantIds.slice(i, i + 10);
+        const variantsQuery = batch.map((id, idx) => `
+          v${idx}: productVariant(id: "${id}") {
+            id
+            price
+            compareAtPrice
+          }
+        `).join('\n');
+        
+        try {
+          const priceResponse = await admin.graphql(`
+            query getVariantPrices {
+              ${variantsQuery}
+            }
+          `);
+          
+          const priceData = await priceResponse.json();
+          
+          // Extract prices from response
+          batch.forEach((id, idx) => {
+            const variant = priceData.data[`v${idx}`];
+            if (variant) {
+              variantPrices.set(id, {
+                price: variant.price,
+                compareAtPrice: variant.compareAtPrice
+              });
+            }
+          });
+        } catch (error) {
+          console.error("Error fetching variant prices:", error);
+          // Continue with updates even if we can't get current prices
+        }
+      }
+      
+      // Now process all updates with original price data
       for (const update of updates) {
         try {
+          // Store the original price
+          const originalPriceData = variantPrices.get(update.variantId) || { price: "0.00", compareAtPrice: null };
+          update.oldPrice = originalPriceData.price;
+          update.oldCompareAtPrice = originalPriceData.compareAtPrice;
+          
           // Update product variant price using bulk update
           const response = await admin.graphql(
             `#graphql
@@ -612,6 +665,58 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
       }
 
+      // Record successful price changes in history
+      const successfulUpdates = results.filter(r => r.success);
+      
+      if (successfulUpdates.length > 0 && batchInfo) {
+        try {
+          // Create history record for bulk edit
+          const historyData = {
+            operationType: batchInfo.type || 'pricing',
+            operationName: batchInfo.operationName || `Price Update ${new Date().toLocaleDateString()}`,
+            description: batchInfo.description || `${successfulUpdates.length} variants affected`,
+            totalProducts: successfulUpdates.length,
+            totalVariants: successfulUpdates.length,
+            changes: successfulUpdates.map(update => ({
+              productId: update.productId.replace('gid://shopify/Product/', ''),
+              variantId: update.variantId.replace('gid://shopify/ProductVariant/', ''),
+              productTitle: updates.find(u => u.variantId === update.variantId)?.productTitle || 'Product',
+              variantTitle: 'Default Variant',
+              fieldChanged: 'price',
+              oldValue: updates.find(u => u.variantId === update.variantId)?.oldPrice || '0.00',
+              newValue: update.newPrice || '0.00',
+              changeType: 'update'
+            }))
+          };
+          
+          // Create form data for the history API
+          const historyFormData = new FormData();
+          historyFormData.append('action', 'create');
+          historyFormData.append('data', JSON.stringify(historyData));
+          
+          // Call the bulk history API endpoint
+          const historyUrl = new URL(request.url);
+          const bulkHistoryUrl = `${historyUrl.protocol}//${historyUrl.host}/app/api/bulk-history`;
+          
+          // Use the same session cookie for authentication
+          const cookie = request.headers.get('cookie');
+          
+          const historyResponse = await fetch(bulkHistoryUrl, {
+            method: 'POST',
+            body: historyFormData,
+            headers: {
+              'Cookie': cookie || ''
+            }
+          });
+          
+          const historyResult = await historyResponse.json();
+          console.log('✅ Bulk history recorded:', historyResult);
+        } catch (historyError) {
+          // Don't fail the main operation if history recording fails
+          console.error('Failed to record price changes in history:', historyError);
+        }
+      }
+      
       return json({ 
         success: true, 
         results,
@@ -1116,9 +1221,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           // Calculate new description based on operation
           let newDescription = currentProduct.descriptionHtml || '';
           
-          if (descriptionOperation === 'suffix' || descriptionOperation === 'append') {
+          if (descriptionOperation === 'append') {
             newDescription = `${newDescription}\n${descriptionValue}`;
-          } else if (descriptionOperation === 'prefix' || descriptionOperation === 'prepend') {
+          } else if (descriptionOperation === 'prepend') {
             newDescription = `${descriptionValue}\n${newDescription}`;
           } else if (descriptionOperation === 'replace') {
             newDescription = newDescription.replace(new RegExp(descriptionReplaceFrom, 'g'), descriptionReplaceTo);
@@ -1192,329 +1297,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       console.error('Error updating descriptions:', error);
       return json({ 
         error: `Failed to update descriptions: ${error instanceof Error ? error.message : 'Unknown error'}` 
-      }, { status: 500 });
-    }
-  }
-
-  if (actionType === "update-images") {
-    try {
-      let productIds, imageOperation, imageUrls;
-      
-      if (requestData instanceof FormData) {
-        productIds = JSON.parse(requestData.get("productIds") as string || "[]");
-        imageOperation = requestData.get("imageOperation") as string;
-        imageUrls = JSON.parse(requestData.get("imageUrls") as string || "[]");
-      } else {
-        ({ productIds, imageOperation, imageUrls } = requestData);
-      }
-
-      if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
-        return json({ error: 'Product IDs are required' }, { status: 400 });
-      }
-
-      const results = [];
-
-      for (const productId of productIds) {
-        try {
-          if (imageOperation === 'add') {
-            // Add images to product
-            const createPromises = imageUrls.map((imageUrl: string) => 
-              admin.graphql(
-                `#graphql
-                  mutation productUpdate($product: ProductUpdateInput!) {
-                    productUpdate(product: $product) {
-                      product {
-                        id
-                        media(first: 10) {
-                          edges {
-                            node {
-                              id
-                              ... on MediaImage {
-                                image {
-                                  id
-                                  url
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                      userErrors {
-                        field
-                        message
-                      }
-                    }
-                  }`,
-                {
-                  variables: {
-                    product: {
-                      id: productId,
-                      media: [{
-                        originalSource: imageUrl,
-                        mediaContentType: "IMAGE"
-                      }]
-                    }
-                  }
-                }
-              )
-            );
-
-            const responses = await Promise.all(createPromises);
-            const errors = [];
-            
-            for (const response of responses) {
-              const json: any = await response.json();
-              if (json.errors || json.data?.productUpdate?.mediaUserErrors?.length > 0) {
-                const error = json.errors?.[0]?.message || json.data?.productUpdate?.mediaUserErrors?.[0]?.message;
-                errors.push(error);
-              }
-            }
-
-            if (errors.length > 0) {
-              results.push({
-                productId,
-                success: false,
-                error: `Failed to add images: ${errors.join(', ')}`
-              });
-            } else {
-              results.push({
-                productId,
-                success: true,
-                message: `Added ${imageUrls.length} image(s)`
-              });
-            }
-
-          } else if (imageOperation === 'remove') {
-            // Get current product images first
-            const productResponse = await admin.graphql(
-              `#graphql
-                query getProduct($id: ID!) {
-                  product(id: $id) {
-                    id
-                    media(first: 10) {
-                      edges {
-                        node {
-                          id
-                          mediaContentType
-                        }
-                      }
-                    }
-                  }
-                }`,
-              { variables: { id: productId } }
-            );
-
-            const productJson: any = await productResponse.json();
-            const images = productJson.data?.product?.media?.edges?.filter(
-              (edge: any) => edge.node.mediaContentType === 'IMAGE'
-            ) || [];
-
-            if (images.length === 0) {
-              results.push({
-                productId,
-                success: true,
-                message: 'No images to remove'
-              });
-              continue;
-            }
-
-            // Remove all images for now (could be enhanced to remove specific ones)
-            const deletePromises = images.map((edge: any) =>
-              admin.graphql(
-                `#graphql
-                  mutation fileUpdate($files: [FileUpdateInput!]!) {
-                    fileUpdate(files: $files) {
-                      files {
-                        id
-                        fileStatus
-                      }
-                      userErrors {
-                        field
-                        message
-                      }
-                    }
-                  }`,
-                {
-                  variables: {
-                    files: [{
-                      id: edge.node.id,
-                      fileStatus: "READY_TO_DELETE"
-                    }]
-                  }
-                }
-              )
-            );
-
-            const deleteResponses = await Promise.all(deletePromises);
-            const deleteErrors = [];
-            
-            for (const response of deleteResponses) {
-              const json: any = await response.json();
-              if (json.errors || json.data?.productDeleteMedia?.mediaUserErrors?.length > 0) {
-                const error = json.errors?.[0]?.message || json.data?.productDeleteMedia?.mediaUserErrors?.[0]?.message;
-                deleteErrors.push(error);
-              }
-            }
-
-            if (deleteErrors.length > 0) {
-              results.push({
-                productId,
-                success: false,
-                error: `Failed to remove images: ${deleteErrors.join(', ')}`
-              });
-            } else {
-              results.push({
-                productId,
-                success: true,
-                message: `Removed ${images.length} image(s)`
-              });
-            }
-
-          } else if (imageOperation === 'replace') {
-            // First remove existing images, then add new ones
-            const productResponse = await admin.graphql(
-              `#graphql
-                query getProduct($id: ID!) {
-                  product(id: $id) {
-                    id
-                    media(first: 10) {
-                      edges {
-                        node {
-                          id
-                          mediaContentType
-                        }
-                      }
-                    }
-                  }
-                }`,
-              { variables: { id: productId } }
-            );
-
-            const productJson: any = await productResponse.json();
-            const existingImages = productJson.data?.product?.media?.edges?.filter(
-              (edge: any) => edge.node.mediaContentType === 'IMAGE'
-            ) || [];
-
-            // Remove existing images
-            if (existingImages.length > 0) {
-              const deleteResponse = await admin.graphql(
-                `#graphql
-                  mutation fileUpdate($files: [FileUpdateInput!]!) {
-                    fileUpdate(files: $files) {
-                      files {
-                        id
-                        fileStatus
-                      }
-                      userErrors {
-                        field
-                        message
-                      }
-                    }
-                  }`,
-                {
-                  variables: {
-                    files: existingImages.map((edge: any) => ({
-                      id: edge.node.id,
-                      fileStatus: "READY_TO_DELETE"
-                    }))
-                  }
-                }
-              );
-
-              const deleteJson: any = await deleteResponse.json();
-              if (deleteJson.errors || deleteJson.data?.productDeleteMedia?.mediaUserErrors?.length > 0) {
-                const error = deleteJson.errors?.[0]?.message || deleteJson.data?.productDeleteMedia?.mediaUserErrors?.[0]?.message;
-                results.push({
-                  productId,
-                  success: false,
-                  error: `Failed to remove existing images: ${error}`
-                });
-                continue;
-              }
-            }
-
-            // Add new images
-            const createPromises = imageUrls.map((imageUrl: string) => 
-              admin.graphql(
-                `#graphql
-                  mutation productUpdate($product: ProductUpdateInput!) {
-                    productUpdate(product: $product) {
-                      product {
-                        id
-                        media(first: 10) {
-                          edges {
-                            node {
-                              id
-                            }
-                          }
-                        }
-                      }
-                      userErrors {
-                        field
-                        message
-                      }
-                    }
-                  }`,
-                {
-                  variables: {
-                    product: {
-                      id: productId,
-                      media: [{
-                        originalSource: imageUrl,
-                        mediaContentType: "IMAGE"
-                      }]
-                    }
-                  }
-                }
-              )
-            );
-
-            const createResponses = await Promise.all(createPromises);
-            const createErrors = [];
-            
-            for (const response of createResponses) {
-              const json: any = await response.json();
-              if (json.errors || json.data?.productUpdate?.mediaUserErrors?.length > 0) {
-                const error = json.errors?.[0]?.message || json.data?.productUpdate?.mediaUserErrors?.[0]?.message;
-                createErrors.push(error);
-              }
-            }
-
-            if (createErrors.length > 0) {
-              results.push({
-                productId,
-                success: false,
-                error: `Failed to add new images: ${createErrors.join(', ')}`
-              });
-            } else {
-              results.push({
-                productId,
-                success: true,
-                message: `Replaced with ${imageUrls.length} new image(s)`
-              });
-            }
-          }
-
-        } catch (error) {
-          results.push({
-            productId,
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error'
-          });
-        }
-      }
-      
-      return json({
-        success: true,
-        results,
-        successful: results.filter(r => r.success).length,
-        failed: results.filter(r => !r.success).length
-      });
-      
-    } catch (error) {
-      console.error('Error updating images:', error);
-      return json({ 
-        error: `Failed to update images: ${error instanceof Error ? error.message : 'Unknown error'}` 
       }, { status: 500 });
     }
   }

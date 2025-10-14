@@ -262,7 +262,6 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
         </Button>
       </div>
 
-
     </div>
   );
 

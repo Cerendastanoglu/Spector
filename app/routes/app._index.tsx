@@ -153,6 +153,7 @@ export default function Index() {
 
       case "forecasting":
         return <ForecastingTab shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} />;
+
       case "help":
         return <Help isVisible={true} />;
       case "billing":

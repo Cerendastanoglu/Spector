@@ -5,4 +5,5 @@ export { WebVitals } from "./WebVitals";
 export { PerformanceDashboard } from "./PerformanceDashboard";
 export { WelcomeModal } from "./WelcomeModal";
 export { ProductTable } from "./ProductTable";
+// BulkEditHistory export removed - functionality disabled
 export { IntelligenceDashboard } from "./IntelligenceDashboard";

@@ -43,6 +43,7 @@ export function useAppBridgePerformance(config: AppBridgePerformanceConfig = {})
         prefetch: [
           // Prefetch likely navigation targets
           '/app/products',
+          '/app/notifications',
           '/app/dashboard'
         ]
       }
