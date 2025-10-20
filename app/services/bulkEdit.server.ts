@@ -1,8 +1,5 @@
-import { PrismaClient } from "@prisma/client";
-import { RevertRecipeManager } from "../utils/revertRecipes.server";
-import { ProductStateManager } from "../utils/productStateManager.server";
-
-const prisma = new PrismaClient();
+// Bulk edit functionality has been disabled and removed
+// This file is kept for compatibility but functions are no-ops
 
 export type CreateBatchInput = {
   shopDomain: string;
@@ -70,8 +67,8 @@ export async function createBatchWithRevert(input: CreateBatchInput) {
  * Gets recent bulk edit batches for a shop
  * Note: This functionality has been removed.
  */
-export async function getRecentBatches(shopDomain: string, limit = 5) {
-  console.log(`📋 Recent batches requested but feature removed for shop: ${shopDomain}`);
+export async function getRecentBatches(_shopDomain: string, _limit = 5) {
+  console.log(`📋 Recent batches requested but feature removed for shop: ${_shopDomain}`);
   
   // Return empty array
   return [];
