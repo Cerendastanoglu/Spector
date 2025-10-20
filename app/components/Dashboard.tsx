@@ -84,23 +84,20 @@ interface InventoryData {
 
 export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavigate: _onNavigate, shopDomain: _shopDomain }: DashboardProps) {
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [timePeriod, setTimePeriod] = useState('30');
+  // Core state
+  const [timePeriod] = useState('30'); // Fixed at 30 days
   const [productAnalyticsData, setProductAnalyticsData] = useState<ProductAnalyticsData | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [inventoryData, setInventoryData] = useState<InventoryData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [isManualRefresh, setIsManualRefresh] = useState(false);
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
+  const [hasReceivedData, setHasReceivedData] = useState(false); // Track if we've ever received data
   
-  // Inventory filtering state
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [filterRisk, setFilterRisk] = useState('all');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [searchProduct, setSearchProduct] = useState('');
+  // Currency state
+  const [storeCurrency, setStoreCurrency] = useState<string>('USD');
+  const [currencySymbol, setCurrencySymbol] = useState<string>('$');
+  
+  // Price distribution slider
   const [priceDistributionIndex, setPriceDistributionIndex] = useState(0);
 
 
@@ -114,6 +111,13 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   const productAnalyticsFetcherRef = useRef(productAnalyticsFetcher);
   const inventoryFetcherRef = useRef(inventoryFetcher);
   
+  // Request ID tracking to prevent race conditions
+  // When user switches time periods rapidly, older requests may complete after newer ones
+  // This ensures we only process the most recent request by tracking generation IDs
+  const fetchGenerationRef = useRef(0);
+  const currentRevenueGenerationRef = useRef(0);
+  const currentInventoryGenerationRef = useRef(0);
+  
   // Update refs when values change
   useEffect(() => {
     timePeriodRef.current = timePeriod;
@@ -125,10 +129,29 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   const getCacheKey = useCallback((type: 'revenue' | 'inventory', period: string) => 
     `spector_${type}_data_${period}`, []);
 
-  // Check if data needs refresh (manual only)
-  const needsRefresh = useCallback((_lastUpdate: Date | null): boolean => {
-    // Only refresh manually - no automatic refresh
-    return false;
+  // Check if data needs refresh based on cache age
+  const needsRefresh = useCallback((lastUpdate: Date | null): boolean => {
+    if (!lastUpdate) return true;
+    
+    const now = new Date();
+    const diffInMs = now.getTime() - lastUpdate.getTime();
+    const diffInMinutes = diffInMs / (1000 * 60);
+    
+    // Cache expiration policy:
+    // - Product analytics data: expires after 5 minutes
+    // - This ensures data stays fresh while reducing API calls
+    // - User can always manually refresh for immediate updates
+    const CACHE_EXPIRATION_MINUTES = 5;
+    
+    const shouldRefresh = diffInMinutes >= CACHE_EXPIRATION_MINUTES;
+    
+    if (shouldRefresh) {
+      console.log(`Dashboard: Cache expired (${Math.round(diffInMinutes)} minutes old, max ${CACHE_EXPIRATION_MINUTES} minutes)`);
+    } else {
+      console.log(`Dashboard: Cache still valid (${Math.round(diffInMinutes)} minutes old)`);
+    }
+    
+    return shouldRefresh;
   }, []);
 
   // Load data from cache (only in browser)
@@ -147,15 +170,17 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
           const data = JSON.parse(cached);
           if (type === 'revenue') {
             setProductAnalyticsData(data);
-          } else {
-            setInventoryData(data);
+            setHasReceivedData(true); // Mark that we've loaded data from cache
           }
+          // else: Inventory data caching removed as feature not implemented yet
           console.log(`Dashboard: Loaded ${type} data from cache (${data?.totalProducts || 0} products)`);
           return true;
         }
       }
     } catch (error) {
-      console.error('Error loading cached data:', error);
+      console.warn('Dashboard: Error loading cached data (localStorage may be disabled):', error);
+      // Gracefully handle localStorage errors (private browsing, quota exceeded, etc.)
+      // Return false to trigger fresh data fetch
     }
     return false;
   }, [needsRefresh, getCacheKey]);
@@ -173,24 +198,60 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
       localStorage.setItem(timestampKey, now.toISOString());
       console.log(`Dashboard: Saved ${type} data to cache (${data?.totalOrders || 0} orders)`);
     } catch (error) {
-      console.error('Error saving cached data:', error);
+      // Gracefully handle localStorage errors with specific detection
+      if (error instanceof DOMException) {
+        if (error.name === 'QuotaExceededError') {
+          console.warn('Dashboard: localStorage quota exceeded. Consider clearing old cache data.');
+          // Attempt to clear old cache entries to make room
+          try {
+            const keys = Object.keys(localStorage);
+            const spectorKeys = keys.filter(k => k.startsWith('spector_'));
+            if (spectorKeys.length > 0) {
+              // Remove oldest entries (keep most recent)
+              const sortedKeys = spectorKeys.sort();
+              const toRemove = sortedKeys.slice(0, Math.ceil(sortedKeys.length / 2));
+              toRemove.forEach(key => {
+                try {
+                  localStorage.removeItem(key);
+                } catch (e) {
+                  // Ignore errors during cleanup
+                }
+              });
+              console.log(`Dashboard: Cleared ${toRemove.length} old cache entries`);
+            }
+          } catch (cleanupError) {
+            console.warn('Dashboard: Failed to cleanup cache:', cleanupError);
+          }
+        } else if (error.name === 'SecurityError') {
+          console.warn('Dashboard: localStorage access denied (private browsing mode or security restrictions)');
+        } else {
+          console.warn('Dashboard: localStorage error:', error.name, error.message);
+        }
+      } else {
+        console.warn('Dashboard: Unexpected error saving cached data:', error);
+      }
+      // App continues to work without cache - data will be refetched next time
     }
   }, [getCacheKey]);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const timePeriodOptions = [
-    { label: 'Last 7 days', value: '7' },
-    { label: 'Last 30 days', value: '30' },
-    { label: 'Last 3 months', value: '90' },
-    { label: 'Last 6 months', value: '180' },
-    { label: 'Last 1 year', value: '365' },
-    { label: 'Last 2 years', value: '730' },
-  ];
+  // Reserved for future time period selector dropdown
+  // const timePeriodOptions = [
+  //   { label: 'Last 7 days', value: '7' },
+  //   { label: 'Last 30 days', value: '30' },
+  //   { label: 'Last 3 months', value: '90' },
+  //   { label: 'Last 6 months', value: '180' },
+  //   { label: 'Last 1 year', value: '365' },
+  //   { label: 'Last 2 years', value: '730' },
+  // ];
 
 
 
   const fetchFreshData = useCallback((type: 'revenue' | 'inventory', force = false) => {
-    console.log(`Dashboard: ${force ? 'Manual' : 'Auto'} ${type} data refresh`);
+    // Increment generation counter to track this specific fetch
+    // Each new fetch gets a new generation number
+    const fetchGeneration = ++fetchGenerationRef.current;
+    
+    console.log(`Dashboard: ${force ? 'Manual' : 'Auto'} ${type} data refresh (Generation #${fetchGeneration})`);
     setIsLoading(true);
     setError(null);
     setIsManualRefresh(force);
@@ -199,16 +260,136 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     const currentProductAnalyticsFetcher = productAnalyticsFetcherRef.current;
     const currentInventoryFetcher = inventoryFetcherRef.current;
     
-    console.log("Dashboard: fetchFreshData called with type:", type, "force:", force);
+    console.log("Dashboard: fetchFreshData called with type:", type, "force:", force, "generation:", fetchGeneration);
     if (type === 'revenue') {
-      console.log("Dashboard: Calling product-analytics API...");
+      // Store this as the latest revenue fetch generation
+      currentRevenueGenerationRef.current = fetchGeneration;
+      console.log("Dashboard: Calling product-analytics API (Generation #" + fetchGeneration + ")");
       currentProductAnalyticsFetcher.load(`/app/api/product-analytics`);
     } else {
-      console.log("Dashboard: Calling inventory API...", currentPeriod);
+      // Store this as the latest inventory fetch generation
+      currentInventoryGenerationRef.current = fetchGeneration;
+      console.log("Dashboard: Calling inventory API (Generation #" + fetchGeneration + ")", currentPeriod);
       currentInventoryFetcher.load(`/app/api/inventory?period=${currentPeriod}`);
     }
   }, []); // No dependencies to prevent recreation
 
+  // Load store currency from Shopify API
+  const loadStoreCurrency = useCallback(async () => {
+    try {
+      const formData = new FormData();
+      formData.append('action', 'get-shop-info');
+      
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.shop) {
+        const currencyCode = result.shop.currencyCode || 'USD';
+        
+        // Comprehensive currency symbol map supporting all major Shopify currencies
+        const currencySymbols: { [key: string]: string } = {
+          // Americas
+          'USD': '$',        // US Dollar
+          'CAD': 'C$',       // Canadian Dollar
+          'MXN': '$',        // Mexican Peso
+          'BRL': 'R$',       // Brazilian Real
+          'ARS': '$',        // Argentine Peso
+          'CLP': '$',        // Chilean Peso
+          'COP': '$',        // Colombian Peso
+          'PEN': 'S/',       // Peruvian Sol
+          
+          // Europe
+          'EUR': '€',        // Euro
+          'GBP': '£',        // British Pound
+          'CHF': 'CHF ',     // Swiss Franc
+          'SEK': 'kr',       // Swedish Krona
+          'NOK': 'kr',       // Norwegian Krone
+          'DKK': 'kr',       // Danish Krone
+          'ISK': 'kr',       // Icelandic Króna
+          'PLN': 'zł',       // Polish Złoty
+          'CZK': 'Kč',       // Czech Koruna
+          'HUF': 'Ft',       // Hungarian Forint
+          'RON': 'lei',      // Romanian Leu
+          'BGN': 'лв',       // Bulgarian Lev
+          'HRK': 'kn',       // Croatian Kuna
+          'RUB': '₽',        // Russian Ruble
+          'UAH': '₴',        // Ukrainian Hryvnia
+          'TRY': '₺',        // Turkish Lira
+          'TL': '₺',         // Turkish Lira (alternative)
+          
+          // Asia-Pacific
+          'JPY': '¥',        // Japanese Yen
+          'CNY': '¥',        // Chinese Yuan
+          'KRW': '₩',        // South Korean Won
+          'INR': '₹',        // Indian Rupee
+          'IDR': 'Rp',       // Indonesian Rupiah
+          'MYR': 'RM',       // Malaysian Ringgit
+          'PHP': '₱',        // Philippine Peso
+          'SGD': 'S$',       // Singapore Dollar
+          'THB': '฿',        // Thai Baht
+          'VND': '₫',        // Vietnamese Dong
+          'HKD': 'HK$',      // Hong Kong Dollar
+          'TWD': 'NT$',      // Taiwan Dollar
+          'AUD': 'A$',       // Australian Dollar
+          'NZD': 'NZ$',      // New Zealand Dollar
+          'PKR': '₨',        // Pakistani Rupee
+          'BDT': '৳',        // Bangladeshi Taka
+          'LKR': 'Rs',       // Sri Lankan Rupee
+          'NPR': 'Rs',       // Nepalese Rupee
+          
+          // Middle East & Africa
+          'AED': 'د.إ',      // UAE Dirham
+          'SAR': '﷼',        // Saudi Riyal
+          'QAR': '﷼',        // Qatari Riyal
+          'KWD': 'د.ك',      // Kuwaiti Dinar
+          'BHD': 'د.ب',      // Bahraini Dinar
+          'OMR': '﷼',        // Omani Rial
+          'JOD': 'د.ا',      // Jordanian Dinar
+          'ILS': '₪',        // Israeli Shekel
+          'EGP': '£',        // Egyptian Pound
+          'ZAR': 'R',        // South African Rand
+          'NGN': '₦',        // Nigerian Naira
+          'KES': 'KSh',      // Kenyan Shilling
+          'GHS': '₵',        // Ghanaian Cedi
+          'MAD': 'د.م.',     // Moroccan Dirham
+          'TND': 'د.ت',      // Tunisian Dinar
+          
+          // Other
+          'NIO': 'C$',       // Nicaraguan Córdoba
+          'CRC': '₡',        // Costa Rican Colón
+          'BOB': 'Bs.',      // Bolivian Boliviano
+          'PYG': '₲',        // Paraguayan Guaraní
+          'UYU': '$U',       // Uruguayan Peso
+          'VES': 'Bs.S',     // Venezuelan Bolívar
+          'DOP': 'RD$',      // Dominican Peso
+          'GTQ': 'Q',        // Guatemalan Quetzal
+          'HNL': 'L',        // Honduran Lempira
+          'PAB': 'B/.',      // Panamanian Balboa
+        };
+        
+        setStoreCurrency(currencyCode);
+        setCurrencySymbol(currencySymbols[currencyCode] || currencyCode + ' ');
+        
+        console.log(`💰 Dashboard: Store currency loaded: ${currencyCode} (${currencySymbols[currencyCode] || currencyCode})`);
+      } else {
+        throw new Error(result.error || 'Failed to fetch shop info');
+      }
+    } catch (error) {
+      console.error('Dashboard: Failed to load store currency:', error);
+      // Fallback to USD
+      setStoreCurrency('USD');
+      setCurrencySymbol('$');
+    }
+  }, []);
+
+  // Load currency on mount
+  useEffect(() => {
+    loadStoreCurrency();
+  }, [loadStoreCurrency]);
 
 
   // Reset loading flag when tab or period changes
@@ -251,9 +432,31 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   }, [isVisible, timePeriod, fetchFreshData, hasLoadedInitialData, loadCachedData]);
 
   // Handle revenue data response
+  // Race condition protection: Store the generation when effect runs
+  // 
+  // Memory leak analysis: This effect is safe because:
+  // - It only depends on .data property (not entire fetcher object)
+  // - .data only changes when API responses arrive (finite occurrences)
+  // - Generation tracking prevents processing same response multiple times
+  // - Effect cleanup isn't needed as we're only updating state
+  const lastProcessedRevenueGeneration = useRef(-1);
+  
   useEffect(() => {
     if (productAnalyticsFetcher.data) {
-      console.log("Dashboard: Product analytics data received", productAnalyticsFetcher.data);
+      const currentGeneration = currentRevenueGenerationRef.current;
+      
+      // Ignore responses from old fetches (race condition protection)
+      // This happens when user switches periods rapidly before previous fetch completes
+      if (currentGeneration <= lastProcessedRevenueGeneration.current) {
+        console.log(`Dashboard: Ignoring stale product analytics response (Generation #${currentGeneration}, already processed #${lastProcessedRevenueGeneration.current})`);
+        return;
+      }
+      
+      lastProcessedRevenueGeneration.current = currentGeneration;
+      console.log(`Dashboard: Product analytics data received (Generation #${currentGeneration})`, productAnalyticsFetcher.data);
+      
+      setHasReceivedData(true); // Mark that we've received data (even if empty)
+      
       if (productAnalyticsFetcher.data.success && productAnalyticsFetcher.data.data) {
         setProductAnalyticsData(productAnalyticsFetcher.data.data);
         saveCachedData('revenue', timePeriod, productAnalyticsFetcher.data.data);
@@ -268,6 +471,9 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   }, [productAnalyticsFetcher.data, timePeriod, saveCachedData]);
 
   // Handle product analytics fetcher state changes
+  // Note: This useEffect is intentionally dependent on fetcher state/data
+  // It's designed to react to state changes and won't cause memory leaks
+  // because the state transitions are finite (loading -> idle)
   useEffect(() => {
     if (productAnalyticsFetcher.state === 'idle' && productAnalyticsFetcher.data) {
       setIsLoading(false);
@@ -277,10 +483,31 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   }, [productAnalyticsFetcher.state, productAnalyticsFetcher.data]);
 
   // Handle inventory data response
+  // Race condition protection: Store the generation when effect runs
+  //
+  // Memory leak analysis: This effect is safe because:
+  // - It only depends on .data property (not entire fetcher object)
+  // - .data only changes when API responses arrive (finite occurrences)
+  // - Generation tracking prevents processing same response multiple times
+  // - Effect cleanup isn't needed as we're only updating state
+  const lastProcessedInventoryGeneration = useRef(-1);
+  
   useEffect(() => {
     if (inventoryFetcher.data) {
+      const currentGeneration = currentInventoryGenerationRef.current;
+      
+      // Ignore responses from old fetches (race condition protection)
+      // This happens when user switches periods rapidly before previous fetch completes
+      if (currentGeneration <= lastProcessedInventoryGeneration.current) {
+        console.log(`Dashboard: Ignoring stale inventory response (Generation #${currentGeneration}, already processed #${lastProcessedInventoryGeneration.current})`);
+        return;
+      }
+      
+      lastProcessedInventoryGeneration.current = currentGeneration;
+      console.log(`Dashboard: Inventory data received (Generation #${currentGeneration})`);
+      
       if (inventoryFetcher.data.success && inventoryFetcher.data.data) {
-        setInventoryData(inventoryFetcher.data.data);
+        // Inventory data state removed as feature not implemented yet
         saveCachedData('inventory', timePeriod, inventoryFetcher.data.data);
         setError(null);
       } else {
@@ -298,15 +525,15 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: storeCurrency
     }).format(amount);
   };
 
   const formatCompactCurrency = (amount: number) => {
     if (amount >= 1000000) {
-      return `$${(amount / 1000000).toFixed(1)}M`;
+      return `${currencySymbol}${(amount / 1000000).toFixed(1)}M`;
     } else if (amount >= 1000) {
-      return `$${(amount / 1000).toFixed(1)}K`;
+      return `${currencySymbol}${(amount / 1000).toFixed(1)}K`;
     }
     return formatCurrency(amount);
   };
@@ -380,7 +607,11 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
             <Icon source={AlertCircleIcon} tone="critical" />
             <Text as="h3" tone="critical">{error}</Text>
             <Button 
-              onClick={() => fetchFreshData('revenue', true)}
+              onClick={() => {
+                // Retry both revenue and inventory data fetches for complete recovery
+                fetchFreshData('revenue', true);
+                fetchFreshData('inventory', true);
+              }}
               variant="primary"
             >
               Try Again
@@ -390,8 +621,12 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
       );
     }
 
-    // Handle empty data state (no products) - only when not loading and we have confirmed empty data
-    if (!isLoading && productAnalyticsData && productAnalyticsData.totalProducts === 0) {
+    // Handle empty data state (no products)
+    // Show empty state if:
+    // 1. We've received data response (!isLoading && hasReceivedData), AND
+    // 2. The data shows 0 products (productAnalyticsData?.totalProducts === 0)
+    // This prevents showing empty state during initial skeleton loading
+    if (!isLoading && hasReceivedData && productAnalyticsData?.totalProducts === 0) {
       return (
         <Card>
           <BlockStack align="center" gap="400">

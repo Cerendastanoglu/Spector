@@ -288,26 +288,6 @@ async function searchBusinessDirectoriesRealTime(classification: string, region:
   }
 }
 
-async function simulateRealTimeSearch(query: string, locality: string): Promise<any[]> {
-  // This simulates what real APIs would return
-  // In production, replace with actual API calls
-  
-  const isApparel = /fashion|clothing|apparel|boutique/.test(query.toLowerCase());
-  const isSports = /sports|athletic|fitness|outdoor/.test(query.toLowerCase());
-  const isHome = /home|furniture|decor/.test(query.toLowerCase());
-  const isLocal = locality === 'local';
-  
-  if (isApparel) {
-    return await searchFashionCompetitors(isLocal);
-  } else if (isSports) {
-    return await searchSportsCompetitors(isLocal);
-  } else if (isHome) {
-    return await searchHomeCompetitors(isLocal);
-  } else {
-    return await searchGeneralCompetitors(isLocal);
-  }
-}
-
 async function simulateBusinessDirectorySearch(classification: string, region: string): Promise<any[]> {
   // Simulate directory API response
   await new Promise(resolve => setTimeout(resolve, 200));
@@ -332,13 +312,6 @@ async function simulateBusinessDirectorySearch(classification: string, region: s
 function calculateMarketShare(revenue: string): number {
   const numericRevenue = parseRevenueToNumber(revenue);
   return Math.min(Math.max((numericRevenue / 1000000) * 0.1, 0.1), 15.0);
-}
-
-function evaluateOnlinePresence(website: string): 'Strong' | 'Moderate' | 'Weak' {
-  if (website.includes('shopify') || website.includes('bigcommerce') || website.includes('.com')) {
-    return 'Strong';
-  }
-  return 'Moderate';
 }
 
 function matchesCompanySize(competitor: Competitor, targetSize: string): boolean {
@@ -369,164 +342,6 @@ function parseEmployeeCount(employees: string): number {
 }
 
 // Note: All static database functions removed - now using real-time search only
-
-// Real-time competitor search by category
-async function searchFashionCompetitors(isLocal: boolean): Promise<any[]> {
-  // Simulate real-time web scraping/API calls for fashion competitors
-  await new Promise(resolve => setTimeout(resolve, 400));
-  
-  console.log(`🔍 Searching fashion competitors (local: ${isLocal})`);
-  
-  // In production, this would scrape or call APIs for:
-  // - Fashion directory websites
-  // - Industry databases
-  // - Social media business listings
-  // - E-commerce platforms
-  
-  if (isLocal) {
-    return [
-      {
-        name: "Local Style Boutique",
-        website: await generateRealWebsite("fashion", "local"),
-        description: "Contemporary fashion boutique discovered through local search",
-        revenue: "$200K-500K",
-        employees: "3-8",
-        founded: "2019",
-        storeType: "retail",
-        specialty: "Local fashion, curated styles"
-      }
-    ];
-  } else {
-    return [
-      {
-        name: "Fashion Forward Inc",
-        website: await generateRealWebsite("fashion", "global"),
-        description: "Global fashion retailer found via real-time search",
-        revenue: "$100M-500M",
-        employees: "1000-5000",
-        founded: "2005",
-        storeType: "retail",
-        specialty: "Contemporary fashion, global brands"
-      }
-    ];
-  }
-}
-
-async function searchSportsCompetitors(isLocal: boolean): Promise<any[]> {
-  await new Promise(resolve => setTimeout(resolve, 350));
-  
-  console.log(`🔍 Searching sports competitors (local: ${isLocal})`);
-  
-  if (isLocal) {
-    return [
-      {
-        name: "Local Sports Hub",
-        website: await generateRealWebsite("sports", "local"),
-        description: "Local sports equipment retailer discovered through directory search",
-        revenue: "$300K-800K",
-        employees: "5-12",
-        founded: "2016",
-        storeType: "retail",
-        specialty: "Local sports, equipment sales"
-      }
-    ];
-  } else {
-    return [
-      {
-        name: "Athletic Gear Global",
-        website: await generateRealWebsite("sports", "global"),
-        description: "International sports retailer found via business search",
-        revenue: "$500M-1B",
-        employees: "5000-10000",
-        founded: "1998",
-        storeType: "retail",
-        specialty: "Athletic equipment, global distribution"
-      }
-    ];
-  }
-}
-
-async function searchHomeCompetitors(isLocal: boolean): Promise<any[]> {
-  await new Promise(resolve => setTimeout(resolve, 450));
-  
-  console.log(`🔍 Searching home goods competitors (local: ${isLocal})`);
-  
-  if (isLocal) {
-    return [
-      {
-        name: "Local Home & Design",
-        website: await generateRealWebsite("home", "local"),
-        description: "Local home goods store found through real-time search",
-        revenue: "$400K-1M",
-        employees: "6-15",
-        founded: "2014",
-        storeType: "retail",
-        specialty: "Home decor, local designers"
-      }
-    ];
-  } else {
-    return [
-      {
-        name: "Global Home Solutions",
-        website: await generateRealWebsite("home", "global"),
-        description: "International home goods retailer discovered online",
-        revenue: "$1B-5B",
-        employees: "10000-25000",
-        founded: "1992",
-        storeType: "retail",
-        specialty: "Home furnishings, global marketplace"
-      }
-    ];
-  }
-}
-
-async function searchGeneralCompetitors(isLocal: boolean): Promise<any[]> {
-  await new Promise(resolve => setTimeout(resolve, 300));
-  
-  console.log(`🔍 Searching general competitors (local: ${isLocal})`);
-  
-  if (isLocal) {
-    return [
-      {
-        name: "Local Market Hub",
-        website: await generateRealWebsite("general", "local"),
-        description: "General retailer discovered through local business search",
-        revenue: "$500K-1.5M",
-        employees: "8-20",
-        founded: "2012",
-        storeType: "retail",
-        specialty: "General merchandise, community focus"
-      }
-    ];
-  } else {
-    return [
-      {
-        name: "Global Retail Network",
-        website: await generateRealWebsite("general", "global"),
-        description: "International retailer found via real-time business discovery",
-        revenue: "$5B-20B",
-        employees: "50000-200000",
-        founded: "1985",
-        storeType: "retail",
-        specialty: "General retail, global operations"
-      }
-    ];
-  }
-}
-
-// Simulate real website discovery
-async function generateRealWebsite(category: string, scope: string): Promise<string> {
-  // Simulate the process of discovering real websites through search
-  await new Promise(resolve => setTimeout(resolve, 100));
-  
-  const timestamp = Date.now().toString().slice(-6);
-  
-  if (scope === "local") {
-    return `https://www.local${category}${timestamp}.com`;
-  } else {
-    return `https://www.${category}store${timestamp}.com`;
-  }
-}
 
 // Simulated API functions for real-time competitor discovery
 async function simulateGoogleSearchAPI(query: string, locality: string): Promise<any[]> {

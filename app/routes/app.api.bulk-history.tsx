@@ -1,8 +1,8 @@
-import { ActionFunctionArgs, json } from "@remix-run/node";
+import { LoaderFunctionArgs, ActionFunctionArgs, json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 
-export async function loader({ request }: ActionFunctionArgs) {
-  const { session } = await authenticate.admin(request);
+export async function loader({ request }: LoaderFunctionArgs) {
+  await authenticate.admin(request);
   
   // Return empty batches array
   return json({ 
@@ -13,7 +13,7 @@ export async function loader({ request }: ActionFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { session } = await authenticate.admin(request);
+  await authenticate.admin(request);
   
   return json({ 
     success: true, 

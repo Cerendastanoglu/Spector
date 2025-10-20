@@ -149,7 +149,7 @@ export default function Index() {
           />
         );
       case "out-of-stock":
-        return <OptimizedComponents.ProductManagement isVisible={true} />;
+        return <OptimizedComponents.ProductManagement isVisible={true} shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} />;
 
       case "forecasting":
         return <ForecastingTab shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} />;

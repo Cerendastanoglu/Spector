@@ -74,6 +74,9 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState(0);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  
+  // Currency state
+  const [currencySymbol, setCurrencySymbol] = useState<string>('$');
 
   const toggleRowExpansion = (itemId: string) => {
     setExpandedRows(prev => {
@@ -86,6 +89,48 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
       return newSet;
     });
   };
+
+  // Load store currency from Shopify API
+  useEffect(() => {
+    const loadStoreCurrency = async () => {
+      try {
+        const formData = new FormData();
+        formData.append('action', 'get-shop-info');
+        
+        const response = await fetch('/app/api/products', {
+          method: 'POST',
+          body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.shop) {
+          const currencyCode = result.shop.currencyCode || 'USD';
+          
+          // Comprehensive currency symbol map
+          const currencySymbols: { [key: string]: string } = {
+            'USD': '$', 'EUR': '€', 'GBP': '£', 'CAD': 'C$', 'AUD': 'A$', 
+            'JPY': '¥', 'CHF': 'CHF ', 'SEK': 'kr', 'NOK': 'kr', 'DKK': 'kr',
+            'TRY': '₺', 'TL': '₺', 'INR': '₹', 'CNY': '¥', 'BRL': 'R$',
+            'MXN': '$', 'RUB': '₽', 'KRW': '₩', 'PLN': 'zł', 'CZK': 'Kč',
+            'HUF': 'Ft', 'ZAR': 'R', 'SGD': 'S$', 'HKD': 'HK$', 'NZD': 'NZ$',
+            'AED': 'د.إ', 'SAR': '﷼', 'ILS': '₪', 'PHP': '₱', 'THB': '฿',
+            'IDR': 'Rp', 'MYR': 'RM', 'VND': '₫', 'PKR': '₨', 'EGP': '£',
+            'NGN': '₦', 'KES': 'KSh', 'TWD': 'NT$', 'ARS': '$', 'CLP': '$',
+            'COP': '$', 'PEN': 'S/', 'UAH': '₴', 'RON': 'lei', 'BGN': 'лв',
+          };
+          
+          setCurrencySymbol(currencySymbols[currencyCode] || currencyCode + ' ');
+          console.log(`💰 ForecastingTab: Currency loaded: ${currencyCode} (${currencySymbols[currencyCode] || currencyCode})`);
+        }
+      } catch (error) {
+        console.error('ForecastingTab: Failed to load store currency:', error);
+        setCurrencySymbol('$'); // Fallback to USD
+      }
+    };
+
+    loadStoreCurrency();
+  }, []);
 
   // Fetch real inventory forecasting data
   useEffect(() => {
@@ -350,28 +395,45 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                             <BlockStack gap="400">
                               <Box background="bg-surface" padding="400" borderRadius="300" borderWidth="025" borderColor="border">
                                 <BlockStack gap="300">
-                                  <Text as="h4" variant="headingMd" fontWeight="bold">
-                                    Product Details
-                                  </Text>
+                                  <InlineStack gap="200" blockAlign="center">
+                                    <Icon source={ClockIcon} />
+                                    <Text as="h4" variant="headingMd" fontWeight="bold">
+                                      Inventory Management
+                                    </Text>
+                                  </InlineStack>
                                   <div style={{ display: 'grid', gap: '12px' }}>
                                     <InlineStack align="space-between">
                                       <Text as="p" variant="bodySm" tone="subdued">SKU</Text>
                                       <Badge size="medium">{item.sku}</Badge>
                                     </InlineStack>
+                                    <Box borderBlockStartWidth="025" borderColor="border" paddingBlockStart="200" />
                                     <InlineStack align="space-between">
-                                      <Text as="p" variant="bodySm" tone="subdued">Reorder Quantity</Text>
-                                      <Text as="p" variant="bodyMd" fontWeight="bold" tone="success">
-                                        {item.suggestedReorderQuantity} units
+                                      <Text as="p" variant="bodySm" tone="subdued">Current Stock Level</Text>
+                                      <Text as="p" variant="bodyMd" fontWeight="bold">
+                                        {item.currentStock} units
                                       </Text>
                                     </InlineStack>
                                     <InlineStack align="space-between">
-                                      <Text as="p" variant="bodySm" tone="subdued">Reorder Point</Text>
+                                      <Text as="p" variant="bodySm" tone="subdued">Days of Supply Left</Text>
+                                      <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                        {item.forecastDays >= 999 ? 'N/A' : `${item.forecastDays} days`}
+                                      </Text>
+                                    </InlineStack>
+                                    <Box borderBlockStartWidth="025" borderColor="border" paddingBlockStart="200" />
+                                    <InlineStack align="space-between">
+                                      <Text as="p" variant="bodySm" tone="subdued">Reorder Point Threshold</Text>
                                       <Text as="p" variant="bodyMd" fontWeight="semibold">
                                         {item.reorderPoint} units
                                       </Text>
                                     </InlineStack>
                                     <InlineStack align="space-between">
-                                      <Text as="p" variant="bodySm" tone="subdued">Lead Time</Text>
+                                      <Text as="p" variant="bodySm" tone="subdued">Suggested Reorder Qty</Text>
+                                      <Text as="p" variant="bodyMd" fontWeight="bold" tone="success">
+                                        {item.suggestedReorderQuantity} units
+                                      </Text>
+                                    </InlineStack>
+                                    <InlineStack align="space-between">
+                                      <Text as="p" variant="bodySm" tone="subdued">Supplier Lead Time</Text>
                                       <Text as="p" variant="bodyMd" fontWeight="semibold">
                                         {item.leadTime} days
                                       </Text>
@@ -392,7 +454,7 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                                     <InlineStack align="space-between">
                                       <Text as="p" variant="bodySm" tone="subdued">Revenue (60 days)</Text>
                                       <Text as="p" variant="headingSm" fontWeight="bold">
-                                        ${item.totalRevenue60Days.toFixed(2)}
+                                        {currencySymbol}{item.totalRevenue60Days.toFixed(2)}
                                       </Text>
                                     </InlineStack>
                                     <InlineStack align="space-between">

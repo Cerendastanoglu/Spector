@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useFetcher } from "@remix-run/react";
 import { openInNewTab } from "../utils/browserUtils";
 import { ProductConstants } from "../utils/scopedConstants";
@@ -99,6 +99,7 @@ interface Product {
 interface ProductManagementProps {
   isVisible: boolean;
   initialCategory?: InventoryCategory;
+  shopDomain?: string;
 }
 
 type InventoryCategory = 'all' | 'out-of-stock' | 'critical' | 'low-stock' | 'in-stock';
@@ -108,7 +109,7 @@ type SortDirection = 'asc' | 'desc';
 
 
 
-export function ProductManagement({ isVisible, initialCategory = 'all' }: ProductManagementProps) {
+export function ProductManagement({ isVisible, initialCategory = 'all', shopDomain }: ProductManagementProps) {
   // Add CSS animations - Fixed to prevent header interference
   useEffect(() => {
     const styles = document.createElement('style');
@@ -277,10 +278,12 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   // Status & Visibility State
 
   
-  // Filter collections based on search query
-  const filteredCollections = availableCollections.filter(collection =>
-    collection.title.toLowerCase().includes(collectionSearchQuery.toLowerCase())
-  );
+  // Filter collections based on search query - memoized to prevent performance issues
+  const filteredCollections = useMemo(() => {
+    return availableCollections.filter(collection =>
+      collection.title.toLowerCase().includes(collectionSearchQuery.toLowerCase())
+    );
+  }, [availableCollections, collectionSearchQuery]);
   
   // Advanced Bulk Operations State
   const [seoTemplate, setSeoTemplate] = useState('');
@@ -349,32 +352,48 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
   };
 
   const handleVariantSelection = (productId: string, variantId: string, checked: boolean) => {
+    // Get all variant IDs for this product upfront to avoid race conditions
+    const variantIds = getProductVariantIds(productId);
+    
     if (checked) {
-      setSelectedVariants(prev => {
-        const newSelectedVariants = [...prev, variantId];
+      // Use functional updates to ensure we're working with latest state
+      setSelectedVariants(prevVariants => {
+        const newSelectedVariants = [...prevVariants, variantId];
         
-        // Check if all variants are now selected, if so add product to selectedProducts
-        const variantIds = getProductVariantIds(productId);
-        if (variantIds.length > 0 && variantIds.every(id => newSelectedVariants.includes(id))) {
-          setSelectedProducts(prevProducts => [...new Set([...prevProducts, productId])]);
+        // Check if all variants are now selected
+        const allVariantsSelected = variantIds.length > 0 && 
+          variantIds.every(id => newSelectedVariants.includes(id));
+        
+        // Update product selection based on variant selection state
+        if (allVariantsSelected) {
+          setSelectedProducts(prevProducts => {
+            // Only add if not already present
+            return prevProducts.includes(productId) 
+              ? prevProducts 
+              : [...prevProducts, productId];
+          });
         }
         
         return newSelectedVariants;
       });
     } else {
-      setSelectedVariants(prev => {
-        const newSelectedVariants = prev.filter(id => id !== variantId);
+      // Deselecting a variant always deselects the parent product
+      setSelectedVariants(prevVariants => {
+        const newSelectedVariants = prevVariants.filter(id => id !== variantId);
         
-        // Remove product from selectedProducts since not all variants are selected
-        setSelectedProducts(prevProducts => prevProducts.filter(id => id !== productId));
+        // Always remove product when any variant is deselected
+        setSelectedProducts(prevProducts => 
+          prevProducts.filter(id => id !== productId)
+        );
         
         return newSelectedVariants;
       });
     }
   };
   
-  // Show more products per page instead of pagination
-  const [productsPerPage] = useState(50); // Increased from 10 to 50
+  // Pagination state
+  const [productsPerPage] = useState(50);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Thresholds for inventory categorization (use constants)
   // Removed duplicated constants
@@ -387,17 +406,26 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       return;
     }
 
+    // Ensure we have a shop domain
+    if (!shopDomain) {
+      console.error('Shop domain not provided');
+      setError('Cannot navigate: Shop domain not available');
+      return;
+    }
+
     try {
       const productId = product.id.replace('gid://shopify/Product/', '');
       
       let url;
       if (section === 'admin') {
-        url = `https://spector-test-store.myshopify.com/admin/products/${productId}`;
+        // Use dynamic shop domain for admin URLs
+        url = `https://${shopDomain}/admin/products/${productId}`;
       } else {
         if (!product.handle) {
           console.warn('No product handle found, using product ID for storefront URL');
         }
-        url = `https://spector-test-store.myshopify.com/products/${product.handle || productId}`;
+        // Use dynamic shop domain for storefront URLs
+        url = `https://${shopDomain}/products/${product.handle || productId}`;
       }
       
       openInNewTab(url, () => {
@@ -530,9 +558,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
     }
   }, [fetcher.state]);
 
-  // Filter change handler - no longer need pagination reset
+  // Filter change handler - reset page when filters change
   useEffect(() => {
-    // Filters changed - table will show products automatically without pagination
+    setCurrentPage(1); // Reset to first page when any filter changes
   }, [
     searchQuery, 
     currentCategory, 
@@ -2079,29 +2107,85 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
       if (response.ok && result.shop) {
         const currencyCode = result.shop.currencyCode || 'USD';
         
+        // Comprehensive currency symbol map supporting all major Shopify currencies
         const currencySymbols: { [key: string]: string } = {
-          'USD': '$',
-          'EUR': '€',
-          'GBP': '£',
-          'CAD': 'C$',
-          'AUD': 'A$',
-          'JPY': '¥',
-          'CHF': 'CHF ',
-          'SEK': 'kr',
-          'NOK': 'kr',
-          'DKK': 'kr',
-          'TRY': '₺',  // Turkish Lira
-          'TL': '₺',   // Alternative for Turkish Lira
-          'INR': '₹',
-          'CNY': '¥',
-          'BRL': 'R$',
-          'MXN': '$',
-          'RUB': '₽',
-          'KRW': '₩',
-          'PLN': 'zł',
-          'CZK': 'Kč',
-          'HUF': 'Ft',
-          'ZAR': 'R',
+          // Americas
+          'USD': '$',        // US Dollar
+          'CAD': 'C$',       // Canadian Dollar
+          'MXN': '$',        // Mexican Peso
+          'BRL': 'R$',       // Brazilian Real
+          'ARS': '$',        // Argentine Peso
+          'CLP': '$',        // Chilean Peso
+          'COP': '$',        // Colombian Peso
+          'PEN': 'S/',       // Peruvian Sol
+          
+          // Europe
+          'EUR': '€',        // Euro
+          'GBP': '£',        // British Pound
+          'CHF': 'CHF ',     // Swiss Franc
+          'SEK': 'kr',       // Swedish Krona
+          'NOK': 'kr',       // Norwegian Krone
+          'DKK': 'kr',       // Danish Krone
+          'ISK': 'kr',       // Icelandic Króna
+          'PLN': 'zł',       // Polish Złoty
+          'CZK': 'Kč',       // Czech Koruna
+          'HUF': 'Ft',       // Hungarian Forint
+          'RON': 'lei',      // Romanian Leu
+          'BGN': 'лв',       // Bulgarian Lev
+          'HRK': 'kn',       // Croatian Kuna
+          'RUB': '₽',        // Russian Ruble
+          'UAH': '₴',        // Ukrainian Hryvnia
+          'TRY': '₺',        // Turkish Lira
+          'TL': '₺',         // Turkish Lira (alternative)
+          
+          // Asia-Pacific
+          'JPY': '¥',        // Japanese Yen
+          'CNY': '¥',        // Chinese Yuan
+          'KRW': '₩',        // South Korean Won
+          'INR': '₹',        // Indian Rupee
+          'IDR': 'Rp',       // Indonesian Rupiah
+          'MYR': 'RM',       // Malaysian Ringgit
+          'PHP': '₱',        // Philippine Peso
+          'SGD': 'S$',       // Singapore Dollar
+          'THB': '฿',        // Thai Baht
+          'VND': '₫',        // Vietnamese Dong
+          'HKD': 'HK$',      // Hong Kong Dollar
+          'TWD': 'NT$',      // Taiwan Dollar
+          'AUD': 'A$',       // Australian Dollar
+          'NZD': 'NZ$',      // New Zealand Dollar
+          'PKR': '₨',        // Pakistani Rupee
+          'BDT': '৳',        // Bangladeshi Taka
+          'LKR': 'Rs',       // Sri Lankan Rupee
+          'NPR': 'Rs',       // Nepalese Rupee
+          
+          // Middle East & Africa
+          'AED': 'د.إ',      // UAE Dirham
+          'SAR': '﷼',        // Saudi Riyal
+          'QAR': '﷼',        // Qatari Riyal
+          'KWD': 'د.ك',      // Kuwaiti Dinar
+          'BHD': 'د.ب',      // Bahraini Dinar
+          'OMR': '﷼',        // Omani Rial
+          'JOD': 'د.ا',      // Jordanian Dinar
+          'ILS': '₪',        // Israeli Shekel
+          'EGP': '£',        // Egyptian Pound
+          'ZAR': 'R',        // South African Rand
+          'NGN': '₦',        // Nigerian Naira
+          'KES': 'KSh',      // Kenyan Shilling
+          'GHS': '₵',        // Ghanaian Cedi
+          'MAD': 'د.م.',     // Moroccan Dirham
+          'TND': 'د.ت',      // Tunisian Dinar
+          
+          // Other
+          'NIO': 'C$',       // Nicaraguan Córdoba
+          'CRC': '₡',        // Costa Rican Colón
+          'BOB': 'Bs.',      // Bolivian Boliviano
+          'PYG': '₲',        // Paraguayan Guaraní
+          'UYU': '$U',       // Uruguayan Peso
+          'VES': 'Bs.S',     // Venezuelan Bolívar
+          'DOP': 'RD$',      // Dominican Peso
+          'GTQ': 'Q',        // Guatemalan Quetzal
+          'HNL': 'L',        // Honduran Lempira
+          'PAB': 'B/.',      // Panamanian Balboa
         };
         
         setStoreCurrency(currencyCode);
@@ -3118,28 +3202,54 @@ export function ProductManagement({ isVisible, initialCategory = 'all' }: Produc
                       <p>Try adjusting your search or filter criteria to find products.</p>
                     </EmptyState>
                   ) : (
-                    <ProductTable
-                      products={filteredProducts.slice(0, productsPerPage)}
-                      selectedProducts={selectedProducts}
-                      selectedVariants={selectedVariants}
-                      expandedProducts={expandedProducts}
-                      onProductSelect={handleProductSelection}
-                      onVariantSelect={(variantId, checked) => {
-                        const product = filteredProducts.find(p => 
-                          p.variants.edges.some(v => v.node.id === variantId)
-                        );
-                        if (product) {
-                          handleVariantSelection(product.id, variantId, checked);
-                        }
-                      }}
-                      onExpandProduct={toggleProductExpansion}
-                      onViewProduct={(product) => navigateToProduct(product, 'storefront')}
-                      onEditProduct={(product) => navigateToProduct(product, 'admin')}
-                      onContinueToBulkEdit={() => setActiveMainTab(1)}
-                      shopCurrency="$"
+                    <>
+                      <ProductTable
+                        products={filteredProducts.slice((currentPage - 1) * productsPerPage, currentPage * productsPerPage)}
+                        selectedProducts={selectedProducts}
+                        selectedVariants={selectedVariants}
+                        expandedProducts={expandedProducts}
+                        onProductSelect={handleProductSelection}
+                        onVariantSelect={(variantId, checked) => {
+                          const product = filteredProducts.find(p => 
+                            p.variants.edges.some(v => v.node.id === variantId)
+                          );
+                          if (product) {
+                            handleVariantSelection(product.id, variantId, checked);
+                          }
+                        }}
+                        onExpandProduct={toggleProductExpansion}
+                        onViewProduct={(product) => navigateToProduct(product, 'storefront')}
+                        onEditProduct={(product) => navigateToProduct(product, 'admin')}
+                        onContinueToBulkEdit={() => setActiveMainTab(1)}
+                      shopCurrency={currencySymbol}
                       showVariantSelection={true}
                       totalCount={filteredProducts.length}
                     />
+                    
+                    {/* Pagination Controls */}
+                    {filteredProducts.length > productsPerPage && (
+                      <Box padding="400">
+                        <InlineStack align="center" gap="400">
+                          <Button
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(currentPage - 1)}
+                          >
+                            Previous
+                          </Button>
+                          <Text as="p" variant="bodyMd">
+                            Page {currentPage} of {Math.ceil(filteredProducts.length / productsPerPage)} 
+                            {' '}({filteredProducts.length} products total)
+                          </Text>
+                          <Button
+                            disabled={currentPage >= Math.ceil(filteredProducts.length / productsPerPage)}
+                            onClick={() => setCurrentPage(currentPage + 1)}
+                          >
+                            Next
+                          </Button>
+                        </InlineStack>
+                      </Box>
+                    )}
+                  </>
                   )}
                 </div>
             </BlockStack>

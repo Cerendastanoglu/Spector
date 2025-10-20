@@ -1,4 +1,4 @@
-import { Page, Layout, Text, Banner } from "@shopify/polaris";
+import { Page, Layout, Banner } from "@shopify/polaris";
 
 export default function ActivityPage() {
   return (

@@ -1,4 +1,4 @@
-import { ActionFunctionArgs, LoaderFunctionArgs, json } from "@remix-run/node";
+import { LoaderFunctionArgs, json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { PrismaClient } from "@prisma/client";
 import { encryptData } from "../utils/encryption";
@@ -17,32 +17,46 @@ type AnalyticsData = {
   outOfStockCount: number;
   lowStockCount: number;
   topProducts: Array<{ name: string; quantity: number; price: number; }>;
-  recentActivity: Array<{}>;  // Empty array as functionality removed
+  recentActivity: Array<Record<string, never>>;  // Empty array as functionality removed
   dataSource: string;
   lastUpdated: string;
 };
 
 // Handler for GET requests to fetch analytics
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const shop = session.shop;
 
   try {
-    // Get analytics data from Shopify APIs
-    const client = new authenticate.admin.rest.RestClient({
-      session,
-      apiVersion: "2024-07"
-    });
+    // Fetch products using GraphQL (limited to MAX_PRODUCTS)
+    const response = await admin.graphql(
+      `#graphql
+      query getProducts($first: Int!) {
+        products(first: $first) {
+          edges {
+            node {
+              id
+              title
+              status
+              updatedAt
+              variants(first: 100) {
+                edges {
+                  node {
+                    id
+                    inventoryQuantity
+                    price
+                  }
+                }
+              }
+            }
+          }
+        }
+      }`,
+      { variables: { first: MAX_PRODUCTS } }
+    );
 
-    const now = new Date();
-    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-
-    // Fetch products (limited to MAX_PRODUCTS)
-    const response = await client.get({
-      path: `products.json?limit=${MAX_PRODUCTS}&status=any&fields=id,title,status,updated_at,variants`
-    });
-
-    const products = response.body.products;
+    const data = await response.json();
+    const products = data.data.products.edges.map((edge: any) => edge.node);
     console.log(`📊 Analyzing ${products.length} products...`);
 
     let totalInventoryValue = 0;
@@ -104,7 +118,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       topProducts,
       recentActivity: [], // Recent activity functionality removed
       dataSource: 'live',
-      lastUpdated: now.toISOString(),
+      lastUpdated: new Date().toISOString(),
     };
 
     // Cache the data with encryption and retention
