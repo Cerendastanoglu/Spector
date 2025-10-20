@@ -22,6 +22,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "@shopify/polaris-icons";
+import { logger } from "~/utils/logger";
 
 interface DashboardProps {
   isVisible: boolean;
@@ -146,9 +147,9 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     const shouldRefresh = diffInMinutes >= CACHE_EXPIRATION_MINUTES;
     
     if (shouldRefresh) {
-      console.log(`Dashboard: Cache expired (${Math.round(diffInMinutes)} minutes old, max ${CACHE_EXPIRATION_MINUTES} minutes)`);
+      logger.debug(`Dashboard: Cache expired (${Math.round(diffInMinutes)} minutes old, max ${CACHE_EXPIRATION_MINUTES} minutes)`);
     } else {
-      console.log(`Dashboard: Cache still valid (${Math.round(diffInMinutes)} minutes old)`);
+      logger.debug(`Dashboard: Cache still valid (${Math.round(diffInMinutes)} minutes old)`);
     }
     
     return shouldRefresh;
@@ -173,12 +174,12 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
             setHasReceivedData(true); // Mark that we've loaded data from cache
           }
           // else: Inventory data caching removed as feature not implemented yet
-          console.log(`Dashboard: Loaded ${type} data from cache (${data?.totalProducts || 0} products)`);
+          logger.debug(`Dashboard: Loaded ${type} data from cache (${data?.totalProducts || 0} products)`);
           return true;
         }
       }
     } catch (error) {
-      console.warn('Dashboard: Error loading cached data (localStorage may be disabled):', error);
+      logger.warn('Dashboard: Error loading cached data (localStorage may be disabled):', error);
       // Gracefully handle localStorage errors (private browsing, quota exceeded, etc.)
       // Return false to trigger fresh data fetch
     }
@@ -196,12 +197,12 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
       
       localStorage.setItem(cacheKey, JSON.stringify(data));
       localStorage.setItem(timestampKey, now.toISOString());
-      console.log(`Dashboard: Saved ${type} data to cache (${data?.totalOrders || 0} orders)`);
+      logger.debug(`Dashboard: Saved ${type} data to cache (${data?.totalOrders || 0} orders)`);
     } catch (error) {
       // Gracefully handle localStorage errors with specific detection
       if (error instanceof DOMException) {
         if (error.name === 'QuotaExceededError') {
-          console.warn('Dashboard: localStorage quota exceeded. Consider clearing old cache data.');
+          logger.warn('Dashboard: localStorage quota exceeded. Consider clearing old cache data.');
           // Attempt to clear old cache entries to make room
           try {
             const keys = Object.keys(localStorage);
@@ -217,18 +218,18 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                   // Ignore errors during cleanup
                 }
               });
-              console.log(`Dashboard: Cleared ${toRemove.length} old cache entries`);
+              logger.debug(`Dashboard: Cleared ${toRemove.length} old cache entries`);
             }
           } catch (cleanupError) {
-            console.warn('Dashboard: Failed to cleanup cache:', cleanupError);
+            logger.warn('Dashboard: Failed to cleanup cache:', cleanupError);
           }
         } else if (error.name === 'SecurityError') {
-          console.warn('Dashboard: localStorage access denied (private browsing mode or security restrictions)');
+          logger.warn('Dashboard: localStorage access denied (private browsing mode or security restrictions)');
         } else {
-          console.warn('Dashboard: localStorage error:', error.name, error.message);
+          logger.warn('Dashboard: localStorage error:', error.name, error.message);
         }
       } else {
-        console.warn('Dashboard: Unexpected error saving cached data:', error);
+        logger.warn('Dashboard: Unexpected error saving cached data:', error);
       }
       // App continues to work without cache - data will be refetched next time
     }
@@ -251,7 +252,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     // Each new fetch gets a new generation number
     const fetchGeneration = ++fetchGenerationRef.current;
     
-    console.log(`Dashboard: ${force ? 'Manual' : 'Auto'} ${type} data refresh (Generation #${fetchGeneration})`);
+    logger.debug(`Dashboard: ${force ? 'Manual' : 'Auto'} ${type} data refresh (Generation #${fetchGeneration})`);
     setIsLoading(true);
     setError(null);
     setIsManualRefresh(force);
@@ -260,16 +261,16 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     const currentProductAnalyticsFetcher = productAnalyticsFetcherRef.current;
     const currentInventoryFetcher = inventoryFetcherRef.current;
     
-    console.log("Dashboard: fetchFreshData called with type:", type, "force:", force, "generation:", fetchGeneration);
+    logger.debug("Dashboard: fetchFreshData called with type:", type, "force:", force, "generation:", fetchGeneration);
     if (type === 'revenue') {
       // Store this as the latest revenue fetch generation
       currentRevenueGenerationRef.current = fetchGeneration;
-      console.log("Dashboard: Calling product-analytics API (Generation #" + fetchGeneration + ")");
+      logger.debug("Dashboard: Calling product-analytics API (Generation #" + fetchGeneration + ")");
       currentProductAnalyticsFetcher.load(`/app/api/product-analytics`);
     } else {
       // Store this as the latest inventory fetch generation
       currentInventoryGenerationRef.current = fetchGeneration;
-      console.log("Dashboard: Calling inventory API (Generation #" + fetchGeneration + ")", currentPeriod);
+      logger.debug("Dashboard: Calling inventory API (Generation #" + fetchGeneration + ")", currentPeriod);
       currentInventoryFetcher.load(`/app/api/inventory?period=${currentPeriod}`);
     }
   }, []); // No dependencies to prevent recreation
@@ -374,12 +375,12 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
         setStoreCurrency(currencyCode);
         setCurrencySymbol(currencySymbols[currencyCode] || currencyCode + ' ');
         
-        console.log(`💰 Dashboard: Store currency loaded: ${currencyCode} (${currencySymbols[currencyCode] || currencyCode})`);
+        logger.debug(`💰 Dashboard: Store currency loaded: ${currencyCode} (${currencySymbols[currencyCode] || currencyCode})`);
       } else {
         throw new Error(result.error || 'Failed to fetch shop info');
       }
     } catch (error) {
-      console.error('Dashboard: Failed to load store currency:', error);
+      logger.error('Dashboard: Failed to load store currency:', error);
       // Fallback to USD
       setStoreCurrency('USD');
       setCurrencySymbol('$');
@@ -401,7 +402,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
 
   // Smart data loading: check cache first, then fetch if needed
   useEffect(() => {
-    console.log("Dashboard: useEffect triggered - isVisible:", isVisible, "hasLoadedInitialData:", hasLoadedInitialData);
+    logger.debug("Dashboard: useEffect triggered - isVisible:", isVisible, "hasLoadedInitialData:", hasLoadedInitialData);
     
     if (!isVisible) return;
 
@@ -409,7 +410,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     const type = 'revenue';
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const cacheKey = `${type}_0_${timePeriod}`;
-    console.log("Dashboard: Loading data for type:", type, "timePeriod:", timePeriod);
+    logger.debug("Dashboard: Loading data for type:", type, "timePeriod:", timePeriod);
     
     // Skip if we've already loaded data for this combination
     if (hasLoadedInitialData) return;
@@ -420,7 +421,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     // If no cached data or cache expired, fetch fresh data
     // But don't block UI - show dashboard structure with loading states
     if (!hasCachedData) {
-      console.log(`Dashboard: No cached ${type} data found, fetching fresh data`);
+      logger.debug(`Dashboard: No cached ${type} data found, fetching fresh data`);
       // Use a timeout to allow UI to render first, then fetch data
       setTimeout(() => {
         fetchFreshData(type, false);
@@ -448,12 +449,12 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
       // Ignore responses from old fetches (race condition protection)
       // This happens when user switches periods rapidly before previous fetch completes
       if (currentGeneration <= lastProcessedRevenueGeneration.current) {
-        console.log(`Dashboard: Ignoring stale product analytics response (Generation #${currentGeneration}, already processed #${lastProcessedRevenueGeneration.current})`);
+        logger.debug(`Dashboard: Ignoring stale product analytics response (Generation #${currentGeneration}, already processed #${lastProcessedRevenueGeneration.current})`);
         return;
       }
       
       lastProcessedRevenueGeneration.current = currentGeneration;
-      console.log(`Dashboard: Product analytics data received (Generation #${currentGeneration})`, productAnalyticsFetcher.data);
+      logger.debug(`Dashboard: Product analytics data received (Generation #${currentGeneration})`, productAnalyticsFetcher.data);
       
       setHasReceivedData(true); // Mark that we've received data (even if empty)
       

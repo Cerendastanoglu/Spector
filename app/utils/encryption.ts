@@ -12,13 +12,26 @@ const _TAG_LENGTH = 16; // 128 bits
  * In production, this should be stored securely (e.g., environment variable, AWS KMS, etc.)
  */
 function getEncryptionKey(): Buffer {
-  const keyString = process.env.ENCRYPTION_KEY || 'default-dev-key-change-in-production-32chars';
+  const keyString = process.env.ENCRYPTION_KEY;
   
-  if (keyString.length < 32) {
+  // SECURITY: Fail in production if encryption key is not set
+  if (process.env.NODE_ENV === 'production' && !keyString) {
+    throw new Error('CRITICAL SECURITY ERROR: ENCRYPTION_KEY environment variable must be set in production. Data cannot be encrypted securely without it.');
+  }
+  
+  // Use default key only in development
+  const key = keyString || 'default-dev-key-change-in-production-32chars';
+  
+  // Warn if using default key in production (shouldn't reach here due to check above)
+  if (process.env.NODE_ENV === 'production' && key === 'default-dev-key-change-in-production-32chars') {
+    throw new Error('CRITICAL SECURITY ERROR: Cannot use default encryption key in production');
+  }
+  
+  if (key.length < 32) {
     throw new Error('Encryption key must be at least 32 characters long');
   }
   
-  return Buffer.from(keyString.slice(0, 32), 'utf8');
+  return Buffer.from(key.slice(0, 32), 'utf8');
 }
 
 /**

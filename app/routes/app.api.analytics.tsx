@@ -3,6 +3,9 @@ import { authenticate } from "../shopify.server";
 import { PrismaClient } from "@prisma/client";
 import { encryptData } from "../utils/encryption";
 import { getRetentionPolicy, calculateExpirationDate } from "../utils/dataRetention";
+import { applyRateLimit, getRateLimitHeaders } from "../utils/rateLimit";
+import { RATE_LIMITS } from "../utils/security";
+import logger from "../utils/logger";
 
 const prisma = new PrismaClient();
 
@@ -24,6 +27,12 @@ type AnalyticsData = {
 
 // Handler for GET requests to fetch analytics
 export async function loader({ request }: LoaderFunctionArgs) {
+  // Apply rate limiting - 30 requests per minute for analytics
+  const rateLimitResponse = await applyRateLimit(request, RATE_LIMITS.API_ANALYTICS);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   const { admin, session } = await authenticate.admin(request);
   const shop = session.shop;
 
@@ -57,7 +66,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     const data = await response.json();
     const products = data.data.products.edges.map((edge: any) => edge.node);
-    console.log(`📊 Analyzing ${products.length} products...`);
+    logger.debug(`📊 Analyzing ${products.length} products...`);
 
     let totalInventoryValue = 0;
     let outOfStockCount = 0;
@@ -135,15 +144,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
         }
       });
       
-      console.log(`Analytics data cached for ${retentionDays} days`);
+      logger.debug(`Analytics data cached for ${retentionDays} days`);
     } catch (error) {
-      console.error('Failed to cache analytics data:', error);
+      logger.error('Failed to cache analytics data:', error);
     }
 
-    return json(analyticsData);
+    // Add rate limit headers to response
+    const rateLimitHeaders = getRateLimitHeaders(request, RATE_LIMITS.API_ANALYTICS);
+    return json(analyticsData, { headers: rateLimitHeaders });
     
   } catch (error: any) {
-    console.error('Error fetching analytics:', error.message);
+    logger.error('Error fetching analytics:', error.message);
     
     // Try to return cached data if available
     try {
