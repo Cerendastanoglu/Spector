@@ -10,9 +10,10 @@ primary_region = 'fra'
 
 [env]
   PORT = '3000'
-  SCOPES = 'read_orders,read_products,write_orders,write_products'
-  SHOPIFY_API_KEY = '035bb80387ae6ea29247c8d0b706f67a'
-  SHOPIFY_APP_URL = 'https://spector.fly.dev'
+  # Updated scopes to match shopify.app.toml
+  SCOPES = 'write_products,read_products,read_orders,write_orders'
+  # SHOPIFY_API_KEY and SHOPIFY_APP_URL moved to Fly.io secrets for better security
+  # Set with: fly secrets set SHOPIFY_API_KEY=xxx SHOPIFY_APP_URL=xxx --app spector
 
 [processes]
   app = 'node ./dbsetup.js npm run docker-start'
