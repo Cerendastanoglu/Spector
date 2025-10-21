@@ -1,7 +1,6 @@
 import {
   Text,
   Button,
-  Icon,
   InlineStack,
   Box,
   Tooltip,
@@ -71,11 +70,16 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
     </div>
   );
 
-  // Mobile-friendly secondary menu
-  const mobileSecondaryMenu = (
-    <InlineStack gap="200">
-      {mobileSettingsButton}
-    </InlineStack>
+  // Help button - appears in pink header background
+  const helpButton = (
+    <Tooltip content="Help & Documentation">
+      <Button 
+        onClick={() => onTabChange("help")}
+        icon={QuestionCircleIcon} 
+        variant="tertiary"
+        size="medium"
+      />
+    </Tooltip>
   );
 
   const logoMarkup = (
@@ -414,10 +418,13 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
               `
             }} />
             
-            {/* Mobile: Logo and Settings on top row */}
+            {/* Mobile: Logo, Help, and Settings on top row */}
             <InlineStack align="space-between" blockAlign="center">
               {logoMarkup}
-              {mobileSecondaryMenu}
+              <InlineStack gap="300">
+                {helpButton}
+                {mobileSettingsButton}
+              </InlineStack>
             </InlineStack>
             
             {/* Mobile: Navigation on second row */}
@@ -455,7 +462,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
               </InlineStack>
               
               {/* Navigation moved to center-right with more spacing */}
-              <InlineStack gap="200" align="center">
+              <InlineStack gap="300" align="center">
                 <div style={{
                   background: theme === 'dark'
                     ? 'rgba(42, 42, 42, 0.9)'
@@ -471,88 +478,18 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
                   backdropFilter: 'blur(10px)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  marginRight: '40px'
+                  gap: '8px'
                 }}>
                   {navigationMarkup}
                   {desktopSettingsButton}
                 </div>
+                {/* Help button outside white section, in pink header */}
+                {helpButton}
               </InlineStack>
             </InlineStack>
           </div>
         </Box>
       </div>
-      
-      {/* Enhanced Floating Help Button */}
-      <Tooltip content="Get Help & Documentation">
-        <div 
-          data-help-button
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            right: '24px',
-            zIndex: 9999,
-            background: '#ee2c52',
-            borderRadius: '16px',
-            width: '56px',
-            height: '56px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(238, 44, 82, 0.3)',
-            cursor: 'pointer',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            border: 'none'
-          }}
-          onClick={() => onTabChange("help")}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.1) rotate(10deg)';
-            e.currentTarget.style.boxShadow = '0 8px 24px rgba(238, 44, 82, 0.4)';
-            e.currentTarget.style.borderRadius = '20px';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
-            e.currentTarget.style.boxShadow = '0 4px 16px rgba(238, 44, 82, 0.3)';
-            e.currentTarget.style.borderRadius = '16px';
-          }}>
-          <div style={{ color: 'white' }}>
-            <Icon source={QuestionCircleIcon} />
-          </div>
-          
-        </div>
-      </Tooltip>
-      
-      {/* Add CSS animations */}
-      <style>{`
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        
-        
-        [data-help-button] {
-          position: fixed !important;
-          bottom: 24px !important;
-          right: 24px !important;
-          z-index: 9999 !important;
-        }
-        
-        @media (max-width: 768px) {
-          [data-help-button] {
-            width: 64px !important;
-            height: 64px !important;
-            bottom: 16px !important;
-            right: 16px !important;
-            border-radius: 20px !important;
-          }
-          
-          [data-help-button] div {
-            font-size: 30px !important;
-          }
-        }
-        
-
-      `}</style>
     </>
   );
 }
