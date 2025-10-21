@@ -102,3 +102,19 @@ model ComplianceAudit {
   @@index([expiresAt])
   @@index([status])
 }
+
+// Intelligence API Credentials Storage
+model IntelligenceCredentials {
+  id                String   @id @default(cuid())
+  shop              String   // Which Shopify store
+  providerId        String   // 'serpapi', 'ahrefs', etc.
+  encryptedApiKey   String   // AES-256-GCM encrypted API key
+  isActive          Boolean  @default(true)
+  lastVerified      DateTime? // Last time credentials were verified
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([shop, providerId])
+  @@index([shop])
+  @@index([providerId])
+}

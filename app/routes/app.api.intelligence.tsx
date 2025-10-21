@@ -214,19 +214,30 @@ async function handleCredentialsUpdate(
       return json({ error: 'Missing providerId or credentials' }, { status: 400 });
     }
 
-    // TODO: Implement encrypted credential storage
-    // This would store encrypted credentials per shop in the database
-    // For now, return success to complete the API structure
+    // Validate credentials object structure
+    if (typeof credentials !== 'object' || !credentials.apiKey) {
+      return json({ error: 'Invalid credentials format. Expected { apiKey: string }' }, { status: 400 });
+    }
+
+    // Import credential management service
+    const { storeProviderCredentials } = await import('../services/intelligence-credentials.server');
     
-    console.log(`📝 Credentials updated for ${shop}:${providerId}`);
+    // Store encrypted credentials
+    const success = await storeProviderCredentials(shop, providerId, credentials.apiKey);
+    
+    if (!success) {
+      return json({ 
+        error: 'Failed to store credentials securely' 
+      }, { status: 500 });
+    }
     
     return json({ 
       success: true,
-      message: `Credentials updated for ${providerId}` 
+      message: `Credentials securely stored for ${providerId}` 
     });
 
   } catch (error) {
-    console.error('Credential update error:', error);
+    console.error('❌ Credential update error:', error);
     return json({ 
       error: error instanceof Error ? error.message : 'Update failed' 
     }, { status: 500 });
@@ -243,15 +254,6 @@ function sendSSE(
 ) {
   const message = `event: ${event}\\ndata: ${JSON.stringify(data)}\\n\\n`;
   controller.enqueue(new TextEncoder().encode(message));
-}
-
-/**
- * Utility to check provider credentials
- */
-export async function checkProviderCredentials(_shop: string, _providerId: string) {
-  // TODO: Implement credential checking from encrypted storage
-  // This would verify that the shop has valid credentials for the provider
-  return false; // Placeholder
 }
 
 /**

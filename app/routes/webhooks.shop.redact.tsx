@@ -25,47 +25,112 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     console.log(`🗑️ Shop data redaction request for shop: ${shop_domain}`);
     console.log(`🏪 Shop ID: ${shop_id}`);
 
-    // TODO: Implement your shop data deletion logic here
-    // You MUST delete ALL data associated with this shop, including:
-    // 1. All customer data from this shop
-    // 2. All analytics data
-    // 3. All product data
-    // 4. All session data
-    // 5. All app configurations
-    // 6. All cached data
-    // 7. All logs containing shop information
+    // GDPR/CCPA Compliance Implementation
+    // Delete ALL data associated with this shop
+    
+    const deletionResults = {
+      sessions: 0,
+      analyticsSnapshots: 0,
+      productAnalytics: 0,
+      dataRetentionPolicies: 0,
+      complianceAudits: 0,
+      errors: [] as string[],
+    };
 
     try {
-      // Delete all sessions for this shop
-      await db.session.deleteMany({
+      // 1. Delete all OAuth sessions for this shop
+      const sessionsDeleted = await db.session.deleteMany({
         where: { shop: shop_domain }
       });
+      deletionResults.sessions = sessionsDeleted.count;
+      console.log(`✅ Deleted ${sessionsDeleted.count} sessions`);
 
-      // Delete any other shop-specific data you might have
-      // Example deletions (customize based on your data structure):
-      /*
-      await db.shopAnalytics.deleteMany({
-        where: { shopDomain: shop_domain }
+      // 2. Delete all analytics snapshots for this shop
+      const analyticsDeleted = await db.analyticsSnapshot.deleteMany({
+        where: { shop: shop_domain }
       });
+      deletionResults.analyticsSnapshots = analyticsDeleted.count;
+      console.log(`✅ Deleted ${analyticsDeleted.count} analytics snapshots`);
 
-      await db.shopSettings.deleteMany({
-        where: { shopDomain: shop_domain }
+      // 3. Delete all product analytics cache for this shop
+      const productAnalyticsDeleted = await db.productAnalytics.deleteMany({
+        where: { shop: shop_domain }
       });
+      deletionResults.productAnalytics = productAnalyticsDeleted.count;
+      console.log(`✅ Deleted ${productAnalyticsDeleted.count} product analytics entries`);
 
-      await db.productCache.deleteMany({
-        where: { shopDomain: shop_domain }
+      // 4. Delete data retention policies for this shop
+      const retentionPoliciesDeleted = await db.dataRetentionPolicy.deleteMany({
+        where: { shop: shop_domain }
       });
+      deletionResults.dataRetentionPolicies = retentionPoliciesDeleted.count;
+      console.log(`✅ Deleted ${retentionPoliciesDeleted.count} data retention policies`);
 
-      await db.notificationSettings.deleteMany({
-        where: { shopDomain: shop_domain }
+      // 5. Delete old compliance audit records (keep this one for 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const auditsDeleted = await db.complianceAudit.deleteMany({
+        where: {
+          shop: shop_domain,
+          receivedAt: { lt: thirtyDaysAgo }, // Keep recent audits
+        },
       });
-      */
+      deletionResults.complianceAudits = auditsDeleted.count;
+      console.log(`✅ Deleted ${auditsDeleted.count} old compliance audit records`);
 
       console.log(`✅ Shop data successfully redacted for shop: ${shop_domain}`);
+      console.log(`📊 Deletion summary:`, deletionResults);
+      
+      // Create final compliance audit record (will auto-expire in 30 days)
+      try {
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30); // 30 days retention
+        
+        await db.complianceAudit.create({
+          data: {
+            shop: shop_domain,
+            topic: 'shop/redact',
+            payload: JSON.stringify(payload),
+            status: 'completed',
+            response: JSON.stringify(deletionResults),
+            receivedAt: new Date(),
+            completedAt: new Date(),
+            expiresAt: expiresAt,
+            notes: `Shop uninstalled. All data deleted: ${deletionResults.sessions} sessions, ${deletionResults.analyticsSnapshots} analytics, ${deletionResults.productAnalytics} products, ${deletionResults.dataRetentionPolicies} policies, ${deletionResults.complianceAudits} old audits.`,
+          },
+        });
+        
+        console.log(`✅ Final compliance audit record created`);
+      } catch (auditError) {
+        console.error('⚠️ Failed to create final compliance audit record:', auditError);
+      }
       
     } catch (dbError) {
       console.error('❌ Failed to redact shop data from database:', dbError);
-      // Still return 200 to acknowledge receipt, but log the error
+      deletionResults.errors.push(dbError instanceof Error ? dbError.message : 'Unknown error');
+      
+      // Log the failed attempt for compliance
+      try {
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30);
+        
+        await db.complianceAudit.create({
+          data: {
+            shop: shop_domain,
+            topic: 'shop/redact',
+            payload: JSON.stringify(payload),
+            status: 'error',
+            receivedAt: new Date(),
+            expiresAt: expiresAt,
+            notes: `Shop redaction failed: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`,
+          },
+        });
+      } catch (auditError) {
+        console.error('⚠️ Failed to log error in compliance audit:', auditError);
+      }
+      
+      // Still return 200 to acknowledge receipt
     }
 
     // Log the redaction for compliance

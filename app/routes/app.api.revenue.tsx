@@ -1,6 +1,8 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
+import { applyRateLimit } from "~/utils/rateLimit";
+import { RATE_LIMITS } from "~/utils/security";
 
 interface RevenueData {
   totalRevenue: number;
@@ -27,6 +29,10 @@ interface RevenueData {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  // Apply rate limiting (60 requests per minute)
+  const rateLimitResponse = await applyRateLimit(request, RATE_LIMITS.API_DEFAULT);
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     console.log("Revenue API: Starting request...");
     

@@ -5,6 +5,13 @@ import { ProductConstants } from "../utils/scopedConstants";
 import { ProductTable } from "./ProductTable";
 import styles from "./StepsUI.module.css";
 import {
+  BulkPriceEditor,
+  BulkTagEditor,
+  BulkCollectionEditor,
+  BulkInventoryEditor,
+  BulkContentEditor,
+} from "./ProductManagement/index";
+import {
   Card,
   Text,
   Badge,
@@ -219,8 +226,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   const [filterByCollection, setFilterByCollection] = useState<string>('');
   
   // Advanced Filter States
-  const [filterByVendor] = useState<string>('');
-  const [filterByProductType] = useState<string>('');
   const [filterByTags, setFilterByTags] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<{ min: string; max: string }>({ min: '', max: '' });
   const [inventoryRange, setInventoryRange] = useState<{ min: string; max: string }>({ min: '', max: '' });
@@ -284,13 +289,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       collection.title.toLowerCase().includes(collectionSearchQuery.toLowerCase())
     );
   }, [availableCollections, collectionSearchQuery]);
-  
-  // Advanced Bulk Operations State
-  const [seoTemplate, setSeoTemplate] = useState('');
-  const [metaDescription, setMetaDescription] = useState('');
-  const [lowStockAlert, setLowStockAlert] = useState('');
-  const [marketingTags, setMarketingTags] = useState('');
-  const [seasonalPricing, setSeasonalPricing] = useState('');
   
   // Enhanced Error and success states for bulk operations
   const [success, setSuccess] = useState<string | null>(null);
@@ -568,8 +566,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     sortField, 
     sortDirection, 
     filterByCollection,
-    filterByVendor,
-    filterByProductType,
     filterByTags,
     tagSearchQuery,
     priceRange,
@@ -624,16 +620,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         return false;
       }
     }
-
-    // Vendor filter (temporarily disabled until added to GraphQL query)
-    // if (filterByVendor && product.vendor !== filterByVendor) {
-    //   return false;
-    // }
-
-    // Product Type filter (temporarily disabled until added to GraphQL query)
-    // if (filterByProductType && product.productType !== filterByProductType) {
-    //   return false;
-    // }
 
     // Tags filter (product must have ALL selected tags)
     if (filterByTags.length > 0) {
@@ -725,14 +711,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     setError(null);
     // Clear bulk messages functionality
   };
-
-
-
-
-
-  // const handleSelectAll = (checked: boolean) => {
-  //   setSelectedProducts(checked ? filteredProducts.map(p => p.id) : []);
-  // };
 
   // CSV Export Function
   const handleExportCSV = () => {
@@ -1824,96 +1802,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     }
   };
 
-  // Advanced SEO Bulk Operations
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleBulkSEO = async () => {
-    if (selectedProducts.length === 0) {
-      setError("Please select at least one product for SEO optimization.");
-      return;
-    }
-    
-    if (!seoTemplate.trim() && !metaDescription.trim()) {
-      setError("Please enter either an SEO title template or meta description.");
-      return;
-    }
-    
-    setIsLoading(true);
-    setError(null);
-    console.log(null);
-    
-    try {
-      const seoUpdates = selectedProducts.map(productId => {
-        const product = products.find(p => p.id === productId);
-        if (!product) return null;
-        
-        // Generate SEO title from template
-        const seoTitle = seoTemplate
-          .replace('{product_name}', product.title)
-          .replace('{price}', product.variants.edges[0]?.node.price || '0')
-          .replace('{category}', 'Product');
-        
-        return {
-          productId,
-          seoTitle: seoTitle || product.title,
-          metaDescription: metaDescription || `Buy ${product.title} at the best price. High quality product with fast shipping.`
-        };
-      }).filter(Boolean);
-      
-      console.log('Bulk SEO updates:', seoUpdates);
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      console.log(`Successfully optimized SEO for ${selectedProducts.length} products with smart templates!`);
-      setSeoTemplate('');
-      setMetaDescription('');
-      // Keep products selected for additional operations
-      setTimeout(() => console.log(null), 3000);
-    } catch (error) {
-      setError(`Failed to update SEO: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Smart Inventory Management (commented out - unused)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleBulkInventory = async () => {
-    if (selectedProducts.length === 0) {
-      setError("Please select at least one product for inventory management.");
-      return;
-    }
-    
-    setIsLoading(true);
-    setError(null);
-    console.log(null);
-    
-    try {
-      const inventoryUpdates = selectedProducts.map(productId => {
-        const product = products.find(p => p.id === productId);
-        if (!product) return null;
-        
-        return {
-          productId,
-          inventoryPolicy: 'deny',
-          tracking: true,
-          lowStockThreshold: parseInt(lowStockAlert) || 5,
-          autoReorderPoint: parseInt(lowStockAlert) * 2 || null
-        };
-      }).filter(Boolean);
-      
-      console.log('Bulk inventory updates:', inventoryUpdates);
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      console.log(`Successfully configured inventory settings for ${selectedProducts.length} products with smart alerts!`);
-      setLowStockAlert('');
-      // Keep products selected for additional operations
-      setTimeout(() => console.log(null), 3000);
-    } catch (error) {
-      setError(`Failed to update inventory: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Handler for fetching product details with lazy loading
   const handleFetchProductDetails = async (tabIndex: number) => {
     if (selectedProducts.length === 0) {
@@ -2040,57 +1928,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     </Card>
   );
 
-  // Advanced Marketing Operations (commented out - unused)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleBulkMarketing = async () => {
-    if (selectedProducts.length === 0) {
-      setError("Please select at least one product for marketing optimization.");
-      return;
-    }
-    
-    setIsLoading(true);
-    setError(null);
-    console.log(null);
-    
-    try {
-      const marketingUpdates = selectedProducts.map(productId => {
-        const product = products.find(p => p.id === productId);
-        if (!product) return null;
-        
-        // Smart tag generation
-        const autoTags = [
-          'bestseller',
-          'trending',
-          'category-general',
-          seasonalPricing ? `seasonal-${seasonalPricing}` : null,
-          marketingTags.split(',').map(tag => tag.trim())
-        ].flat().filter(Boolean);
-        
-        return {
-          productId,
-          tags: autoTags,
-          seasonalPricing: seasonalPricing || null,
-          promotionReady: true,
-          crossSellEnabled: true
-        };
-      }).filter(Boolean);
-      
-      console.log('Bulk marketing updates:', marketingUpdates);
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      console.log(`Successfully applied marketing optimization to ${selectedProducts.length} products with smart tagging!`);
-      setMarketingTags('');
-      setSeasonalPricing('');
-      // Keep products selected for additional operations
-      setTimeout(() => console.log(null), 3000);
-    } catch (error) {
-      setError(`Failed to update marketing: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-
   // Load store currency from Shopify API
   const loadStoreCurrency = async () => {
     try {
@@ -2213,122 +2050,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   useEffect(() => {
     loadStoreCurrency();
   }, []);
-
-  // const handleDraftSelected = () => {
-  //   if (selectedProducts.length === 0) return;
-
-  //   // Single confirmation
-  //   if (!confirm(`Draft ${selectedProducts.length} selected products? This will change their status to draft.`)) {
-  //     return;
-  //   }
-
-  //   // Store selected product IDs before clearing
-  //   const productsToUpdate = [...selectedProducts];
-
-  //   // Clear selection immediately for better UX
-  //   setSelectedProducts([]);
-
-  //   // Optimistically update UI - change products to draft immediately
-  //   setProducts(prevProducts => 
-  //     prevProducts.map(product => 
-  //       productsToUpdate.includes(product.id) 
-  //         ? { ...product, status: 'DRAFT' }
-  //         : product
-  //     )
-  //   );
-
-  //   // Submit to API in background with error handling
-  //   try {
-  //     const formData = new FormData();
-  //     formData.append('action', 'draft-products');
-  //     formData.append('productIds', JSON.stringify(productsToUpdate));
-      
-  //     fetcher.submit(formData, { 
-  //       method: "post", 
-  //       action: "/app/api/products",
-  //       encType: "multipart/form-data"
-  //     });
-  //   } catch (error) {
-  //     console.error('Error submitting draft request:', error);
-  //     // Revert optimistic update on error
-  //     setProducts(prevProducts => 
-  //       prevProducts.map(product => 
-  //         productsToUpdate.includes(product.id) 
-  //           ? { ...product, status: 'ACTIVE' } // Revert to previous status
-  //           : product
-  //       )
-  //     );
-  //     setError('Failed to draft products. Please try again.');
-  //   }
-  // };
-
-  // const handleActivateSelected = () => {
-  //   if (selectedProducts.length === 0) return;
-
-  //   // Single confirmation
-  //   if (!confirm(`Activate ${selectedProducts.length} selected products? This will change their status to active.`)) {
-  //     return;
-  //   }
-
-  //   // Store selected product IDs before clearing
-  //   const productsToUpdate = [...selectedProducts];
-
-  //   // Clear selection immediately for better UX
-  //   setSelectedProducts([]);
-
-  //   // Optimistically update UI - change products to active immediately
-  //   setProducts(prevProducts => 
-  //     prevProducts.map(product => 
-  //       productsToUpdate.includes(product.id) 
-  //         ? { ...product, status: 'ACTIVE' }
-  //         : product
-  //     )
-  //   );
-
-  //   // If draft products are hidden, temporarily show them so user can see the activation
-  //   if (!showDraftProducts) {
-  //     setShowDraftProducts(true);
-  //   }
-
-  //   // Submit to API in background with error handling
-  //   try {
-  //     const formData = new FormData();
-  //     formData.append('action', 'activate-products');
-  //     formData.append('productIds', JSON.stringify(productsToUpdate));
-      
-  //     fetcher.submit(formData, { 
-  //       method: "post", 
-  //       action: "/app/api/products",
-  //       encType: "multipart/form-data"
-  //     });
-  //   } catch (error) {
-  //     console.error('Error submitting activate request:', error);
-  //     // Revert optimistic update on error
-  //     setProducts(prevProducts => 
-  //       prevProducts.map(product => 
-  //         productsToUpdate.includes(product.id) 
-  //           ? { ...product, status: 'DRAFT' } // Revert to previous status
-  //           : product
-  //       )
-  //     );
-  //     setError('Failed to activate products. Please try again.');
-  //   }
-  // };
-
-  // const handleExportSelected = () => {
-  //   const selectedProductData = filteredProducts.filter(p => selectedProducts.includes(p.id));
-    
-  //   if (selectedProductData.length === 0) {
-  //     return;
-  //   }
-    
-  //   const filename = `products-${currentCategory}-${new Date().toISOString().split('T')[0]}`;
-    
-  //   ProductExporter.exportProducts(selectedProductData, {
-  //     format: exportSettings.format,
-  //     filename
-  //   });
-  // };
 
   // Helper functions for product results selection
 
@@ -3281,372 +3002,81 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           ) : (
             <Card>
               <BlockStack gap="400">
+                {/* Selected Products Count */}
+                <div style={{
+                  padding: '12px 16px',
+                  backgroundColor: '#f8fafc',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <InlineStack gap="200" align="space-between" blockAlign="center">
+                    <Text as="span" variant="bodyMd" fontWeight="semibold">
+                      Selected Products ({selectedProducts.length} {selectedProducts.length === 1 ? 'product' : 'products'})
+                    </Text>
+                    <Button
+                      variant="plain"
+                      size="micro"
+                      onClick={() => {
+                        setSelectedVariants([]);
+                        setSelectedProducts([]);
+                        setHasBulkOperationsCompleted(false);
+                      }}
+                    >
+                      Clear all
+                    </Button>
+                  </InlineStack>
+                </div>
+
                 {/* Pricing Tab */}
                 {activeBulkTab === 0 && (
-                  <BlockStack gap="400">
-                    <InlineStack gap="200" blockAlign="center">
-                      <Text as="h3" variant="headingSm">Pricing Operations</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Change prices completely or round existing prices.
-                      </Text>
-                    </InlineStack>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Update pricing for {selectedVariants.length} selected variants.
-                    </Text>
-
-                    {/* Current Ads Section */}
-                    {renderCurrentAdsSection()}
-
-                    {/* Price Management Category */}
-                    <BlockStack gap="400">
-
-                        <Text as="p" variant="bodyMd" fontWeight="medium">Price Update Method</Text>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
-                          <Button
-                            variant={priceOperation === 'set' ? 'primary' : 'secondary'}
-                            onClick={() => setPriceOperation('set')}
-                            size="medium"
-                          >
-                            Set Fixed Price
-                          </Button>
-                          <Button
-                            variant={priceOperation === 'increase' ? 'primary' : 'secondary'}
-                            onClick={() => setPriceOperation('increase')}
-                            size="medium"
-                          >
-                            Increase by %
-                          </Button>
-                          <Button
-                            variant={priceOperation === 'decrease' ? 'primary' : 'secondary'}
-                            onClick={() => setPriceOperation('decrease')}
-                            size="medium"
-                          >
-                            Decrease by %
-                          </Button>
-                        </div>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          {priceOperation === 'set' && 'Apply same price to all variants'}
-                          {priceOperation === 'increase' && 'Increase current prices by percentage'}
-                          {priceOperation === 'decrease' && 'Decrease current prices by percentage'}
-                        </Text>
-                        
-                        {priceOperation === 'set' && (
-                          <TextField
-                            label="New Price"
-                            type="number"
-                            value={priceValue}
-                            onChange={setPriceValue}
-                            placeholder="0.00"
-                            autoComplete="off"
-                            prefix={currencySymbol}
-                            helpText="Set the same price for all selected variants"
-                          />
-                        )}
-                        
-                        {(priceOperation === 'increase' || priceOperation === 'decrease') && (
-                          <TextField
-                            label={`${priceOperation === 'increase' ? 'Increase' : 'Decrease'} Percentage`}
-                            type="number"
-                            value={pricePercentage}
-                            onChange={setPricePercentage}
-                            placeholder="10"
-                            autoComplete="off"
-                            suffix="%"
-                            helpText={`${priceOperation === 'increase' ? 'Increase' : 'Decrease'} current prices by this percentage`}
-                          />
-                        )}
-
-                        {/* Compare Price Section */}
-                        <Divider />
-                        <BlockStack gap="300">
-                          <InlineStack align="space-between" blockAlign="center">
-                            <Text as="p" variant="bodyMd" fontWeight="medium">Compare At Price</Text>
-                            <Checkbox
-                              label="Apply compare price changes"
-                              checked={applyCompareChanges}
-                              onChange={setApplyCompareChanges}
-                            />
-                          </InlineStack>
-                          
-                          {applyCompareChanges && (
-                            <BlockStack gap="300">
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
-                                <Button
-                                  variant={compareOperation === 'set' ? 'primary' : 'secondary'}
-                                  onClick={() => setCompareOperation('set')}
-                                  size="medium"
-                                >
-                                  Set Fixed
-                                </Button>
-                                <Button
-                                  variant={compareOperation === 'increase' ? 'primary' : 'secondary'}
-                                  onClick={() => setCompareOperation('increase')}
-                                  size="medium"
-                                >
-                                  Increase %
-                                </Button>
-                                <Button
-                                  variant={compareOperation === 'decrease' ? 'primary' : 'secondary'}
-                                  onClick={() => setCompareOperation('decrease')}
-                                  size="medium"
-                                >
-                                  Decrease %
-                                </Button>
-                                <Button
-                                  variant={compareOperation === 'remove' ? 'primary' : 'secondary'}
-                                  onClick={() => setCompareOperation('remove')}
-                                  size="medium"
-                                >
-                                  Remove
-                                </Button>
-                              </div>
-                              
-                              {compareOperation === 'set' && (
-                                <TextField
-                                  label="Compare At Price"
-                                  type="number"
-                                  value={compareValue}
-                                  onChange={setCompareValue}
-                                  placeholder="0.00"
-                                  prefix={currencySymbol}
-                                  helpText="Set compare at price for all selected variants"
-                                  autoComplete="off"
-                                />
-                              )}
-                              
-                              {(compareOperation === 'increase' || compareOperation === 'decrease') && (
-                                <TextField
-                                  label={`${compareOperation === 'increase' ? 'Increase' : 'Decrease'} Compare Price %`}
-                                  type="number"
-                                  value={comparePercentage}
-                                  onChange={setComparePercentage}
-                                  placeholder="10"
-                                  suffix="%"
-                                  helpText={`${compareOperation === 'increase' ? 'Increase' : 'Decrease'} current compare prices by this percentage`}
-                                  autoComplete="off"
-                                />
-                              )}
-                              
-                              {compareOperation === 'remove' && (
-                                <Text as="p" variant="bodySm" tone="subdued">
-                                  This will remove compare at price from all selected variants
-                                </Text>
-                              )}
-                            </BlockStack>
-                          )}
-                        </BlockStack>
-
-                        <Button
-                          variant="primary"
-                          onClick={handleBulkPricing}
-                          disabled={
-                            selectedVariants.length === 0 || 
-                            (priceOperation === 'set' && !priceValue) ||
-                            ((priceOperation === 'increase' || priceOperation === 'decrease') && !pricePercentage)
-                          }
-                          loading={isLoading}
-                        >
-                          Apply Price Changes
-                        </Button>
-                      </BlockStack>
-
-
-                  </BlockStack>
+                  <BulkPriceEditor
+                    priceOperation={priceOperation}
+                    setPriceOperation={setPriceOperation}
+                    priceValue={priceValue}
+                    setPriceValue={setPriceValue}
+                    pricePercentage={pricePercentage}
+                    setPricePercentage={setPricePercentage}
+                    applyCompareChanges={applyCompareChanges}
+                    setApplyCompareChanges={setApplyCompareChanges}
+                    compareOperation={compareOperation}
+                    setCompareOperation={setCompareOperation}
+                    compareValue={compareValue}
+                    setCompareValue={setCompareValue}
+                    comparePercentage={comparePercentage}
+                    setComparePercentage={setComparePercentage}
+                    currencySymbol={currencySymbol}
+                    selectedCount={selectedVariants.length}
+                    onApply={handleBulkPricing}
+                    isLoading={isLoading}
+                  />
                 )}
 
                 {/* Collections Tab */}
-                {activeBulkTab === 1 && (() => {
-                  // Get current collections for selected products
-                  const selectedProductsData = products.filter(p => selectedProducts.includes(p.id));
-                  const currentCollections = new Set<string>();
-                  selectedProductsData.forEach(product => {
-                    product.collections?.edges.forEach(edge => {
-                      currentCollections.add(edge.node.id);
-                    });
-                  });
-                  
-                  return (
-                    <BlockStack gap="400">
-                      <Text as="h3" variant="headingSm">Collection Management</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Manage collections for {selectedProducts.length} selected {selectedProducts.length === 1 ? 'product' : 'products'}.
-                        <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium"> 
-                          {" "}• Green dots indicate products already in the collection.
-                        </Text>
-                      </Text>
-
-                      {/* Current Ads Section */}
-                      {renderCurrentAdsSection()}
-
-                      <div>
-                        <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
-                          Collection Operation
-                        </Text>
-                        <div style={{ 
-                          display: 'grid', 
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', 
-                          gap: '8px', 
-                          marginTop: '8px' 
-                        }}>
-                          <Button
-                            variant={collectionOperation === 'add' ? 'primary' : 'secondary'}
-                            onClick={() => setCollectionOperation('add')}
-                            size="large"
-                            icon={PlusIcon}
-                          >
-                            Add to Collections
-                          </Button>
-                          <Button
-                            variant={collectionOperation === 'remove' ? 'primary' : 'secondary'}
-                            onClick={() => setCollectionOperation('remove')}
-                            size="large"
-                            icon={MinusIcon}
-                          >
-                            Remove from Collections
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
-                          Available Collections
-                        </Text>
-                        <div style={{ 
-                          maxHeight: '250px', 
-                          overflowY: 'auto', 
-                          border: '1px solid #e1e3e5', 
-                          borderRadius: '8px', 
-                          marginTop: '8px'
-                        }}>
-                          {filteredCollections.map((collection) => {
-                            const isInCurrent = currentCollections.has(collection.id);
-                            const isSelected = selectedCollections.includes(collection.id);
-                            
-                            return (
-                              <div 
-                                key={collection.id} 
-                                style={{ 
-                                  padding: '12px',
-                                  borderBottom: '1px solid #f1f2f3',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  backgroundColor: isSelected ? '#f0f8ff' : 'transparent'
-                                }}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                                  <Checkbox
-                                    checked={isSelected}
-                                    onChange={(checked) => {
-                                      if (checked) {
-                                        setSelectedCollections([...selectedCollections, collection.id]);
-                                      } else {
-                                        setSelectedCollections(selectedCollections.filter(id => id !== collection.id));
-                                      }
-                                    }}
-                                    label=""
-                                  />
-                                  <div>
-                                    <Text as="p" variant="bodyMd">
-                                      {collection.title}
-                                    </Text>
-                                    {isInCurrent && (
-                                      <Text as="p" variant="bodySm" tone="subdued">
-                                        Currently assigned
-                                      </Text>
-                                    )}
-                                  </div>
-                                </div>
-                                {isInCurrent && (
-                                  <div style={{
-                                    width: '8px',
-                                    height: '8px',
-                                    borderRadius: '50%',
-                                    backgroundColor: '#008060'
-                                  }} />
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <Button
-                        variant="primary"
-                        onClick={handleBulkCollections}
-                        disabled={selectedProducts.length === 0 || selectedCollections.length === 0}
-                        loading={isLoading}
-                        size="large"
-                      >
-                        {collectionOperation === 'add' ? 'Add Selected Collections' : 'Remove Selected Collections'}
-                      </Button>
-                    </BlockStack>
-                  );
-                })()}
+                {activeBulkTab === 1 && (
+                  <BulkCollectionEditor
+                    availableCollections={availableCollections}
+                    selectedCollections={selectedCollections}
+                    onSelectedCollectionsChange={setSelectedCollections}
+                    collectionOperation={collectionOperation}
+                    onCollectionOperationChange={setCollectionOperation}
+                    onApply={handleBulkCollections}
+                    isLoading={isLoading}
+                  />
+                )}
 
                 {/* Tags Tab */}
                 {activeBulkTab === 2 && (
-                  <BlockStack gap="400">
-                    <Text as="h3" variant="headingSm">Tag Management</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Manage tags for {selectedProducts.length} selected {selectedProducts.length === 1 ? 'product' : 'products'}.
-                    </Text>
-
-                    {/* Current Ads Section */}
-                    {renderCurrentAdsSection()}
-
-                    <div>
-                      <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
-                        Tag Operations
-                      </Text>
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
-                        gap: '8px', 
-                        marginTop: '8px' 
-                      }}>
-                        <Button
-                          variant={tagOperation === 'add' ? 'primary' : 'secondary'}
-                          onClick={() => setTagOperation('add')}
-                          size="large"
-                          icon={PlusIcon}
-                        >
-                          Add Tags
-                        </Button>
-                        <Button
-                          variant={tagOperation === 'remove' ? 'primary' : 'secondary'}
-                          onClick={() => setTagOperation('remove')}
-                          size="large"
-                          icon={MinusIcon}
-                        >
-                          Remove Tags
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <TextField
-                      label={tagOperation === 'add' ? 'Tags to Add' : 'Tags to Remove'}
-                      value={tagOperation === 'add' ? tagValue : tagRemoveValue}
-                      onChange={tagOperation === 'add' ? setTagValue : setTagRemoveValue}
-                      placeholder="Enter tags separated by commas"
-                      autoComplete="off"
-                      helpText="Separate multiple tags with commas (e.g., sale, summer, featured)"
-                    />
-
-                    <Button
-                      variant="primary"
-                      onClick={handleBulkTags}
-                      disabled={
-                        selectedProducts.length === 0 || 
-                        (tagOperation === 'add' && !tagValue) ||
-                        (tagOperation === 'remove' && !tagRemoveValue)
-                      }
-                      loading={isLoading}
-                      size="large"
-                    >
-                      {tagOperation === 'add' ? 'Add Tags to Products' : 'Remove Tags from Products'}
-                    </Button>
-                  </BlockStack>
+                  <BulkTagEditor
+                    tagOperation={tagOperation}
+                    setTagOperation={setTagOperation}
+                    tagValue={tagValue}
+                    setTagValue={setTagValue}
+                    tagRemoveValue={tagRemoveValue}
+                    setTagRemoveValue={setTagRemoveValue}
+                    selectedCount={selectedProducts.length}
+                    onApply={handleBulkTags}
+                    isLoading={isLoading}
+                  />
                 )}
 
                 {/* Content Tab */}
