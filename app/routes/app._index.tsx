@@ -7,6 +7,8 @@ import {
   Text,
   Card,
   BlockStack,
+  InlineStack,
+  Button,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { AppHeader } from "../components/AppHeader";
@@ -171,7 +173,7 @@ export default function Index() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingLg">
-                  App Settings
+                  Settings
                 </Text>
                 <Text as="p" variant="bodyMd" tone="subdued">
                   Manage your Spector app settings and subscription details.
@@ -182,9 +184,19 @@ export default function Index() {
             {/* Subscription & Plan Information */}
             <Card>
               <BlockStack gap="500">
-                <Text as="h3" variant="headingMd">
-                  Subscription & Plan
-                </Text>
+                <InlineStack align="space-between" blockAlign="center">
+                  <Text as="h3" variant="headingMd">
+                    Subscription & Plan
+                  </Text>
+                  <Button
+                    variant="plain"
+                    tone="critical"
+                    url="https://admin.shopify.com/store/settings/apps"
+                    external
+                  >
+                    Cancel Plan & Uninstall
+                  </Button>
+                </InlineStack>
                 <Layout>
                   <Layout.Section variant="oneHalf">
                     <Card>
