@@ -395,7 +395,7 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                             <BlockStack gap="400">
                               <Box background="bg-surface" padding="400" borderRadius="300" borderWidth="025" borderColor="border">
                                 <BlockStack gap="300">
-                                  <InlineStack gap="200" blockAlign="center">
+                                  <InlineStack gap="200" blockAlign="center" align="start">
                                     <Icon source={ClockIcon} />
                                     <Text as="h4" variant="headingMd" fontWeight="bold">
                                       Inventory Management
@@ -444,7 +444,7 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
 
                               <Box background="bg-surface" padding="400" borderRadius="300" borderWidth="025" borderColor="border">
                                 <BlockStack gap="300">
-                                  <InlineStack gap="200" blockAlign="center">
+                                  <InlineStack gap="200" blockAlign="center" align="start">
                                     <Icon source={CashDollarIcon} tone="success" />
                                     <Text as="h4" variant="headingMd" fontWeight="bold">
                                       Financial Performance
@@ -477,7 +477,7 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                             {/* Right Column - Order Statistics */}
                             <Box background="bg-surface" padding="400" borderRadius="300" borderWidth="025" borderColor="border">
                               <BlockStack gap="400">
-                                <InlineStack gap="200" blockAlign="center">
+                                <InlineStack gap="200" blockAlign="center" align="start">
                                   <Icon source={ChartVerticalIcon} tone="info" />
                                   <Text as="h4" variant="headingMd" fontWeight="bold">
                                     Order Trends
@@ -630,20 +630,9 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                   <BlockStack gap="300">
                     {slowMovingItems.length > 0 && (
                       <Banner tone="warning">
-                        <BlockStack gap="200">
-                          <Text as="p" variant="bodyMd">
-                            <strong>{slowMovingItems.length} slow-moving products</strong> detected. Consider these strategies:
-                          </Text>
-                          <ul style={{ marginLeft: '20px', marginTop: '8px' }}>
-                            <li><strong>Promotional Campaigns:</strong> Run discounts or special offers to boost sales</li>
-                            <li><strong>Product Bundling:</strong> Bundle with popular fast-moving products</li>
-                            <li><strong>Pricing Review:</strong> Evaluate if pricing is competitive</li>
-                            <li><strong>Content Optimization:</strong> Improve product descriptions, images, and SEO</li>
-                            <li><strong>Marketing Push:</strong> Feature in email campaigns or social media</li>
-                            <li><strong>Customer Feedback:</strong> Review reviews and adjust based on feedback</li>
-                            <li><strong>Discontinuation:</strong> Consider removing if consistently underperforming</li>
-                          </ul>
-                        </BlockStack>
+                        <Text as="p" variant="bodyMd">
+                          <strong>{slowMovingItems.length} slow-moving products</strong> detected.
+                        </Text>
                       </Banner>
                     )}
                     {renderProductTable(

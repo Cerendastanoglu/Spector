@@ -184,6 +184,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   // Bulk Operation Completion Tracking
   const [hasBulkOperationsCompleted, setHasBulkOperationsCompleted] = useState(false);
   
+  // Selected Products Collapse State
+  const [showSelectedProducts, setShowSelectedProducts] = useState(false);
+  
   // Enhanced Pricing Operations State
   const [priceOperation, setPriceOperation] = useState<'set' | 'increase' | 'decrease' | 'round'>('set');
   const [priceValue, setPriceValue] = useState('');
@@ -2244,8 +2247,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
             </div>
           </div>
 
-          {/* Selected Products Preview - Lightweight for up to 10K products */}
-          {selectedVariants.length > 0 && (
+          {/* Selected Products Preview - Only show in Step 1 */}
+          {activeMainTab === 0 && selectedVariants.length > 0 && (
             <div style={{
               padding: '12px 16px',
               backgroundColor: '#f8fafc',
@@ -3002,82 +3005,97 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           ) : (
             <Card>
               <BlockStack gap="400">
-                {/* Selected Products Count */}
-                <div style={{
-                  padding: '12px 16px',
-                  backgroundColor: '#f8fafc',
-                  borderRadius: '8px',
-                  border: '1px solid #e2e8f0'
-                }}>
-                  <InlineStack gap="200" align="space-between" blockAlign="center">
-                    <Text as="span" variant="bodyMd" fontWeight="semibold">
-                      Selected Products ({selectedProducts.length} {selectedProducts.length === 1 ? 'product' : 'products'})
-                    </Text>
-                    <Button
-                      variant="plain"
-                      size="micro"
-                      onClick={() => {
+                {/* Pricing Tab */}
+                {activeBulkTab === 0 && (() => {
+                  // Convert selectedProducts IDs to actual Product objects
+                  const selectedProductObjects = filteredProducts.filter(p => selectedProducts.includes(p.id));
+                  
+                  return (
+                    <BulkPriceEditor
+                      priceOperation={priceOperation}
+                      setPriceOperation={setPriceOperation}
+                      priceValue={priceValue}
+                      setPriceValue={setPriceValue}
+                      pricePercentage={pricePercentage}
+                      setPricePercentage={setPricePercentage}
+                      applyCompareChanges={applyCompareChanges}
+                      setApplyCompareChanges={setApplyCompareChanges}
+                      compareOperation={compareOperation}
+                      setCompareOperation={setCompareOperation}
+                      compareValue={compareValue}
+                      setCompareValue={setCompareValue}
+                      comparePercentage={comparePercentage}
+                      setComparePercentage={setComparePercentage}
+                      currencySymbol={currencySymbol}
+                      selectedCount={selectedVariants.length}
+                      onApply={handleBulkPricing}
+                      isLoading={isLoading}
+                      selectedProducts={selectedProductObjects}
+                      selectedVariants={selectedVariants}
+                      showSelectedProducts={showSelectedProducts}
+                      setShowSelectedProducts={setShowSelectedProducts}
+                      onClearAll={() => {
                         setSelectedVariants([]);
                         setSelectedProducts([]);
                         setHasBulkOperationsCompleted(false);
                       }}
-                    >
-                      Clear all
-                    </Button>
-                  </InlineStack>
-                </div>
-
-                {/* Pricing Tab */}
-                {activeBulkTab === 0 && (
-                  <BulkPriceEditor
-                    priceOperation={priceOperation}
-                    setPriceOperation={setPriceOperation}
-                    priceValue={priceValue}
-                    setPriceValue={setPriceValue}
-                    pricePercentage={pricePercentage}
-                    setPricePercentage={setPricePercentage}
-                    applyCompareChanges={applyCompareChanges}
-                    setApplyCompareChanges={setApplyCompareChanges}
-                    compareOperation={compareOperation}
-                    setCompareOperation={setCompareOperation}
-                    compareValue={compareValue}
-                    setCompareValue={setCompareValue}
-                    comparePercentage={comparePercentage}
-                    setComparePercentage={setComparePercentage}
-                    currencySymbol={currencySymbol}
-                    selectedCount={selectedVariants.length}
-                    onApply={handleBulkPricing}
-                    isLoading={isLoading}
-                  />
-                )}
+                    />
+                  );
+                })()}
 
                 {/* Collections Tab */}
-                {activeBulkTab === 1 && (
-                  <BulkCollectionEditor
-                    availableCollections={availableCollections}
-                    selectedCollections={selectedCollections}
-                    onSelectedCollectionsChange={setSelectedCollections}
-                    collectionOperation={collectionOperation}
-                    onCollectionOperationChange={setCollectionOperation}
-                    onApply={handleBulkCollections}
-                    isLoading={isLoading}
-                  />
-                )}
+                {activeBulkTab === 1 && (() => {
+                  const selectedProductObjects = filteredProducts.filter(p => selectedProducts.includes(p.id));
+                  
+                  return (
+                    <BulkCollectionEditor
+                      availableCollections={availableCollections}
+                      selectedCollections={selectedCollections}
+                      onSelectedCollectionsChange={setSelectedCollections}
+                      collectionOperation={collectionOperation}
+                      onCollectionOperationChange={setCollectionOperation}
+                      onApply={handleBulkCollections}
+                      isLoading={isLoading}
+                      selectedProducts={selectedProductObjects}
+                      selectedVariants={selectedVariants}
+                      showSelectedProducts={showSelectedProducts}
+                      setShowSelectedProducts={setShowSelectedProducts}
+                      onClearAll={() => {
+                        setSelectedVariants([]);
+                        setSelectedProducts([]);
+                        setHasBulkOperationsCompleted(false);
+                      }}
+                    />
+                  );
+                })()}
 
                 {/* Tags Tab */}
-                {activeBulkTab === 2 && (
-                  <BulkTagEditor
-                    tagOperation={tagOperation}
-                    setTagOperation={setTagOperation}
-                    tagValue={tagValue}
-                    setTagValue={setTagValue}
-                    tagRemoveValue={tagRemoveValue}
-                    setTagRemoveValue={setTagRemoveValue}
-                    selectedCount={selectedProducts.length}
-                    onApply={handleBulkTags}
-                    isLoading={isLoading}
-                  />
-                )}
+                {activeBulkTab === 2 && (() => {
+                  const selectedProductObjects = filteredProducts.filter(p => selectedProducts.includes(p.id));
+                  
+                  return (
+                    <BulkTagEditor
+                      tagOperation={tagOperation}
+                      setTagOperation={setTagOperation}
+                      tagValue={tagValue}
+                      setTagValue={setTagValue}
+                      tagRemoveValue={tagRemoveValue}
+                      setTagRemoveValue={setTagRemoveValue}
+                      selectedCount={selectedProducts.length}
+                      onApply={handleBulkTags}
+                      isLoading={isLoading}
+                      selectedProducts={selectedProductObjects}
+                      selectedVariants={selectedVariants}
+                      showSelectedProducts={showSelectedProducts}
+                      setShowSelectedProducts={setShowSelectedProducts}
+                      onClearAll={() => {
+                        setSelectedVariants([]);
+                        setSelectedProducts([]);
+                        setHasBulkOperationsCompleted(false);
+                      }}
+                    />
+                  );
+                })()}
 
                 {/* Content Tab */}
                 {activeBulkTab === 3 && (
