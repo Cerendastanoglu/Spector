@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import {
   Modal,
   Text,
-  // Button,
   BlockStack,
   InlineStack,
   Box,
@@ -15,7 +14,6 @@ import {
   ChartVerticalIcon,
   PackageIcon,
   OrderIcon,
-  // CheckIcon,
   StarIcon,
   CalendarIcon,
 } from "@shopify/polaris-icons";

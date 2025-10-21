@@ -1,6 +1,8 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
+import { applyRateLimit } from "~/utils/rateLimit";
+import { RATE_LIMITS } from "~/utils/security";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -8,6 +10,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  // Apply rate limiting (100 requests per minute for products API)
+  const rateLimitResponse = await applyRateLimit(request, RATE_LIMITS.API_PRODUCTS);
+  if (rateLimitResponse) return rateLimitResponse;
+
   const { admin } = await authenticate.admin(request);
   
   // Handle both JSON and form data

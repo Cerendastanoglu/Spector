@@ -1,7 +1,7 @@
 import { LoaderFunctionArgs, json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { PrismaClient } from "@prisma/client";
-import { encryptData } from "../utils/encryption";
+import { encryptData, decryptData } from "../utils/encryption";
 import { getRetentionPolicy, calculateExpirationDate } from "../utils/dataRetention";
 import { applyRateLimit, getRateLimitHeaders } from "../utils/rateLimit";
 import { RATE_LIMITS } from "../utils/security";
@@ -169,7 +169,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
       if (latestSnapshot) {
         // Return cached data with source indicator
-        const cachedData = JSON.parse(latestSnapshot.encryptedData);
+        const cachedData = JSON.parse(decryptData(latestSnapshot.encryptedData));
         return json({
           ...cachedData,
           dataSource: 'cached',
@@ -177,7 +177,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         });
       }
     } catch (cacheError) {
-      console.error('Error fetching cached analytics:', cacheError);
+      logger.error('Error fetching cached analytics:', cacheError);
     }
 
     // Return error response if no cached data available
