@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useFetcher } from "@remix-run/react";
 import { openInNewTab } from "../utils/browserUtils";
 import { ProductConstants } from "../utils/scopedConstants";
@@ -8,8 +8,6 @@ import {
   BulkPriceEditor,
   BulkTagEditor,
   BulkCollectionEditor,
-  BulkInventoryEditor,
-  BulkContentEditor,
 } from "./ProductManagement/index";
 import {
   Card,
@@ -27,7 +25,6 @@ import {
   Icon,
   Collapsible,
   Toast,
-  Divider,
   Banner,
 } from '@shopify/polaris';
 // Import only the icons we actually use
@@ -207,7 +204,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   const [collectionOperation, setCollectionOperation] = useState<'add' | 'remove'>('add');
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [availableCollections, setAvailableCollections] = useState<{id: string, title: string}[]>([]);
-  const [collectionSearchQuery] = useState('');
   
   // Current Ads Management State
   const [showCurrentAds, setShowCurrentAds] = useState<{[key: number]: boolean}>({});
@@ -285,13 +281,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   
   // Status & Visibility State
 
-  
-  // Filter collections based on search query - memoized to prevent performance issues
-  const filteredCollections = useMemo(() => {
-    return availableCollections.filter(collection =>
-      collection.title.toLowerCase().includes(collectionSearchQuery.toLowerCase())
-    );
-  }, [availableCollections, collectionSearchQuery]);
   
   // Enhanced Error and success states for bulk operations
   const [success, setSuccess] = useState<string | null>(null);
