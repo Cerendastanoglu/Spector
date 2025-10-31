@@ -1,3 +1,4 @@
+import { logger } from "~/utils/logger";
 import { useState, useEffect } from 'react';
 import { 
   Card, 
@@ -67,7 +68,7 @@ export function IntelligenceDashboard() {
         const healthyProviders = data.providers?.filter((p: Provider) => p.healthy).map((p: Provider) => p.id) || [];
         setRequest(prev => ({ ...prev, providers: healthyProviders.slice(0, 2) }));
       })
-      .catch(console.error);
+      .catch((error) => logger.error('Failed to fetch intelligence providers:', error));
   }, []);
 
   const handleSubmit = async () => {
@@ -110,7 +111,7 @@ export function IntelligenceDashboard() {
         setResults(result);
       }
     } catch (error) {
-      console.error('Intelligence request failed:', error);
+      logger.error('Intelligence request failed:', error);
       setStreamChunks(prev => [...prev, {
         type: 'error',
         error: {
@@ -153,7 +154,7 @@ export function IntelligenceDashboard() {
                 setProgress(null);
               }
             } catch (e) {
-              console.warn('Failed to parse stream chunk:', e);
+              logger.warn('Failed to parse stream chunk:', e);
             }
           }
         }

@@ -3,6 +3,7 @@ import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { decryptData } from "../utils/encryption";
+import { logger } from "~/utils/logger";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -64,7 +65,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               data: decryptedData
             };
           } catch (error) {
-            console.error('Error decrypting analytics data:', error);
+            logger.error('Error decrypting analytics data:', error);
             return {
               id: snapshot.id,
               dataType: snapshot.dataType,
@@ -88,7 +89,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
 
       } catch (error) {
-        console.error('Error exporting data:', error);
+        logger.error('Error exporting data:', error);
         return json({
           success: false,
           error: "Failed to export data"
@@ -107,7 +108,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         await db.$executeRaw`DELETE FROM DataRetentionPolicy WHERE shop = ${shop}`;
 
         // Log the deletion
-        console.log(`Manual data deletion completed for shop: ${shop}`);
+        logger.info(`Manual data deletion completed for shop: ${shop}`);
 
         return json({
           success: true,
@@ -115,7 +116,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
 
       } catch (error) {
-        console.error('Error deleting data:', error);
+        logger.error('Error deleting data:', error);
         return json({
           success: false,
           error: "Failed to delete data"
@@ -153,7 +154,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
 
       } catch (error) {
-        console.error('Error getting data summary:', error);
+        logger.error('Error getting data summary:', error);
         return json({
           success: false,
           error: "Failed to get data summary"

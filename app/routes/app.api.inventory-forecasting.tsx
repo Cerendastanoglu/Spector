@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
+import { logger } from "~/utils/logger";
 
 interface ForecastItem {
   id: string;
@@ -41,18 +42,18 @@ interface InventoryForecastingData {
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
-    console.log("🔵 Inventory Forecasting API: Starting analysis...");
-    console.log(`🔵 Inventory Forecasting API: Request URL: ${request.url}`);
+    logger.info("🔵 Inventory Forecasting API: Starting analysis...");
+    logger.info(`🔵 Inventory Forecasting API: Request URL: ${request.url}`);
     
     const { admin } = await authenticate.admin(request);
-    console.log("🔵 Inventory Forecasting API: Authentication successful");
+    logger.info("🔵 Inventory Forecasting API: Authentication successful");
 
     // Calculate 60 days ago date
     const sixtyDaysAgo = new Date();
     sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
     const sixtyDaysAgoISO = sixtyDaysAgo.toISOString();
     
-    console.log(`🔵 Fetching orders from last 60 days (since ${sixtyDaysAgoISO})`);
+    logger.info(`🔵 Fetching orders from last 60 days (since ${sixtyDaysAgoISO})`);
 
     // GraphQL query to get all products with inventory and variants
     const productsResponse = await admin.graphql(`
@@ -134,11 +135,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const productsData: any = await productsResponse.json();
     const ordersData: any = await ordersResponse.json();
     
-    console.log("🔵 Inventory Forecasting API: Products fetched successfully");
-    console.log("🔵 Inventory Forecasting API: Orders fetched successfully");
+    logger.info("🔵 Inventory Forecasting API: Products fetched successfully");
+    logger.info("🔵 Inventory Forecasting API: Orders fetched successfully");
     
     if (productsData.errors) {
-      console.error("🔴 Inventory Forecasting API: GraphQL errors:", productsData.errors);
+      logger.error("🔴 Inventory Forecasting API: GraphQL errors:", productsData.errors);
       return json({ 
         success: false, 
         error: `GraphQL Error: ${productsData.errors[0]?.message || "Unknown error"}` 
@@ -146,7 +147,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     if (ordersData.errors) {
-      console.error("🔴 Inventory Forecasting API: Orders GraphQL errors:", ordersData.errors);
+      logger.error("🔴 Inventory Forecasting API: Orders GraphQL errors:", ordersData.errors);
       return json({ 
         success: false, 
         error: `Orders GraphQL Error: ${ordersData.errors[0]?.message || "Unknown error"}` 
@@ -156,8 +157,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const products = productsData.data?.products?.edges || [];
     const orders = ordersData.data?.orders?.edges || [];
     
-    console.log(`🔵 Inventory Forecasting API: Found ${products.length} products`);
-    console.log(`🔵 Inventory Forecasting API: Found ${orders.length} orders from last 60 days`);
+    logger.info(`🔵 Inventory Forecasting API: Found ${products.length} products`);
+    logger.info(`🔵 Inventory Forecasting API: Found ${orders.length} orders from last 60 days`);
 
     // Process orders to create product sales data
     const productSalesMap: { [variantId: string]: { 
@@ -167,7 +168,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       dates: string[];
     } } = {};
 
-    console.log(`🔵 Processing ${orders.length} orders for sales analysis...`);
+    logger.info(`🔵 Processing ${orders.length} orders for sales analysis...`);
     
     orders.forEach(({ node: order }: any) => {
       const lineItems = order.lineItems?.edges || [];
@@ -199,12 +200,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
             productSalesMap[variantId].dates.push(orderDate);
           }
         } catch (e) {
-          console.warn(`🔴 Error processing line item:`, e);
+          logger.warn(`🔴 Error processing line item:`, e);
         }
       });
     });
     
-    console.log(`🔵 Inventory Forecasting API: Processed sales data for ${Object.keys(productSalesMap).length} variants`);
+    logger.info(`🔵 Inventory Forecasting API: Processed sales data for ${Object.keys(productSalesMap).length} variants`);
 
     // Process products to create forecast items
     const forecastItems: ForecastItem[] = [];
@@ -308,7 +309,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
               });
             }
           } catch (e) {
-            console.warn(`🔴 Error processing variant ${variant.id}:`, e);
+            logger.warn(`🔴 Error processing variant ${variant.id}:`, e);
           }
         });
       }
@@ -335,9 +336,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
       slowMovingItems
     };
 
-    console.log(`🟢 Inventory Forecasting API: Analysis complete`);
-    console.log(`🔵 Summary: ${summary.totalProducts} products, ${criticalItems} critical, ${lowStockItems} low stock`);
-    console.log(`🔵 Revenue (60 days): $${summary.totalRevenue60Days}, Daily avg: $${summary.averageDailyRevenue}`);
+    logger.info(`🟢 Inventory Forecasting API: Analysis complete`);
+    logger.info(`🔵 Summary: ${summary.totalProducts} products, ${criticalItems} critical, ${lowStockItems} low stock`);
+    logger.info(`🔵 Revenue (60 days): $${summary.totalRevenue60Days}, Daily avg: $${summary.averageDailyRevenue}`);
 
     const responseData: InventoryForecastingData = {
       forecastItems,
@@ -350,7 +351,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
 
   } catch (error) {
-    console.error("🔴 Inventory Forecasting API Error:", error);
+    logger.error("🔴 Inventory Forecasting API Error:", error);
     return json({ 
       success: false, 
       error: error instanceof Error ? error.message : "Unknown server error" 

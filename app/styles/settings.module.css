@@ -1,0 +1,59 @@
+/* Settings Page Styles */
+
+.pageContainer {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.sectionSpacing {
+  margin-bottom: 24px;
+}
+
+.featureItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.featureItem:hover {
+  background-color: #f9fafb;
+}
+
+.featureIcon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  color: #10b981;
+  margin-top: 2px;
+}
+
+.featureIcon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.subscriptionIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: #667eea;
+}
+
+.subscriptionIcon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.cardSpacing {
+  margin-bottom: 20px;
+}
+
+.helpSection {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}

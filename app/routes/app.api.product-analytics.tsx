@@ -3,6 +3,7 @@ import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { applyRateLimit } from "~/utils/rateLimit";
 import { RATE_LIMITS } from "~/utils/security";
+import { logger } from "~/utils/logger";
 
 interface ProductAnalyticsData {
   totalProducts: number;
@@ -64,8 +65,8 @@ function calculateDynamicPriceRanges(
   // Check if we have enough real order data
   const totalRealOrders = Object.values(priceToOrdersMap).reduce((sum, orders) => sum + orders, 0);
   
-  console.log(`🔵 Total real orders: ${totalRealOrders}`);
-  console.log(`🔵 Real order data available: ${totalRealOrders > 0 ? 'Yes' : 'No'}`);
+  logger.info(`🔵 Total real orders: ${totalRealOrders}`);
+  logger.info(`🔵 Real order data available: ${totalRealOrders > 0 ? 'Yes' : 'No'}`);
   
   prices.forEach((price) => {
     // Get real order data for this price point
@@ -126,11 +127,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (rateLimitResponse) return rateLimitResponse;
 
   try {
-    console.log("🔵 Product Analytics API: Starting analysis...");
-    console.log("🔵 Product Analytics API: Request URL:", request.url);
+    logger.info("🔵 Product Analytics API: Starting analysis...");
+    logger.info("🔵 Product Analytics API: Request URL:", request.url);
     
     const { admin } = await authenticate.admin(request);
-    console.log("🔵 Product Analytics API: Authentication successful");
+    logger.info("🔵 Product Analytics API: Authentication successful");
 
     // GraphQL query to get products and orders
     const productsResponse = await admin.graphql(`
@@ -200,11 +201,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const productsData: any = await productsResponse.json();
     const ordersData: any = await ordersResponse.json();
     
-    console.log("🔵 Product Analytics API: Products fetched successfully");
-    console.log("🔵 Product Analytics API: Orders fetched successfully");
+    logger.info("🔵 Product Analytics API: Products fetched successfully");
+    logger.info("🔵 Product Analytics API: Orders fetched successfully");
     
     if (productsData.errors) {
-      console.error("🔴 Product Analytics API: GraphQL errors:", productsData.errors);
+      logger.error("🔴 Product Analytics API: GraphQL errors:", productsData.errors);
       return json({ 
         success: false, 
         error: `GraphQL Error: ${productsData.errors[0]?.message || "Unknown error"}` 
@@ -212,7 +213,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     if (ordersData.errors) {
-      console.error("🔴 Product Analytics API: Orders GraphQL errors:", ordersData.errors);
+      logger.error("🔴 Product Analytics API: Orders GraphQL errors:", ordersData.errors);
       return json({ 
         success: false, 
         error: `Orders GraphQL Error: ${ordersData.errors[0]?.message || "Unknown error"}` 
@@ -222,8 +223,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const products = productsData.data?.products?.edges || [];
     const orders = ordersData.data?.orders?.edges || [];
     
-    console.log(`🔵 Product Analytics API: Found ${products.length} products`);
-    console.log(`🔵 Product Analytics API: Found ${orders.length} orders`);
+    logger.info(`🔵 Product Analytics API: Found ${products.length} products`);
+    logger.info(`🔵 Product Analytics API: Found ${orders.length} orders`);
 
     // Process product data
     const totalProducts = products.length;
@@ -252,7 +253,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     let totalOrderItems = 0;
     let ordersWithValidPrices = 0;
     
-    console.log(`🔵 Processing ${orders.length} orders for price analysis...`);
+    logger.info(`🔵 Processing ${orders.length} orders for price analysis...`);
     
     orders.forEach(({ node: order }: any) => {
       const lineItems = order.lineItems?.edges || [];
@@ -278,14 +279,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             ordersWithValidPrices++;
           }
         } catch (e) {
-          console.warn(`🔴 Error processing line item:`, e);
+          logger.warn(`🔴 Error processing line item:`, e);
         }
       });
     });
     
-    console.log(`🔵 Product Analytics API: Total order items processed: ${totalOrderItems}`);
-    console.log(`🔵 Product Analytics API: Orders with valid prices: ${ordersWithValidPrices}`);
-    console.log(`🔵 Product Analytics API: Unique price points: ${Object.keys(priceToOrdersMap).length}`);
+    logger.info(`🔵 Product Analytics API: Total order items processed: ${totalOrderItems}`);
+    logger.info(`🔵 Product Analytics API: Orders with valid prices: ${ordersWithValidPrices}`);
+    logger.info(`🔵 Product Analytics API: Unique price points: ${Object.keys(priceToOrdersMap).length}`);
 
     products.forEach(({ node: product }: any) => {
       if (product.status === 'ACTIVE') {
@@ -318,7 +319,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               allPrices.push(price);
             }
           } catch (e) {
-            console.warn(`🔴 Error processing variant:`, e);
+            logger.warn(`🔴 Error processing variant:`, e);
           }
         });
 
@@ -361,7 +362,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     // Ensure we have valid price data
     if (allPrices.length === 0) {
-      console.warn("🔴 No valid prices found in products");
+      logger.warn("🔴 No valid prices found in products");
     }
 
     const analyticsData: ProductAnalyticsData = {
@@ -384,7 +385,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     };
 
-    console.log("🟢 Product Analytics API: Analysis complete:", {
+    logger.info("🟢 Product Analytics API: Analysis complete:", {
       totalProducts: analyticsData.totalProducts,
       activeProducts: analyticsData.activeProducts,
       catalogValue: analyticsData.totalCatalogValue.toFixed(2),
@@ -402,7 +403,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
   } catch (error) {
-    console.error("🔴 Product Analytics API Error:", error);
+    logger.error("🔴 Product Analytics API Error:", error);
     
     return json({
       success: false,

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useFetcher } from '@remix-run/react';
 
 type Theme = 'light' | 'dark';
 
@@ -10,21 +11,18 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light');
+interface ThemeProviderProps {
+  children: React.ReactNode;
+  initialTheme: Theme;
+}
+
+export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
+  const [theme, setThemeState] = useState<Theme>(initialTheme);
+  const fetcher = useFetcher();
 
   useEffect(() => {
-    // Check for saved theme preference or default to light
-    const savedTheme = localStorage.getItem('spector-theme') as Theme;
-    if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
-      setTheme(savedTheme);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Apply theme to document
+    // Apply theme to document (no localStorage!)
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('spector-theme', theme);
     
     // Add/remove dark theme class for compatibility
     if (theme === 'dark') {
@@ -34,8 +32,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [theme]);
 
+  const setTheme = (newTheme: Theme) => {
+    setThemeState(newTheme);
+    
+    // Save to server (replaces localStorage.setItem)
+    const formData = new FormData();
+    formData.append('action', 'setTheme');
+    formData.append('theme', newTheme);
+    fetcher.submit(formData, { method: 'POST' });
+  };
+
   const toggleTheme = () => {
-    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
+    setTheme(theme === 'light' ? 'dark' : 'light');
   };
 
   return (

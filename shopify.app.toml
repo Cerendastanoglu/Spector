@@ -27,9 +27,16 @@ api_version = "2024-10"
   topics = [ "shop/update" ]
   uri = "/webhooks/shop/update"
 
-  # Mandatory GDPR Privacy Compliance Webhooks
-  # Note: These are configured automatically by Shopify for published apps
-  # The handler is already implemented in /app/routes/webhooks.tsx
+  # App subscription billing webhooks
+  [[webhooks.subscriptions]]
+  topics = [ "app_subscriptions/update" ]
+  uri = "/webhooks/app/subscription_update"
+
+  # NOTE: GDPR webhooks (customers/data_request, customers/redact, shop/redact)
+  # CANNOT be added via shopify.app.toml - Shopify blocks automated registration.
+  # You MUST add them manually in the Partner Dashboard under:
+  # "Protected customer data access" → Complete the questionnaire first
+  # Then webhooks will appear after you submit for protected data review.
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes

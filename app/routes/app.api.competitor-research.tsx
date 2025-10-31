@@ -1,3 +1,4 @@
+import { logger } from "~/utils/logger";
 import { json, type ActionFunctionArgs } from "@remix-run/node";
 
 interface CompetitorResearchRequest {
@@ -48,7 +49,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     return json({ competitors });
   } catch (error) {
-    console.error("Error researching competitors:", error);
+    logger.error("Error researching competitors:", error);
     return json({ error: "Failed to research competitors" }, { status: 500 });
   }
 }
@@ -79,7 +80,7 @@ async function researchCompetitors(params: CompetitorResearchRequest): Promise<C
     return uniqueCompetitors.slice(0, 15);
     
   } catch (error) {
-    console.error("Error in competitor research:", error);
+    logger.error("Error in competitor research:", error);
     // Return real fallback competitors instead of generic ones
     return getRealFallbackCompetitors(storeClassification, region);
   }
@@ -116,7 +117,7 @@ async function fetchRealCompetitors(
     
     return competitors;
   } catch (error) {
-    console.error("Error fetching real competitors:", error);
+    logger.error("Error fetching real competitors:", error);
     return [];
   }
 }
@@ -143,7 +144,7 @@ async function searchBusinessDirectories(
       weaknesses: business.weaknesses || ['Market competition', 'Economic factors', 'Digital transformation']
     }));
   } catch (error) {
-    console.error("Error searching business directories:", error);
+    logger.error("Error searching business directories:", error);
     return [];
   }
 }
@@ -194,7 +195,7 @@ async function getRealBusinessesByCategory(classification: string, region: strin
     
     return competitors.slice(0, 8);
   } catch (error) {
-    console.error("Error fetching real-time competitors:", error);
+    logger.error("Error fetching real-time competitors:", error);
     return [];
   }
 }
@@ -205,7 +206,7 @@ async function getBusinessDirectoryData(classification: string, region: string):
     const results = await searchBusinessDirectoriesRealTime(classification, region);
     return results;
   } catch (error) {
-    console.error("Error fetching from business directories:", error);
+    logger.error("Error fetching from business directories:", error);
     return [];
   }
 }
@@ -236,8 +237,8 @@ function generateSearchQueries(classification: string, region: string, locality:
 
 async function searchCompetitorsRealTime(query: string, locality: string): Promise<any[]> {
   try {
-    console.log(`🔍 Real-time search: "${query}"`);
-    console.log(`📡 Simulating API calls to multiple search engines and business directories...`);
+    logger.info(`🔍 Real-time search: "${query}"`);
+    logger.info(`📡 Simulating API calls to multiple search engines and business directories...`);
     
     // Simulate multiple parallel API calls for comprehensive results
     const searchPromises = [
@@ -253,20 +254,20 @@ async function searchCompetitorsRealTime(query: string, locality: string): Promi
     const searchResults = await Promise.all(searchPromises);
     const competitors = searchResults.flat();
     
-    console.log(`✅ Real-time search completed: Found ${competitors.length} competitors for "${query}"`);
-    console.log(`📊 Sources: Google Search, Yelp Business, Crunchbase, LinkedIn Company`);
+    logger.info(`✅ Real-time search completed: Found ${competitors.length} competitors for "${query}"`);
+    logger.info(`📊 Sources: Google Search, Yelp Business, Crunchbase, LinkedIn Company`);
     
     return competitors;
     
   } catch (error) {
-    console.error(`❌ Real-time search failed for "${query}":`, error);
+    logger.error(`❌ Real-time search failed for "${query}":`, error);
     return [];
   }
 }
 
 async function searchBusinessDirectoriesRealTime(classification: string, region: string): Promise<any[]> {
   try {
-    console.log(`🔍 Searching business directories for: ${classification} in ${region}`);
+    logger.info(`🔍 Searching business directories for: ${classification} in ${region}`);
     
     // Simulate API calls to business directories
     await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 700));
@@ -279,11 +280,11 @@ async function searchBusinessDirectoriesRealTime(classification: string, region:
     
     const results = await simulateBusinessDirectorySearch(classification, region);
     
-    console.log(`✅ Business directories returned ${results.length} results`);
+    logger.info(`✅ Business directories returned ${results.length} results`);
     return results;
     
   } catch (error) {
-    console.error("❌ Business directory search failed:", error);
+    logger.error("❌ Business directory search failed:", error);
     return [];
   }
 }
@@ -292,7 +293,7 @@ async function simulateBusinessDirectorySearch(classification: string, region: s
   // Simulate directory API response
   await new Promise(resolve => setTimeout(resolve, 200));
   
-  console.log(`📊 Fetching directory data for ${classification} in ${region}`);
+  logger.info(`📊 Fetching directory data for ${classification} in ${region}`);
   
   // Return format that matches real directory APIs
   return [
@@ -345,7 +346,7 @@ function parseEmployeeCount(employees: string): number {
 
 // Simulated API functions for real-time competitor discovery
 async function simulateGoogleSearchAPI(query: string, locality: string): Promise<any[]> {
-  console.log(`🔍 Google Search API: Searching for "${query}"`);
+  logger.info(`🔍 Google Search API: Searching for "${query}"`);
   await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
   
   const businessName = generateBusinessName(query, "Google Search");
@@ -365,7 +366,7 @@ async function simulateGoogleSearchAPI(query: string, locality: string): Promise
 }
 
 async function simulateYelpBusinessAPI(query: string, locality: string): Promise<any[]> {
-  console.log(`🔍 Yelp Business API: Searching for "${query}"`);
+  logger.info(`🔍 Yelp Business API: Searching for "${query}"`);
   await new Promise(resolve => setTimeout(resolve, 150 + Math.random() * 250));
   
   const businessName = generateBusinessName(query, "Yelp");
@@ -385,7 +386,7 @@ async function simulateYelpBusinessAPI(query: string, locality: string): Promise
 }
 
 async function simulateCrunchbaseAPI(query: string): Promise<any[]> {
-  console.log(`🔍 Crunchbase API: Searching companies for "${query}"`);
+  logger.info(`🔍 Crunchbase API: Searching companies for "${query}"`);
   await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
   
   const businessName = generateBusinessName(query, "Crunchbase");
@@ -405,7 +406,7 @@ async function simulateCrunchbaseAPI(query: string): Promise<any[]> {
 }
 
 async function simulateLinkedInCompanyAPI(query: string): Promise<any[]> {
-  console.log(`🔍 LinkedIn Company API: Searching for "${query}"`);
+  logger.info(`🔍 LinkedIn Company API: Searching for "${query}"`);
   await new Promise(resolve => setTimeout(resolve, 250 + Math.random() * 350));
   
   const businessName = generateBusinessName(query, "LinkedIn");

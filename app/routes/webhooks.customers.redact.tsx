@@ -1,17 +1,37 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
+import { logger } from "~/utils/logger";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     // Clone the request to avoid body reading conflicts
     const webhookRequest = request.clone();
     
-    // Authenticate the webhook request
+    // Authenticate the webhook request (verifies HMAC)
     const { shop, payload, topic } = await authenticate.webhook(webhookRequest);
 
-    console.log(`✅ Verified webhook: ${topic} for shop: ${shop}`);
-    console.log(`🔐 HMAC signature verified successfully`);
+    logger.info(`✅ Verified webhook: ${topic} for shop: ${shop}`);
+    logger.debug(`🔐 HMAC signature verified successfully`);
 
+    // 🚀 CRITICAL: Respond with 200 OK immediately (Shopify requirement)
+    // Process webhook asynchronously to avoid timeout
+    processRedactionAsync(shop, payload, topic);
+
+    return new Response(null, { status: 200 });
+  } catch (error) {
+    logger.error('❌ Customer redaction webhook failed:', error);
+    
+    if (error instanceof Error && error.message.includes('verify')) {
+      return new Response('Unauthorized - HMAC verification failed', { status: 401 });
+    }
+
+    return new Response('Internal Server Error', { status: 500 });
+  }
+};
+
+// Process webhook asynchronously after sending 200 OK
+async function processRedactionAsync(shop: string, payload: any, _topic: string) {
+  try {
     // Extract customer redaction information
     const {
       customer,
@@ -28,9 +48,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       shop_domain: string;
     };
 
-    console.log(`🗑️ Customer data redaction request for customer ID: ${customer.id}`);
-    console.log(`📧 Customer email: ${customer.email}`);
-    console.log(`🛍️ Orders to redact: ${orders_to_redact.length} orders`);
+    logger.info(`🗑️ Customer data redaction request for customer ID: ${customer.id}`);
+    logger.debug(`📧 Customer email: ${customer.email}`);
+    logger.debug(`🛍️ Orders to redact: ${orders_to_redact.length} orders`);
 
     // GDPR/CCPA Compliance Implementation
     // Delete all customer data stored in our system
@@ -79,7 +99,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
       deletionResults.complianceAudits = auditDeleted.count;
 
-      console.log(`✅ Customer data redaction completed:`, deletionResults);
+      logger.info(`✅ Customer data redaction completed:`, deletionResults);
       
       // Create compliance audit record for this redaction
       try {
@@ -101,13 +121,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           },
         });
         
-        console.log(`✅ Compliance audit record created for customer redaction`);
+        logger.info(`✅ Compliance audit record created for customer redaction`);
       } catch (auditError) {
-        console.error('⚠️ Failed to create compliance audit record:', auditError);
+        logger.error('⚠️ Failed to create compliance audit record:', auditError);
       }
       
     } catch (dbError) {
-      console.error('❌ Failed to redact customer data from database:', dbError);
+      logger.error('❌ Failed to redact customer data from database:', dbError);
       deletionResults.notes.push(`Error during deletion: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`);
       
       // Log the failed attempt for compliance
@@ -129,22 +149,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           },
         });
       } catch (auditError) {
-        console.error('⚠️ Failed to log error in compliance audit:', auditError);
+        logger.error('⚠️ Failed to log error in compliance audit:', auditError);
       }
     }
 
     // Log the redaction for compliance
-    console.log(`📝 Customer data redaction completed for shop: ${shop_domain}`);
-    console.log(`🗑️ Deletion summary:`, deletionResults);
-
-    return new Response(null, { status: 200 });
+    logger.info(`📝 Customer data redaction completed for shop: ${shop_domain}`);
+    logger.debug(`🗑️ Deletion summary:`, deletionResults);
   } catch (error) {
-    console.error('❌ Customer redaction webhook failed:', error);
-    
-    if (error instanceof Error && error.message.includes('verify')) {
-      return new Response('Unauthorized - HMAC verification failed', { status: 401 });
-    }
-
-    return new Response('Internal Server Error', { status: 500 });
+    logger.error('❌ Async redaction processing failed:', error);
   }
-};
+}

@@ -8,6 +8,7 @@ import type {
   SocialPayload,
   CompanyProfilePayload
 } from './types.js';
+import { logger } from "~/utils/logger";
 
 /**
  * Result normalizer - converts heterogeneous payloads into common schema
@@ -25,7 +26,7 @@ export class ResultNormalizer {
         const results = this.normalizeDatum(datum);
         normalized.push(...results);
       } catch (error) {
-        console.warn(`Failed to normalize ${datum.provider}:${datum.capability}`, error);
+        logger.warn(`Failed to normalize ${datum.provider}:${datum.capability}`, error);
         // Continue processing other data
       }
     }
@@ -53,7 +54,7 @@ export class ResultNormalizer {
       case 'company_profile':
         return this.normalizeCompanyProfile(datum);
       default:
-        console.warn(`Unknown capability: ${datum.capability}`);
+        logger.warn(`Unknown capability: ${datum.capability}`);
         return [];
     }
   }

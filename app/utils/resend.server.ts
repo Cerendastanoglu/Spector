@@ -4,6 +4,7 @@
  * Simple Resend integration for email notifications
  */
 import { Resend } from 'resend';
+import { logger } from "~/utils/logger";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -69,21 +70,21 @@ export async function sendTestEmail(to: string, shop: string, content?: string) 
     });
 
     if (error) {
-      console.error('❌ Resend API error:', error);
+      logger.error('❌ Resend API error:', error);
       return {
         success: false,
         message: `Failed to send email: ${error.message || 'Unknown error'}`
       };
     }
 
-    console.log('✅ Test email sent successfully:', data?.id);
+    logger.info('✅ Test email sent successfully:', data?.id);
     return {
       success: true,
       messageId: data?.id,
       message: 'Test email sent successfully'
     };
   } catch (error) {
-    console.error('❌ Error sending test email:', error);
+    logger.error('❌ Error sending test email:', error);
     return {
       success: false,
       message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -124,21 +125,21 @@ export async function sendOutOfStockAlert(to: string, shopName: string, products
     });
 
     if (error) {
-      console.error('❌ Resend API error:', error);
+      logger.error('❌ Resend API error:', error);
       return {
         success: false,
         message: `Failed to send alert: ${error.message || 'Unknown error'}`
       };
     }
 
-    console.log('✅ Out of stock alert sent successfully:', data?.id);
+    logger.info('✅ Out of stock alert sent successfully:', data?.id);
     return {
       success: true,
       messageId: data?.id,
       message: 'Out of stock alert sent successfully'
     };
   } catch (error) {
-    console.error('❌ Error sending out of stock alert:', error);
+    logger.error('❌ Error sending out of stock alert:', error);
     return {
       success: false,
       message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -165,21 +166,21 @@ export async function sendNotificationEmail(to: string, subject: string, htmlCon
     });
 
     if (error) {
-      console.error('❌ Resend API error:', error);
+      logger.error('❌ Resend API error:', error);
       return {
         success: false,
         message: `Failed to send notification: ${error.message || 'Unknown error'}`
       };
     }
 
-    console.log('✅ Notification email sent successfully:', data?.id);
+    logger.info('✅ Notification email sent successfully:', data?.id);
     return {
       success: true,
       messageId: data?.id,
       message: 'Notification email sent successfully'
     };
   } catch (error) {
-    console.error('❌ Error sending notification email:', error);
+    logger.error('❌ Error sending notification email:', error);
     return {
       success: false,
       message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`

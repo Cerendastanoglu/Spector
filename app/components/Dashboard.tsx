@@ -126,114 +126,9 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     inventoryFetcherRef.current = inventoryFetcher;
   });
 
-  // Cache key for localStorage
-  const getCacheKey = useCallback((type: 'revenue' | 'inventory', period: string) => 
-    `spector_${type}_data_${period}`, []);
-
-  // Check if data needs refresh based on cache age
-  const needsRefresh = useCallback((lastUpdate: Date | null): boolean => {
-    if (!lastUpdate) return true;
-    
-    const now = new Date();
-    const diffInMs = now.getTime() - lastUpdate.getTime();
-    const diffInMinutes = diffInMs / (1000 * 60);
-    
-    // Cache expiration policy:
-    // - Product analytics data: expires after 5 minutes
-    // - This ensures data stays fresh while reducing API calls
-    // - User can always manually refresh for immediate updates
-    const CACHE_EXPIRATION_MINUTES = 5;
-    
-    const shouldRefresh = diffInMinutes >= CACHE_EXPIRATION_MINUTES;
-    
-    if (shouldRefresh) {
-      logger.debug(`Dashboard: Cache expired (${Math.round(diffInMinutes)} minutes old, max ${CACHE_EXPIRATION_MINUTES} minutes)`);
-    } else {
-      logger.debug(`Dashboard: Cache still valid (${Math.round(diffInMinutes)} minutes old)`);
-    }
-    
-    return shouldRefresh;
-  }, []);
-
-  // Load data from cache (only in browser)
-  const loadCachedData = useCallback((type: 'revenue' | 'inventory', period: string) => {
-    if (typeof window === 'undefined') return false;
-    
-    try {
-      const cacheKey = getCacheKey(type, period);
-      const cached = localStorage.getItem(cacheKey);
-      const timestampKey = `${cacheKey}_timestamp`;
-      const timestamp = localStorage.getItem(timestampKey);
-      
-      if (cached && timestamp) {
-        const lastUpdate = new Date(timestamp);
-        if (!needsRefresh(lastUpdate)) {
-          const data = JSON.parse(cached);
-          if (type === 'revenue') {
-            setProductAnalyticsData(data);
-            setHasReceivedData(true); // Mark that we've loaded data from cache
-          }
-          // else: Inventory data caching removed as feature not implemented yet
-          logger.debug(`Dashboard: Loaded ${type} data from cache (${data?.totalProducts || 0} products)`);
-          return true;
-        }
-      }
-    } catch (error) {
-      logger.warn('Dashboard: Error loading cached data (localStorage may be disabled):', error);
-      // Gracefully handle localStorage errors (private browsing, quota exceeded, etc.)
-      // Return false to trigger fresh data fetch
-    }
-    return false;
-  }, [needsRefresh, getCacheKey]);
-
-  // Save data to cache (only in browser)
-  const saveCachedData = useCallback((type: 'revenue' | 'inventory', period: string, data: any) => {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      const cacheKey = getCacheKey(type, period);
-      const timestampKey = `${cacheKey}_timestamp`;
-      const now = new Date();
-      
-      localStorage.setItem(cacheKey, JSON.stringify(data));
-      localStorage.setItem(timestampKey, now.toISOString());
-      logger.debug(`Dashboard: Saved ${type} data to cache (${data?.totalOrders || 0} orders)`);
-    } catch (error) {
-      // Gracefully handle localStorage errors with specific detection
-      if (error instanceof DOMException) {
-        if (error.name === 'QuotaExceededError') {
-          logger.warn('Dashboard: localStorage quota exceeded. Consider clearing old cache data.');
-          // Attempt to clear old cache entries to make room
-          try {
-            const keys = Object.keys(localStorage);
-            const spectorKeys = keys.filter(k => k.startsWith('spector_'));
-            if (spectorKeys.length > 0) {
-              // Remove oldest entries (keep most recent)
-              const sortedKeys = spectorKeys.sort();
-              const toRemove = sortedKeys.slice(0, Math.ceil(sortedKeys.length / 2));
-              toRemove.forEach(key => {
-                try {
-                  localStorage.removeItem(key);
-                } catch (e) {
-                  // Ignore errors during cleanup
-                }
-              });
-              logger.debug(`Dashboard: Cleared ${toRemove.length} old cache entries`);
-            }
-          } catch (cleanupError) {
-            logger.warn('Dashboard: Failed to cleanup cache:', cleanupError);
-          }
-        } else if (error.name === 'SecurityError') {
-          logger.warn('Dashboard: localStorage access denied (private browsing mode or security restrictions)');
-        } else {
-          logger.warn('Dashboard: localStorage error:', error.name, error.message);
-        }
-      } else {
-        logger.warn('Dashboard: Unexpected error saving cached data:', error);
-      }
-      // App continues to work without cache - data will be refetched next time
-    }
-  }, [getCacheKey]);
+  // NOTE: localStorage caching removed to comply with Shopify embedded app requirements
+  // Data is fetched fresh on each page load. For better performance, consider implementing
+  // server-side caching using Prisma/database or React Query for in-memory caching.
 
   // Reserved for future time period selector dropdown
   // const timePeriodOptions = [
@@ -408,29 +303,21 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
 
     // Always load product performance data (revenue type)
     const type = 'revenue';
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const cacheKey = `${type}_0_${timePeriod}`;
     logger.debug("Dashboard: Loading data for type:", type, "timePeriod:", timePeriod);
     
     // Skip if we've already loaded data for this combination
     if (hasLoadedInitialData) return;
     
-    // Try loading from cache first
-    const hasCachedData = loadCachedData(type, timePeriod);
+    // Fetch fresh data (no caching to comply with Shopify requirements)
+    logger.debug(`Dashboard: Fetching fresh ${type} data`);
+    // Use a timeout to allow UI to render first, then fetch data
+    setTimeout(() => {
+      fetchFreshData(type, false);
+    }, 100);
     
-    // If no cached data or cache expired, fetch fresh data
-    // But don't block UI - show dashboard structure with loading states
-    if (!hasCachedData) {
-      logger.debug(`Dashboard: No cached ${type} data found, fetching fresh data`);
-      // Use a timeout to allow UI to render first, then fetch data
-      setTimeout(() => {
-        fetchFreshData(type, false);
-      }, 100);
-    }
-    
-    // Mark as loaded regardless of cache hit/miss
+    // Mark as loaded
     setHasLoadedInitialData(true);
-  }, [isVisible, timePeriod, fetchFreshData, hasLoadedInitialData, loadCachedData]);
+  }, [isVisible, timePeriod, fetchFreshData, hasLoadedInitialData]);
 
   // Handle revenue data response
   // Race condition protection: Store the generation when effect runs
@@ -460,7 +347,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
       
       if (productAnalyticsFetcher.data.success && productAnalyticsFetcher.data.data) {
         setProductAnalyticsData(productAnalyticsFetcher.data.data);
-        saveCachedData('revenue', timePeriod, productAnalyticsFetcher.data.data);
+        // Note: Caching removed to comply with Shopify embedded app requirements
         setError((productAnalyticsFetcher.data as any).warning || null); // Show warning if present
       } else {
         setError(productAnalyticsFetcher.data.error || 'Failed to load product analytics data');
@@ -469,7 +356,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
       setIsLoading(false);
       setIsManualRefresh(false);
     }
-  }, [productAnalyticsFetcher.data, timePeriod, saveCachedData]);
+  }, [productAnalyticsFetcher.data, timePeriod]);
 
   // Handle product analytics fetcher state changes
   // Note: This useEffect is intentionally dependent on fetcher state/data
@@ -500,16 +387,16 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
       // Ignore responses from old fetches (race condition protection)
       // This happens when user switches periods rapidly before previous fetch completes
       if (currentGeneration <= lastProcessedInventoryGeneration.current) {
-        console.log(`Dashboard: Ignoring stale inventory response (Generation #${currentGeneration}, already processed #${lastProcessedInventoryGeneration.current})`);
+        logger.info(`Dashboard: Ignoring stale inventory response (Generation #${currentGeneration}, already processed #${lastProcessedInventoryGeneration.current})`);
         return;
       }
       
       lastProcessedInventoryGeneration.current = currentGeneration;
-      console.log(`Dashboard: Inventory data received (Generation #${currentGeneration})`);
+      logger.info(`Dashboard: Inventory data received (Generation #${currentGeneration})`);
       
       if (inventoryFetcher.data.success && inventoryFetcher.data.data) {
         // Inventory data state removed as feature not implemented yet
-        saveCachedData('inventory', timePeriod, inventoryFetcher.data.data);
+        // Note: Caching removed to comply with Shopify embedded app requirements
         setError(null);
       } else {
         setError(inventoryFetcher.data.error || 'Failed to load inventory data');
@@ -517,7 +404,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
       setIsLoading(false);
       setIsManualRefresh(false);
     }
-  }, [inventoryFetcher.data, timePeriod, saveCachedData]);
+  }, [inventoryFetcher.data, timePeriod]);
 
   if (!isVisible) {
     return null;

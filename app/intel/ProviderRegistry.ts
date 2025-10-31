@@ -12,6 +12,7 @@ import type {
   IntelRequest,
   ProviderResponse 
 } from './types';
+import { logger } from "~/utils/logger";
 
 export class ProviderRegistry {
   private providers = new Map<string, ProviderConfig>();
@@ -31,7 +32,7 @@ export class ProviderRegistry {
     this.initializeMetrics(config.id);
     this.startHealthCheck(config);
     
-    console.log(`✅ Registered provider: ${config.name} (${config.type.join(', ')})`);
+    logger.info(`✅ Registered provider: ${config.name} (${config.type.join(', ')})`);
   }
 
   /**
@@ -341,7 +342,7 @@ export class ProviderRegistry {
       try {
         await this.performHealthCheck(provider);
       } catch (error) {
-        console.error(`❌ Health check failed for ${provider.name}:`, error);
+        logger.error(`❌ Health check failed for ${provider.name}:`, error);
         this.updateHealthStatus(provider.id, 'unhealthy');
       }
     }, provider.healthCheck.intervalMs);
@@ -368,10 +369,10 @@ export class ProviderRegistry {
         this.updateHealthStatus(provider.id, 'healthy');
       }
       
-      console.log(`💚 Health check passed for ${provider.name} (${duration}ms)`);
+      // logger.info(`💚 Health check passed for ${provider.name} (${duration}ms)`);
     } catch (error) {
       this.updateHealthStatus(provider.id, 'unhealthy');
-      console.error(`❌ Health check failed for ${provider.name}:`, error);
+      // logger.error(`❌ Health check failed for ${provider.name}:`, error);
     }
   }
 

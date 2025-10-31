@@ -4,6 +4,7 @@ import type {
   ComplianceCheckResult,
   ProviderStatus
 } from './types.js';
+import { logger } from "~/utils/logger";
 
 /**
  * Compliance Middleware - Legal and robots.txt safety hooks
@@ -210,7 +211,7 @@ export class ComplianceMiddleware {
       
     } catch (error) {
       // Failed to fetch robots.txt - assume allowed but log warning
-      console.warn(`Failed to check robots.txt for ${domain}:`, error);
+      logger.warn(`Failed to check robots.txt for ${domain}:`, error);
       return { allowed: true };
     }
   }

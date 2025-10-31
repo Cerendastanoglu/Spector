@@ -13,23 +13,18 @@ export default function App() {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
+        
+        {/* Shopify App Bridge - Required for embedded apps */}
+        <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+        
         {/* Performance optimizations */}
         <link rel="preconnect" href="https://cdn.shopify.com/" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://cdn.shopify.com/" />
+        
+        {/* Shopify Polaris fonts (CSP compliant) */}
         <link
           rel="stylesheet"
           href="https://cdn.shopify.com/static/fonts/inter/v4/styles.css"
-        />
-        <link 
-          href="https://fonts.googleapis.com/css2?family=Unbounded:wght@200..900&display=swap" 
-          rel="stylesheet" 
-        />
-        {/* All Round Gothic Bold - using similar alternative */}
-        <link
-          href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap"
-          rel="stylesheet"
         />
         
         {/* Critical performance hints */}

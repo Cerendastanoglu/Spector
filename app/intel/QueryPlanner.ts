@@ -12,6 +12,7 @@ import type {
   StreamChunk,
   NormalizedResult 
 } from './types';
+import { logger } from "~/utils/logger";
 import { providerRegistry } from './ProviderRegistry.js';
 import { resultNormalizer } from './ResultNormalizer.js';
 import { rateLimiter } from './RateLimiter.js';
@@ -359,7 +360,7 @@ export class QueryPlanner {
     // This is where you would implement the actual API calls to each provider
     // For now, we'll simulate the request
     
-    console.log(`🔍 Querying ${provider.name} for ${request.type} on ${request.target}`);
+    logger.info(`🔍 Querying ${provider.name} for ${request.type} on ${request.target}`);
     
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1500));

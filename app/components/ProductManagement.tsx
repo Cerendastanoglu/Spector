@@ -4,6 +4,7 @@ import { openInNewTab } from "../utils/browserUtils";
 import { ProductConstants } from "../utils/scopedConstants";
 import { ProductTable } from "./ProductTable";
 import styles from "./StepsUI.module.css";
+import { logger } from "~/utils/logger";
 import {
   BulkPriceEditor,
   BulkTagEditor,
@@ -391,14 +392,14 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   // Helper function to navigate to product pages
   const navigateToProduct = (product: any, section: 'admin' | 'storefront') => {
     if (!product?.id) {
-      console.error('No product ID found:', product);
+      logger.error('No product ID found:', product);
       setError('Cannot navigate: Product ID not found');
       return;
     }
 
     // Ensure we have a shop domain
     if (!shopDomain) {
-      console.error('Shop domain not provided');
+      logger.error('Shop domain not provided');
       setError('Cannot navigate: Shop domain not available');
       return;
     }
@@ -412,7 +413,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         url = `https://${shopDomain}/admin/products/${productId}`;
       } else {
         if (!product.handle) {
-          console.warn('No product handle found, using product ID for storefront URL');
+          logger.warn('No product handle found, using product ID for storefront URL');
         }
         // Use dynamic shop domain for storefront URLs
         url = `https://${shopDomain}/products/${product.handle || productId}`;
@@ -422,7 +423,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         setError('Failed to open product page. Please allow popups for this site.');
       });
     } catch (error) {
-      console.error('Error navigating to product:', error);
+      logger.error('Error navigating to product:', error);
       setError('Failed to navigate to product page');
     }
   };
@@ -439,7 +440,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     // Prevent duplicate requests
     const now = Date.now();
     if (now - lastFetchTime < 1000) {
-      console.log('Skipping duplicate fetch request');
+      logger.info('Skipping duplicate fetch request');
       return;
     }
     
@@ -454,7 +455,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       );
       setRetryCount(0); // Reset retry count on successful submission
     } catch (error) {
-      console.error("Error fetching products:", error);
+      logger.error("Error fetching products:", error);
       setError(`Failed to fetch products: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsLoading(false);
       
@@ -910,13 +911,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
             case 'increase': {
               const increasePercent = parseFloat(pricePercentage) || 0;
               newPrice = currentPrice * (1 + increasePercent / 100);
-              console.log(`Increase: ${currentPrice} * (1 + ${increasePercent}/100) = ${newPrice}`);
+              logger.info(`Increase: ${currentPrice} * (1 + ${increasePercent}/100) = ${newPrice}`);
               break;
             }
             case 'decrease': {
               const decreasePercent = parseFloat(pricePercentage) || 0;
               newPrice = currentPrice * (1 - decreasePercent / 100);
-              console.log(`Decrease: ${currentPrice} * (1 - ${decreasePercent}/100) = ${newPrice}`);
+              logger.info(`Decrease: ${currentPrice} * (1 - ${decreasePercent}/100) = ${newPrice}`);
               break;
             }
             case 'round':
@@ -947,7 +948,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                   newComparePrice = (currentComparePrice * (1 + compareIncreasePercent / 100)).toFixed(2);
                 } else {
                   // Skip if no existing compare price
-                  console.log(`${targetProduct.title} (${targetVariant.title}): No existing compare price to increase`);
+                  logger.info(`${targetProduct.title} (${targetVariant.title}): No existing compare price to increase`);
                 }
                 break;
               case 'decrease':
@@ -956,7 +957,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                   newComparePrice = (currentComparePrice * (1 - compareDecreasePercent / 100)).toFixed(2);
                 } else {
                   // Skip if no existing compare price
-                  console.log(`${targetProduct.title} (${targetVariant.title}): No existing compare price to decrease`);
+                  logger.info(`${targetProduct.title} (${targetVariant.title}): No existing compare price to decrease`);
                 }
                 break;
               case 'remove':
@@ -1006,7 +1007,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           throw new Error(result.error || 'Failed to update prices');
         }
       } catch (apiError) {
-        console.error('API call error:', apiError);
+        logger.error('API call error:', apiError);
         throw new Error(`Failed to communicate with server: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
       }
       
@@ -1049,12 +1050,12 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       }
       
       if (apiSuccessful.length > 0) {
-        console.log(`✅ Successfully updated pricing for ${apiSuccessful.length} products!`);
+        logger.info(`✅ Successfully updated pricing for ${apiSuccessful.length} products!`);
       }
       
       if (failed.length > 0) {
-        console.log(`⚠️ ${apiSuccessful.length} products updated successfully. ${failed.length} failed.`);
-        console.log("Failed operations:", failed);
+        logger.info(`⚠️ ${apiSuccessful.length} products updated successfully. ${failed.length} failed.`);
+        logger.info("Failed operations:", failed);
       }
       
       // Reset form only if completely successful (keep products selected for additional operations)
@@ -1084,13 +1085,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           }).length;
           
           if (productsWithoutCompare > 0 && (compareOperation === 'increase' || compareOperation === 'decrease')) {
-            console.log(`ℹ️ Note: ${productsWithoutCompare} product(s) didn't have existing compare prices, so percentage changes were skipped for those.`);
+            logger.info(`ℹ️ Note: ${productsWithoutCompare} product(s) didn't have existing compare prices, so percentage changes were skipped for those.`);
           }
         }
       }
       
     } catch (error) {
-      console.error('Bulk pricing error:', error);
+      logger.error('Bulk pricing error:', error);
       setError(`Failed to update prices: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
@@ -1129,7 +1130,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       formData.append('action', 'update-collections');
       formData.append('updates', JSON.stringify(updates));
       
-      console.log('🔄 Sending collection operation:', { updates, operation: collectionOperation });
+      logger.info('🔄 Sending collection operation:', { updates, operation: collectionOperation });
       
       const response = await fetch('/app/api/products', {
         method: 'POST',
@@ -1137,7 +1138,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       });
       
       const result = await response.json();
-      console.log('📤 Collection API response:', result);
+      logger.info('📤 Collection API response:', result);
       
       if (!response.ok) {
         throw new Error(result.error || 'Failed to update collections');
@@ -1185,7 +1186,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           message: `${successful.length} products updated, ${failed.length} failed. See console for details.`,
           error: true
         });
-        console.log("Failed operations:", failed);
+        logger.info("Failed operations:", failed);
       }
       
       // Reset collection selections only if completely successful
@@ -1195,7 +1196,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       }
       
     } catch (error) {
-      console.error('Failed to update collections:', error);
+      logger.error('Failed to update collections:', error);
       setError(`Failed to update collections: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
@@ -1327,8 +1328,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       }
       
       if (failed.length > 0) {
-        console.log(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
-        console.log("Failed operations:", failed);
+        logger.info(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
+        logger.info("Failed operations:", failed);
         
         setNotification({
           show: true,
@@ -1346,7 +1347,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update tags';
-      console.error('Failed to update tags:', error);
+      logger.error('Failed to update tags:', error);
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -1438,12 +1439,12 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       }
       
       if (successful.length > 0) {
-        console.log(`✅ Successfully ${operationText} ${successful.length} product titles!`);
+        logger.info(`✅ Successfully ${operationText} ${successful.length} product titles!`);
       }
       
       if (failed.length > 0) {
-        console.log(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
-        console.log("Failed operations:", failed);
+        logger.info(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
+        logger.info("Failed operations:", failed);
       }
       
       // Clear form only if completely successful
@@ -1456,7 +1457,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update titles';
-      console.error('Failed to update titles:', error);
+      logger.error('Failed to update titles:', error);
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -1536,12 +1537,12 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       }
       
       if (successful.length > 0) {
-        console.log(`✅ Successfully ${operationText} ${successful.length} products!`);
+        logger.info(`✅ Successfully ${operationText} ${successful.length} products!`);
       }
       
       if (failed.length > 0) {
-        console.log(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
-        console.log("Failed operations:", failed);
+        logger.info(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
+        logger.info("Failed operations:", failed);
       }
       
       // Clear form only if completely successful
@@ -1552,7 +1553,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update descriptions';
-      console.error('Failed to update descriptions:', error);
+      logger.error('Failed to update descriptions:', error);
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -1627,12 +1628,12 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       }
       
       if (successful.length > 0) {
-        console.log(`✅ Successfully ${operationText} ${successful.length} products!`);
+        logger.info(`✅ Successfully ${operationText} ${successful.length} products!`);
       }
       
       if (failed.length > 0) {
-        console.log(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
-        console.log("Failed operations:", failed);
+        logger.info(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
+        logger.info("Failed operations:", failed);
       }
       
       // Clear form only if completely successful
@@ -1643,7 +1644,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update images';
-      console.error('Failed to update images:', error);
+      logger.error('Failed to update images:', error);
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -1705,12 +1706,12 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                           stockUpdateMethod === 'add' ? 'added' : 'subtracted';
         
         if (successful.length > 0) {
-          console.log(`✅ Successfully ${actionText} ${stockQuantity} for ${successful.length} variants!`);
+          logger.info(`✅ Successfully ${actionText} ${stockQuantity} for ${successful.length} variants!`);
         }
         
         if (failed.length > 0) {
-          console.log(`⚠️ ${successful.length} variants updated successfully. ${failed.length} failed.`);
-          console.log("Failed operations:", failed);
+          logger.info(`⚠️ ${successful.length} variants updated successfully. ${failed.length} failed.`);
+          logger.info("Failed operations:", failed);
         }
         
         // Clear form only if completely successful
@@ -1758,13 +1759,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           })
         );
         
-        console.log(`Successfully updated SKUs for ${selectedProducts.length} products using ${skuUpdateMethod} method!`);
+        logger.info(`Successfully updated SKUs for ${selectedProducts.length} products using ${skuUpdateMethod} method!`);
         
       } else if (inventoryOperation === 'cost') {
         // This would typically update cost, weight, origin country, and tracking settings
         // For now, we'll just log the operation since these are meta fields
-        console.log(`Successfully updated inventory metadata for ${selectedProducts.length} products!`);
-        console.log({
+        logger.info(`Successfully updated inventory metadata for ${selectedProducts.length} products!`);
+        logger.info({
           cost: costValue,
           weight: weightValue,
           originCountry: originCountry,
@@ -1787,7 +1788,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       }
       
     } catch (error) {
-      console.error('Failed to update inventory:', error);
+      logger.error('Failed to update inventory:', error);
       setError(`Failed to update inventory: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
@@ -1819,7 +1820,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       setCurrentAds(selectedProductDetails);
       setAdsLoaded(prev => ({ ...prev, [tabIndex]: true }));
     } catch (error) {
-      console.error('Error loading product details:', error);
+      logger.error('Error loading product details:', error);
       setNotification({
         show: true,
         message: 'Failed to load product details. Please try again.',
@@ -2025,13 +2026,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         const shopName = domain.split('.')[0];
         setShopDomain(shopName);
         
-        console.log(`💰 Store currency loaded: ${currencyCode} (${currencySymbols[currencyCode] || currencyCode})`);
-        console.log(`🏪 Shop domain: ${shopName}`);
+        logger.info(`💰 Store currency loaded: ${currencyCode} (${currencySymbols[currencyCode] || currencyCode})`);
+        logger.info(`🏪 Shop domain: ${shopName}`);
       } else {
         throw new Error(result.error || 'Failed to fetch shop info');
       }
     } catch (error) {
-      console.error('Failed to load store currency:', error);
+      logger.error('Failed to load store currency:', error);
       // Fallback to USD
       setStoreCurrency('USD');
       setCurrencySymbol('$');

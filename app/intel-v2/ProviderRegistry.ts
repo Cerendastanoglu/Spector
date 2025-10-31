@@ -5,6 +5,7 @@ import type {
   ShopSecrets,
   ComplianceConfig 
 } from './types.js';
+import { logger } from "~/utils/logger";
 
 /**
  * Provider Registry - Central management of intelligence providers
@@ -33,7 +34,7 @@ export class ProviderRegistry {
     }
 
     this.providers.set(provider.name, provider);
-    console.log(`✅ Registered provider: ${provider.name} (${provider.capabilities.join(', ')})`);
+    logger.info(`✅ Registered provider: ${provider.name} (${provider.capabilities.join(', ')})`);
   }
 
   /**
@@ -143,7 +144,7 @@ export class ProviderRegistry {
    */
   updateCompliance(config: Partial<ComplianceConfig>): void {
     this.complianceConfig = { ...this.complianceConfig, ...config };
-    console.log('🔒 Updated compliance configuration');
+    logger.info('🔒 Updated compliance configuration');
   }
 
   /**
@@ -231,7 +232,7 @@ export class SecretsManager {
     
     this.secrets.set(shopId, shopSecrets);
     
-    console.log(`🔐 Updated secret for provider ${provider} (shop: ${shopId})`);
+    logger.info(`🔐 Updated secret for provider ${provider} (shop: ${shopId})`);
   }
 
   /**
@@ -247,7 +248,7 @@ export class SecretsManager {
    */
   async deleteShopSecrets(shopId: string): Promise<void> {
     this.secrets.delete(shopId);
-    console.log(`🗑️ Deleted all secrets for shop: ${shopId}`);
+    logger.info(`🗑️ Deleted all secrets for shop: ${shopId}`);
   }
 
   /**
@@ -284,4 +285,4 @@ import { serpApiProvider } from './providers/SerpApiProvider.js';
 providerRegistry.addProvider(ahrefsProvider);
 providerRegistry.addProvider(serpApiProvider);
 
-console.log('🚀 Intelligence v2 system initialized with provider stubs');
+logger.info('🚀 Intelligence v2 system initialized with provider stubs');

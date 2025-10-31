@@ -1,4 +1,5 @@
 import type { ProviderError, RateLimitConfig } from './types.js';
+import { logger } from '~/utils/logger';
 
 interface TokenBucket {
   tokens: number;
@@ -89,7 +90,7 @@ export class RequestCoordinator {
       lastRefill: Date.now()
     });
 
-    console.log(`⚡ Set rate limits for ${providerId}: ${limits.requestsPerMinute}/min`);
+    logger.info(`⚡ Set rate limits for ${providerId}: ${limits.requestsPerMinute}/min`);
   }
 
   /**
@@ -159,7 +160,7 @@ export class RequestCoordinator {
     budget.dailySpent += cost;
     
     if (budget.dailySpent > budget.dailyLimit) {
-      console.warn(`💰 Budget exceeded for ${providerId}: $${budget.dailySpent}/$${budget.dailyLimit}`);
+      logger.warn(`💰 Budget exceeded for ${providerId}: $${budget.dailySpent}/$${budget.dailyLimit}`);
     }
   }
 
@@ -215,7 +216,7 @@ export class RequestCoordinator {
         const jitter = Math.random() * 1000; // 0-1s jitter
         const delay = baseDelay + jitter;
 
-        console.warn(
+        logger.warn(
           `🔄 Retry ${attempts}/${maxRetries} for ${providerId} after ${Math.round(delay)}ms:`,
           lastError.message
         );
@@ -391,7 +392,7 @@ export class RequestCoordinator {
    */
   resetBudgets(): void {
     this.budgets.clear();
-    console.log('💰 Reset all provider budgets');
+    logger.info('💰 Reset all provider budgets');
   }
 
   /**
@@ -402,7 +403,7 @@ export class RequestCoordinator {
       bucket.tokens = bucket.capacity;
       bucket.lastRefill = Date.now();
     }
-    console.log('⚡ Reset all rate limit buckets');
+    logger.info('⚡ Reset all rate limit buckets');
   }
 }
 

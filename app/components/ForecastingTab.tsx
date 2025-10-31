@@ -1,3 +1,4 @@
+import { logger } from "~/utils/logger";
 import {
   Card,
   BlockStack,
@@ -121,10 +122,10 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
           };
           
           setCurrencySymbol(currencySymbols[currencyCode] || currencyCode + ' ');
-          console.log(`💰 ForecastingTab: Currency loaded: ${currencyCode} (${currencySymbols[currencyCode] || currencyCode})`);
+          logger.info(`💰 ForecastingTab: Currency loaded: ${currencyCode} (${currencySymbols[currencyCode] || currencyCode})`);
         }
       } catch (error) {
-        console.error('ForecastingTab: Failed to load store currency:', error);
+        logger.error('ForecastingTab: Failed to load store currency:', error);
         setCurrencySymbol('$'); // Fallback to USD
       }
     };
@@ -149,7 +150,7 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
-        console.error('Error fetching forecast data:', err);
+        logger.error('Error fetching forecast data:', err);
       } finally {
         setLoading(false);
       }

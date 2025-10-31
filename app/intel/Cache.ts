@@ -1,4 +1,5 @@
 import type { IntelRequest, NormalizedResult } from './types.js';
+import { logger } from '~/utils/logger';
 
 interface CacheEntry {
   result: NormalizedResult;
@@ -94,7 +95,7 @@ export class Cache {
     // Update access time for LRU behavior
     entry.lastAccessed = now;
     
-    console.log(`📦 Cache hit for ${request.type}:${request.target}`);
+    logger.info(`📦 Cache hit for ${request.type}:${request.target}`);
     return entry.result;
   }
 
@@ -118,7 +119,7 @@ export class Cache {
     
     this.cache.set(key, entry);
     
-    console.log(`📦 Cached ${request.type}:${request.target} for ${ttl / 60000} minutes`);
+    logger.info(`📦 Cached ${request.type}:${request.target} for ${ttl / 60000} minutes`);
   }
 
   /**
@@ -135,7 +136,7 @@ export class Cache {
     
     keysToDelete.forEach(key => this.cache.delete(key));
     
-    console.log(`🗑️ Invalidated ${keysToDelete.length} cache entries for ${target}`);
+    logger.info(`🗑️ Invalidated ${keysToDelete.length} cache entries for ${target}`);
   }
 
   /**
@@ -184,7 +185,7 @@ export class Cache {
     keysToDelete.forEach(key => this.cache.delete(key));
     
     if (keysToDelete.length > 0) {
-      console.log(`🧹 Cleaned up ${keysToDelete.length} expired cache entries`);
+      logger.info(`🧹 Cleaned up ${keysToDelete.length} expired cache entries`);
     }
   }
 
@@ -193,7 +194,7 @@ export class Cache {
    */
   clear(): void {
     this.cache.clear();
-    console.log('🗑️ Cache cleared');
+    logger.info('🗑️ Cache cleared');
   }
 
   /**
@@ -223,14 +224,14 @@ export class Cache {
     const toRemove = entries.slice(0, this.cache.size - maxSize);
     toRemove.forEach(([key]) => this.cache.delete(key));
     
-    console.log(`♻️ Evicted ${toRemove.length} LRU cache entries`);
+    logger.info(`♻️ Evicted ${toRemove.length} LRU cache entries`);
   }
 
   /**
    * Prefetch data for common queries
    */
   async prefetch(targets: string[], type: IntelRequest['type']): Promise<void> {
-    console.log(`🔮 Prefetching ${type} data for ${targets.length} targets`);
+    logger.info(`🔮 Prefetching ${type} data for ${targets.length} targets`);
     // TODO: Implement prefetching logic
     // This would make background requests to warm the cache
   }

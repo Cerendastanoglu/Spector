@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { logger } from "~/utils/logger";
 
 export interface ProductState {
   timestamp: string;
@@ -61,7 +62,7 @@ export class ProductStateManager {
   ): Promise<void> {
     await this.ensureStateDir();
     
-    console.log(`💾 Saving product state for shop: ${shopDomain}, batch: ${batchId}`);
+    logger.info(`💾 Saving product state for shop: ${shopDomain}, batch: ${batchId}`);
 
     // Load existing history
     const history = await this.loadProductStateHistory(shopDomain);
@@ -168,7 +169,7 @@ export class ProductStateManager {
       // Save new state
       await fs.writeFile(filePath, JSON.stringify(history, null, 2), 'utf-8');
       
-      console.log(`✅ Product state saved successfully for ${shopDomain} - Current: ${operationName}, Previous: ${history.previous?.operationName || 'none'}`);
+      logger.info(`✅ Product state saved successfully for ${shopDomain} - Current: ${operationName}, Previous: ${history.previous?.operationName || 'none'}`);
       
       // Remove backup on success
       try {
@@ -178,14 +179,14 @@ export class ProductStateManager {
       }
       
     } catch (error) {
-      console.error(`❌ Failed to save product state for ${shopDomain}:`, error);
+      logger.error(`❌ Failed to save product state for ${shopDomain}:`, error);
       
       // Restore from backup if save failed
       try {
         await fs.access(backupPath);
         await fs.copyFile(backupPath, filePath);
         await fs.unlink(backupPath);
-        console.log(`🔄 Restored from backup for ${shopDomain}`);
+        logger.info(`🔄 Restored from backup for ${shopDomain}`);
       } catch {
         // No backup to restore
       }

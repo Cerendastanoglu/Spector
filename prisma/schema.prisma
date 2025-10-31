@@ -118,3 +118,50 @@ model IntelligenceCredentials {
   @@index([shop])
   @@index([providerId])
 }
+
+// User Preferences (replaces localStorage)
+model UserPreferences {
+  id                  String   @id @default(cuid())
+  shop                String   @unique
+  hasSeenWelcomeModal Boolean  @default(false)
+  theme               String?  // 'light' or 'dark'
+  dashboardLayout     String?  // Custom dashboard preferences
+  notificationSettings String? // JSON string of notification preferences
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([shop])
+}
+
+// Subscription & Billing Management
+model Subscription {
+  id                    String   @id @default(cuid())
+  shop                  String   @unique // One subscription per shop
+  shopifyChargeId       String?  @unique // Shopify's recurring charge ID
+  plan                  String   @default("basic") // Plan name: "basic"
+  status                String   @default("trialing") // 'trialing', 'active', 'cancelled', 'expired', 'frozen'
+  
+  // Trial Management
+  trialStartedAt        DateTime @default(now())
+  trialEndsAt           DateTime // 3 days from install
+  isTrialUsed           Boolean  @default(false)
+  
+  // Billing Dates
+  billingStartedAt      DateTime? // When paid subscription started
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  cancelledAt           DateTime?
+  
+  // Pricing
+  price                 Float    @default(9.99) // Monthly price in USD
+  currency              String   @default("USD")
+  
+  // Metadata
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  lastCheckedAt         DateTime @default(now()) // Last time we checked Shopify for status
+  
+  @@index([shop])
+  @@index([status])
+  @@index([trialEndsAt])
+}

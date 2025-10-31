@@ -1,4 +1,5 @@
 import type { IntelRequest, CacheConfig } from './types.js';
+import { logger } from '~/utils/logger';
 
 interface CacheEntry {
   value: any;
@@ -172,7 +173,7 @@ export class IntelCache {
     }
     
     if (cleaned > 0) {
-      console.log(`🧹 Cleaned up ${cleaned} expired cache entries`);
+      logger.info(`🧹 Cleaned up ${cleaned} expired cache entries`);
     }
   }
 
@@ -190,7 +191,7 @@ export class IntelCache {
       }
     }
     
-    console.log(`🗑️ Cleared ${cleared} cache entries for shop: ${shopId}`);
+    logger.info(`🗑️ Cleared ${cleared} cache entries for shop: ${shopId}`);
     return cleared;
   }
 
@@ -200,7 +201,7 @@ export class IntelCache {
   clear(): void {
     const size = this.cache.size;
     this.cache.clear();
-    console.log(`🗑️ Cleared entire cache: ${size} entries`);
+    logger.info(`🗑️ Cleared entire cache: ${size} entries`);
   }
 
   /**
@@ -261,7 +262,7 @@ export class IntelCache {
         }
       })
       .catch(error => {
-        console.warn(`Background revalidation failed for ${key}:`, error);
+        logger.warn(`Background revalidation failed for ${key}:`, error);
       })
       .finally(() => {
         this.revalidationPromises.delete(key);

@@ -1,18 +1,38 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { logger } from "~/utils/logger";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     // Clone the request to avoid body reading conflicts
     const webhookRequest = request.clone();
     
-    // Authenticate the webhook request
+    // Authenticate the webhook request (verifies HMAC)
     const { shop, payload, topic } = await authenticate.webhook(webhookRequest);
 
-    console.log(`✅ Verified webhook: ${topic} for shop: ${shop}`);
-    console.log(`🔐 HMAC signature verified successfully`);
+    logger.info(`✅ Verified webhook: ${topic} for shop: ${shop}`);
+    logger.debug(`🔐 HMAC signature verified successfully`);
 
+    // 🚀 CRITICAL: Respond with 200 OK immediately (Shopify requirement)
+    // Process webhook asynchronously to avoid timeout
+    processShopRedactionAsync(shop, payload, topic);
+
+    return new Response(null, { status: 200 });
+  } catch (error) {
+    logger.error('❌ Shop redaction webhook failed:', error);
+    
+    if (error instanceof Error && error.message.includes('verify')) {
+      return new Response('Unauthorized - HMAC verification failed', { status: 401 });
+    }
+
+    return new Response('Internal Server Error', { status: 500 });
+  }
+};
+
+// Process webhook asynchronously after sending 200 OK
+async function processShopRedactionAsync(shop: string, payload: any, _topic: string) {
+  try {
     // Extract shop redaction information
     const {
       shop_id,
@@ -22,8 +42,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       shop_domain: string;
     };
 
-    console.log(`🗑️ Shop data redaction request for shop: ${shop_domain}`);
-    console.log(`🏪 Shop ID: ${shop_id}`);
+    logger.info(`🗑️ Shop data redaction request for shop: ${shop_domain}`);
+    logger.debug(`🏪 Shop ID: ${shop_id}`);
 
     // GDPR/CCPA Compliance Implementation
     // Delete ALL data associated with this shop
@@ -43,28 +63,28 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         where: { shop: shop_domain }
       });
       deletionResults.sessions = sessionsDeleted.count;
-      console.log(`✅ Deleted ${sessionsDeleted.count} sessions`);
+      logger.info(`✅ Deleted ${sessionsDeleted.count} sessions`);
 
       // 2. Delete all analytics snapshots for this shop
       const analyticsDeleted = await db.analyticsSnapshot.deleteMany({
         where: { shop: shop_domain }
       });
       deletionResults.analyticsSnapshots = analyticsDeleted.count;
-      console.log(`✅ Deleted ${analyticsDeleted.count} analytics snapshots`);
+      logger.info(`✅ Deleted ${analyticsDeleted.count} analytics snapshots`);
 
       // 3. Delete all product analytics cache for this shop
       const productAnalyticsDeleted = await db.productAnalytics.deleteMany({
         where: { shop: shop_domain }
       });
       deletionResults.productAnalytics = productAnalyticsDeleted.count;
-      console.log(`✅ Deleted ${productAnalyticsDeleted.count} product analytics entries`);
+      logger.info(`✅ Deleted ${productAnalyticsDeleted.count} product analytics entries`);
 
       // 4. Delete data retention policies for this shop
       const retentionPoliciesDeleted = await db.dataRetentionPolicy.deleteMany({
         where: { shop: shop_domain }
       });
       deletionResults.dataRetentionPolicies = retentionPoliciesDeleted.count;
-      console.log(`✅ Deleted ${retentionPoliciesDeleted.count} data retention policies`);
+      logger.info(`✅ Deleted ${retentionPoliciesDeleted.count} data retention policies`);
 
       // 5. Delete old compliance audit records (keep this one for 30 days)
       const thirtyDaysAgo = new Date();
@@ -77,10 +97,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         },
       });
       deletionResults.complianceAudits = auditsDeleted.count;
-      console.log(`✅ Deleted ${auditsDeleted.count} old compliance audit records`);
+      logger.info(`✅ Deleted ${auditsDeleted.count} old compliance audit records`);
 
-      console.log(`✅ Shop data successfully redacted for shop: ${shop_domain}`);
-      console.log(`📊 Deletion summary:`, deletionResults);
+      logger.info(`✅ Shop data successfully redacted for shop: ${shop_domain}`);
+      logger.debug(`📊 Deletion summary:`, deletionResults);
       
       // Create final compliance audit record (will auto-expire in 30 days)
       try {
@@ -101,13 +121,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           },
         });
         
-        console.log(`✅ Final compliance audit record created`);
+        logger.info(`✅ Final compliance audit record created`);
       } catch (auditError) {
-        console.error('⚠️ Failed to create final compliance audit record:', auditError);
+        logger.error('⚠️ Failed to create final compliance audit record:', auditError);
       }
       
     } catch (dbError) {
-      console.error('❌ Failed to redact shop data from database:', dbError);
+      logger.error('❌ Failed to redact shop data from database:', dbError);
       deletionResults.errors.push(dbError instanceof Error ? dbError.message : 'Unknown error');
       
       // Log the failed attempt for compliance
@@ -127,23 +147,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           },
         });
       } catch (auditError) {
-        console.error('⚠️ Failed to log error in compliance audit:', auditError);
+        logger.error('⚠️ Failed to log error in compliance audit:', auditError);
       }
       
-      // Still return 200 to acknowledge receipt
     }
 
     // Log the redaction for compliance
-    console.log(`📝 Shop data redaction completed for shop: ${shop_domain}`);
-
-    return new Response(null, { status: 200 });
+    logger.info(`📝 Shop data redaction completed for shop: ${shop_domain}`);
   } catch (error) {
-    console.error('❌ Shop redaction webhook failed:', error);
-    
-    if (error instanceof Error && error.message.includes('verify')) {
-      return new Response('Unauthorized - HMAC verification failed', { status: 401 });
-    }
-
-    return new Response('Internal Server Error', { status: 500 });
+    logger.error('❌ Async shop redaction processing failed:', error);
   }
-};
+}

@@ -1,3 +1,5 @@
+import { logger } from "~/utils/logger";
+
 /**
  * Scoped application constants to avoid namespace collisions
  * Uses IIFE pattern to ensure constants are properly encapsulated
@@ -131,5 +133,5 @@ export const UIConstants = (() => {
  */
 export const cleanupConstants = () => {
   // Constants are immutable, but this allows for future cleanup if needed
-  console.debug('Constants cleanup called - no cleanup needed for immutable values');
+  logger.debug('Constants cleanup called - no cleanup needed for immutable values');
 };

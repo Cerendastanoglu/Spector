@@ -1,3 +1,5 @@
+import { logger } from "~/utils/logger";
+
 // Performance optimization utilities for Core Web Vitals
 
 /**
@@ -140,7 +142,7 @@ export const PerformanceMonitoring = {
         const measure = performance.getEntriesByName(name)[0];
         return measure.duration;
       } catch (error) {
-        console.warn('Performance measurement failed:', error);
+        logger.warn('Performance measurement failed:', error);
         return 0;
       }
     }
@@ -174,7 +176,7 @@ export const BundleOptimization = {
     try {
       return await importFn();
     } catch (error) {
-      console.error('Dynamic import failed:', error);
+      logger.error('Dynamic import failed:', error);
       return null;
     }
   },
