@@ -4,27 +4,33 @@ import {
   Text,
   BlockStack,
   InlineStack,
-  Box,
   Icon,
   Card,
-  Badge,
-  List,
 } from "@shopify/polaris";
 import {
   ChartVerticalIcon,
   PackageIcon,
-  OrderIcon,
   StarIcon,
-  CalendarIcon,
 } from "@shopify/polaris-icons";
+import styles from "./WelcomeModal.module.css";
 
 interface WelcomeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenHelp?: () => void;
+  hasSubscription?: boolean;
+  onSubscribe?: () => void;
+  subscriptionPrice?: string;
 }
 
-export function WelcomeModal({ isOpen, onClose, onOpenHelp: _onOpenHelp }: WelcomeModalProps) {
+export function WelcomeModal({ 
+  isOpen, 
+  onClose, 
+  onOpenHelp: _onOpenHelp,
+  hasSubscription = true,
+  onSubscribe: handleSubscribe,
+  subscriptionPrice = '$9.99/month'
+}: WelcomeModalProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isModalReady, setIsModalReady] = useState(false);
 
@@ -41,92 +47,152 @@ export function WelcomeModal({ isOpen, onClose, onOpenHelp: _onOpenHelp }: Welco
   }, [isOpen]);
 
   const slides = [
+    // Slide 1: Welcome + Subscription + Basics
     {
       icon: StarIcon,
+      iconClass: styles.iconWrapper,
       title: "Welcome to Spector",
-      subtitle: "Your Product Management Suite Dashboard",
+      subtitle: "Your Product Management Suite",
       content: (
         <BlockStack gap="400">
-          <Text as="p" variant="bodyMd">
-            Spector helps you prevent stockouts, optimize product performance, and make 
-            data-driven decisions that grow your business.
+          {/* Subscription Banner - Only show if no subscription */}
+          {!hasSubscription && (
+            <div className={styles.bannerCompact}>
+              <div className={styles.bannerText}>
+                <span className={styles.bannerIcon}>🎉</span>
+                <Text as="p" variant="bodyMd">
+                  <strong>3-day free trial</strong> • Only {subscriptionPrice} after • Cancel anytime
+                </Text>
+              </div>
+            </div>
+          )}
+
+          <Text as="p" variant="bodyMd" tone="subdued">
+            Spector helps you monitor inventory, track performance, and make data-driven decisions.
           </Text>
+          
           <Card>
-            <BlockStack gap="300">
-              <Text as="h3" variant="headingMd">Key Features:</Text>
-              <List type="bullet">
-                <List.Item>Real-time inventory monitoring</List.Item>
-                <List.Item>Advanced analytics and forecasting</List.Item>
-                <List.Item>Automated alerts and notifications</List.Item>
-                <List.Item>Performance insights and recommendations</List.Item>
-              </List>
+            <BlockStack gap="200">
+              <div className={styles.featureItem}>
+                <div className={styles.checkmark}>✓</div>
+                <Text as="p" variant="bodyMd">
+                  Real-time inventory monitoring
+                </Text>
+              </div>
+              <div className={styles.featureItem}>
+                <div className={styles.checkmark}>✓</div>
+                <Text as="p" variant="bodyMd">
+                  Product analytics dashboard
+                </Text>
+              </div>
+              <div className={styles.featureItem}>
+                <div className={styles.checkmark}>✓</div>
+                <Text as="p" variant="bodyMd">
+                  Bulk product management
+                </Text>
+              </div>
+              <div className={styles.featureItem}>
+                <div className={styles.checkmark}>✓</div>
+                <Text as="p" variant="bodyMd">
+                  Revenue tracking & forecasting
+                </Text>
+              </div>
             </BlockStack>
           </Card>
         </BlockStack>
       )
     },
+    
+    // Slide 2: Bulk Edit + How-to's
+    {
+      icon: PackageIcon,
+      iconClass: `${styles.iconWrapper} ${styles.iconWrapperSlide2}`,
+      title: "Bulk Product Management",
+      subtitle: "Edit multiple products at once",
+      content: (
+        <BlockStack gap="400">
+          <Text as="p" variant="bodyMd" tone="subdued">
+            Save time by updating prices, inventory, and product details for multiple items simultaneously.
+          </Text>
+          
+          <Card>
+            <BlockStack gap="200">
+              <div className={styles.featureItem}>
+                <div className={`${styles.bullet} ${styles.bulletSlide2}`}></div>
+                <Text as="p" variant="bodyMd">
+                  Bulk price updates across categories
+                </Text>
+              </div>
+              <div className={styles.featureItem}>
+                <div className={`${styles.bullet} ${styles.bulletSlide2}`}></div>
+                <Text as="p" variant="bodyMd">
+                  Quick inventory adjustments
+                </Text>
+              </div>
+              <div className={styles.featureItem}>
+                <div className={`${styles.bullet} ${styles.bulletSlide2}`}></div>
+                <Text as="p" variant="bodyMd">
+                  CSV export/import functionality
+                </Text>
+              </div>
+            </BlockStack>
+          </Card>
+
+          <a 
+            href="https://docs.spector-app.com/bulk-edit" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className={`${styles.learnButton} ${styles.learnButtonSlide2}`}
+          >
+            📚 Learn How It Works
+          </a>
+        </BlockStack>
+      )
+    },
+    
+    // Slide 3: Forecasting
     {
       icon: ChartVerticalIcon,
-      title: "Product Performance Analytics",
-      subtitle: "Deep insights into your catalog health",
+      iconClass: `${styles.iconWrapper} ${styles.iconWrapperSlide3}`,
+      title: "Inventory Forecasting",
+      subtitle: "Predict demand & prevent stockouts",
       content: (
         <BlockStack gap="400">
-          <Text as="p" variant="bodyMd">
-            Track your product performance with comprehensive analytics including 
-            catalog value, product health scores, and top performers.
+          <Text as="p" variant="bodyMd" tone="subdued">
+            Use AI-powered forecasting to predict when you'll run out of stock and plan ahead.
           </Text>
-          <InlineStack gap="300" wrap={false}>
-            <Box padding="400" background="bg-surface-success" borderRadius="200">
-              <BlockStack gap="200" align="center">
-                <Icon source={ChartVerticalIcon} tone="success" />
-                <Text as="p" variant="bodyMd" fontWeight="semibold">Real-time Data</Text>
-              </BlockStack>
-            </Box>
-            <Box padding="400" background="bg-surface-info" borderRadius="200">
-              <BlockStack gap="200" align="center">
-                <Icon source={PackageIcon} tone="info" />
-                <Text as="p" variant="bodyMd" fontWeight="semibold">Catalog Health</Text>
-              </BlockStack>
-            </Box>
-            <Box padding="400" background="bg-surface-warning" borderRadius="200">
-              <BlockStack gap="200" align="center">
-                <Icon source={OrderIcon} tone="warning" />
-                <Text as="p" variant="bodyMd" fontWeight="semibold">Order Analysis</Text>
-              </BlockStack>
-            </Box>
-          </InlineStack>
-        </BlockStack>
-      )
-    },
-    {
-      icon: CalendarIcon,
-      title: "Coming Soon",
-      subtitle: "Exciting features in development",
-      content: (
-        <BlockStack gap="400">
-          <Text as="p" variant="bodyMd">
-            We're continuously improving Spector with new features and capabilities.
-          </Text>
+          
           <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="200" align="space-between">
-                <Text as="p" variant="bodyMd">Inventory Forecasting</Text>
-                <Badge tone="info">In Development</Badge>
-              </InlineStack>
-              <InlineStack gap="200" align="space-between">
-                <Text as="p" variant="bodyMd">Order Analysis</Text>
-                <Badge tone="info">In Development</Badge>
-              </InlineStack>
-              <InlineStack gap="200" align="space-between">
-                <Text as="p" variant="bodyMd">AI-Powered Recommendations</Text>
-                <Badge tone="attention">Coming Soon</Badge>
-              </InlineStack>
-              <InlineStack gap="200" align="space-between">
-                <Text as="p" variant="bodyMd">Advanced Integrations</Text>
-                <Badge tone="attention">Coming Soon</Badge>
-              </InlineStack>
+            <BlockStack gap="200">
+              <div className={styles.featureItem}>
+                <div className={`${styles.bullet} ${styles.bulletSlide3}`}></div>
+                <Text as="p" variant="bodyMd">
+                  Sales trend analysis with charts
+                </Text>
+              </div>
+              <div className={styles.featureItem}>
+                <div className={`${styles.bullet} ${styles.bulletSlide3}`}></div>
+                <Text as="p" variant="bodyMd">
+                  Smart restock recommendations
+                </Text>
+              </div>
+              <div className={styles.featureItem}>
+                <div className={`${styles.bullet} ${styles.bulletSlide3}`}></div>
+                <Text as="p" variant="bodyMd">
+                  Demand predictions by product
+                </Text>
+              </div>
             </BlockStack>
           </Card>
+
+          <a 
+            href="https://docs.spector-app.com/forecasting" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className={`${styles.learnButton} ${styles.learnButtonSlide3}`}
+          >
+            📈 Learn How It Works
+          </a>
         </BlockStack>
       )
     }
@@ -149,22 +215,18 @@ export function WelcomeModal({ isOpen, onClose, onOpenHelp: _onOpenHelp }: Welco
   const currentSlideData = slides[currentSlide];
   const isLastSlide = currentSlide === slides.length - 1;
 
+  // Handle final action - subscribe or just close
+  const handleFinalAction = () => {
+    if (!hasSubscription && handleSubscribe) {
+      handleSubscribe();
+    } else {
+      handleClose();
+    }
+  };
+
   // Don't render modal content until it's ready to prevent freezing
   if (!isOpen || !isModalReady) {
-    return (
-      <Modal
-        open={isOpen}
-        onClose={handleClose}
-        title=""
-        size="large"
-      >
-        <Modal.Section>
-          <BlockStack gap="400" align="center">
-            <Text as="p" variant="bodyMd">Loading...</Text>
-          </BlockStack>
-        </Modal.Section>
-      </Modal>
-    );
+    return null;
   }
 
   return (
@@ -173,58 +235,61 @@ export function WelcomeModal({ isOpen, onClose, onOpenHelp: _onOpenHelp }: Welco
       onClose={handleClose}
       title=""
       primaryAction={{
-        content: isLastSlide ? "Get Started" : "Next",
-        onAction: isLastSlide ? handleClose : nextSlide,
+        content: isLastSlide 
+          ? (!hasSubscription ? "🚀 Start Free Trial" : "✨ Get Started")
+          : "Next →",
+        onAction: isLastSlide ? handleFinalAction : nextSlide,
       }}
       secondaryActions={[
         ...(currentSlide > 0 ? [{
-          content: "Previous",
+          content: "← Previous",
           onAction: prevSlide,
         }] : []),
         {
-          content: "Skip Tour",
+          content: isLastSlide ? "Explore App" : "Skip",
           onAction: handleClose,
         }
       ]}
-      size="large"
     >
       <Modal.Section>
-        <BlockStack gap="600" align="center">
+        <BlockStack gap="500">
           {/* Icon and Title */}
-          <BlockStack gap="400" align="center">
-            <Box 
-              background="bg-fill-info" 
-              padding="600" 
-              borderRadius="200"
-            >
-              <Icon source={currentSlideData.icon} tone="base" />
-            </Box>
+          <BlockStack gap="300" align="center">
+            <div className={currentSlideData.iconClass}>
+              <Icon source={currentSlideData.icon} />
+            </div>
             
-            <BlockStack gap="200" align="center">
-              <Text as="h1" variant="headingLg" fontWeight="bold" alignment="center">
+            <BlockStack gap="100" align="center">
+              <Text as="h2" variant="headingLg" alignment="center">
                 {currentSlideData.title}
               </Text>
-              <Text as="p" variant="bodyLg" tone="subdued" alignment="center">
+              <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
                 {currentSlideData.subtitle}
               </Text>
             </BlockStack>
           </BlockStack>
 
           {/* Content */}
-          <Box width="100%">
-            {currentSlideData.content}
-          </Box>
+          {currentSlideData.content}
 
           {/* Slide Indicators */}
-          <InlineStack gap="200" align="center">
+          <InlineStack gap="100" align="center">
             {slides.map((_, index) => (
-              <Box
+              <div
                 key={index}
-                background={index === currentSlide ? "bg-fill-info" : "bg-fill-disabled"}
-                borderRadius="100"
-                minHeight="8px"
-                minWidth="8px"
-                padding="100"
+                className={`${styles.slideIndicator} ${
+                  index === currentSlide 
+                    ? styles.slideIndicatorActive 
+                    : styles.slideIndicatorInactive
+                }`}
+                onClick={() => setCurrentSlide(index)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setCurrentSlide(index);
+                  }
+                }}
               />
             ))}
           </InlineStack>

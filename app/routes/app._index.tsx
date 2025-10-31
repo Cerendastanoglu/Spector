@@ -1,3 +1,4 @@
+import { logger } from "~/utils/logger";
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
@@ -7,18 +8,48 @@ import {
   Text,
   Card,
   BlockStack,
-  InlineStack,
-  Button,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { AppHeader } from "../components/AppHeader";
 import { WelcomeModal } from "../components/WelcomeModal";
 import { Help } from "../components/Help";
+import { Settings } from "../components/Settings";
 import { ForecastingTab } from "../components/ForecastingTab";
 import { OptimizedComponents, useComponentPreloader } from "../utils/lazyLoader";
+import { SubscriptionBanner } from "../components/SubscriptionBanner";
+import { checkAccess, checkSubscriptionStatus, getManagedPricingUrl } from "../services/billing.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
+  const shop = session.shop;
+  
+  // Check subscription status from Shopify (Managed Pricing)
+  const { hasAccess, subscription: shopifySubscription } = await checkAccess(admin.graphql, shop);
+  
+  // Get full subscription details for settings page
+  const { hasActiveSubscription, subscription: fullSubscription, error } = await checkSubscriptionStatus(
+    admin.graphql,
+    shop
+  );
+  
+  // Fetch user preferences from database (replaces localStorage)
+  const prisma = (await import("../db.server")).default;
+  let userPreferences;
+  try {
+    userPreferences = await prisma.userPreferences.findUnique({
+      where: { shop },
+    });
+    
+    // Create preferences if they don't exist
+    if (!userPreferences) {
+      userPreferences = await prisma.userPreferences.create({
+        data: { shop },
+      });
+    }
+  } catch (err) {
+    logger.error('Error fetching user preferences:', err);
+    userPreferences = { hasSeenWelcomeModal: false };
+  }
   
   // Fetch shop information
   try {
@@ -37,17 +68,79 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     );
     
     const data = await response.json();
+    
     return {
-      shop: data.data?.shop || null
+      shop: data.data?.shop || null,
+      hasSeenWelcomeModal: userPreferences?.hasSeenWelcomeModal || false,
+      subscription: {
+        status: shopifySubscription?.status || 'none',
+        hasAccess,
+        planName: shopifySubscription?.name || 'Spector Basic',
+        price: shopifySubscription?.lineItems[0]?.plan?.pricingDetails?.price?.amount || '9.99',
+        currency: shopifySubscription?.lineItems[0]?.plan?.pricingDetails?.price?.currencyCode || 'USD',
+      },
+      // Settings data
+      settingsData: {
+        subscription: fullSubscription ? {
+          id: fullSubscription.id,
+          name: fullSubscription.name,
+          status: fullSubscription.status,
+          price: fullSubscription.lineItems[0]?.plan?.pricingDetails?.price?.amount,
+          currency: fullSubscription.lineItems[0]?.plan?.pricingDetails?.price?.currencyCode,
+          currentPeriodEnd: fullSubscription.currentPeriodEnd,
+          test: fullSubscription.test,
+          trialDays: fullSubscription.trialDays,
+        } : null,
+        hasActiveSubscription,
+        error,
+        managedPricingUrl: getManagedPricingUrl(shop),
+      },
     };
   } catch (error) {
-    console.error('Error fetching shop data:', error);
-    return { shop: null };
+    logger.error('Error fetching shop data:', error);
+    return { 
+      shop: null,
+      hasSeenWelcomeModal: userPreferences?.hasSeenWelcomeModal || false,
+      subscription: {
+        status: 'error',
+        hasAccess: true, // Allow access on error
+        planName: 'Spector Basic',
+        price: '9.99',
+        currency: 'USD',
+      },
+      settingsData: {
+        subscription: null,
+        hasActiveSubscription: false,
+        error: 'Failed to load subscription data',
+        managedPricingUrl: getManagedPricingUrl(shop),
+      },
+    };
   }
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
+  const shop = session.shop;
+  const formData = await request.formData();
+  const actionType = formData.get('action');
+  
+  // Handle welcome modal dismissal
+  if (actionType === 'dismissWelcome') {
+    const prisma = (await import("../db.server")).default;
+    try {
+      await prisma.userPreferences.upsert({
+        where: { shop },
+        update: { hasSeenWelcomeModal: true },
+        create: { shop, hasSeenWelcomeModal: true },
+      });
+      return { success: true };
+    } catch (error) {
+      logger.error('Error saving welcome preference:', error);
+      return { success: false, error: 'Failed to save preference' };
+    }
+  }
+  
+  // Original product creation action
   const color = ["Red", "Orange", "Yellow", "Green"][
     Math.floor(Math.random() * 4)
   ];
@@ -89,12 +182,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Index() {
-  const { shop } = useLoaderData<typeof loader>();
+  const { shop, hasSeenWelcomeModal, subscription, settingsData } = useLoaderData<typeof loader>();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [outOfStockCount] = useState(0);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [isAppReady, setIsAppReady] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
   const { preloadComponent } = useComponentPreloader();
+
+  // Fix hydration issues by marking when client has hydrated
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
 
   // Wait for app to be fully loaded before checking welcome status
   useEffect(() => {
@@ -103,17 +203,8 @@ export default function Index() {
       setTimeout(() => {
         setIsAppReady(true);
         
-        // Only check for welcome modal after app is ready
-        let hasSeenWelcome = false;
-        try {
-          hasSeenWelcome = localStorage.getItem('spector-welcome-seen') === 'true';
-        } catch (error) {
-          // If localStorage is not available, don't show modal to be safe
-          console.warn('Could not access localStorage:', error);
-          hasSeenWelcome = true;
-        }
-        
-        if (!hasSeenWelcome) {
+        // Check server-side preference (no localStorage!)
+        if (!hasSeenWelcomeModal) {
           // Add another small delay to ensure smooth transition
           setTimeout(() => {
             setShowWelcomeModal(true);
@@ -123,21 +214,39 @@ export default function Index() {
     };
 
     initializeApp();
-  }, []);
+  }, [hasSeenWelcomeModal]);
 
-  const handleWelcomeModalClose = () => {
+  const handleWelcomeModalClose = async () => {
     setShowWelcomeModal(false);
+    
+    // Save preference to server (no localStorage!)
     try {
-      localStorage.setItem('spector-welcome-seen', 'true');
+      const formData = new FormData();
+      formData.append('action', 'dismissWelcome');
+      await fetch('', {
+        method: 'POST',
+        body: formData,
+      });
     } catch (error) {
-      // Fallback if localStorage is not available (e.g., private browsing)
-      console.warn('Could not save welcome preference to localStorage:', error);
+      logger.error('Failed to save welcome preference:', error);
     }
   };
 
   const handleTabChange = (tab: string) => {
+    logger.info('[Dashboard] Tab change requested:', tab);
+    
+    // Don't navigate away, just change the active tab
     setActiveTab(tab);
   };
+
+  // Handle "Start Free Trial" - just close modal and stay on dashboard
+  const handleSubscribe = () => {
+    // Close the welcome modal
+    handleWelcomeModalClose();
+    // User stays on the dashboard to explore the app
+  };
+
+  // Remove the subscription modal useEffect - WelcomeModal handles everything now
 
   const renderActiveTabContent = () => {
     switch (activeTab) {
@@ -168,138 +277,12 @@ export default function Index() {
         );
       case "settings":
         return (
-          <BlockStack gap="500">
-            {/* App Configuration Header */}
-            <Card>
-              <BlockStack gap="400">
-                <Text as="h2" variant="headingLg">
-                  Settings
-                </Text>
-                <Text as="p" variant="bodyMd" tone="subdued">
-                  Manage your Spector app settings and subscription details.
-                </Text>
-              </BlockStack>
-            </Card>
-
-            {/* Subscription & Plan Information */}
-            <Card>
-              <BlockStack gap="500">
-                <InlineStack align="space-between" blockAlign="center">
-                  <Text as="h3" variant="headingMd">
-                    Subscription & Plan
-                  </Text>
-                  <Button
-                    variant="plain"
-                    tone="critical"
-                    url="https://admin.shopify.com/store/settings/apps"
-                    external
-                  >
-                    Cancel Plan & Uninstall
-                  </Button>
-                </InlineStack>
-                <Layout>
-                  <Layout.Section variant="oneHalf">
-                    <Card>
-                      <BlockStack gap="300">
-                        <Text as="h4" variant="headingSm">
-                          Free Trial Active
-                        </Text>
-                        <Text as="p" variant="bodyMd">
-                          <strong>3-Day Trial</strong>
-                        </Text>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          • Full access to all features
-                          • No payment required
-                          • Export capabilities included
-                          • Trial ends: October 8, 2025
-                        </Text>
-                      </BlockStack>
-                    </Card>
-                  </Layout.Section>
-                  
-                  <Layout.Section variant="oneHalf">
-                    <Card>
-                      <BlockStack gap="300">
-                        <Text as="h4" variant="headingSm">
-                          Current Plan
-                        </Text>
-                        <Text as="p" variant="bodyMd">
-                          <strong>Basic Plan</strong>
-                        </Text>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          • Basic inventory tracking
-                          • Product analytics dashboard
-                          • Bulk product operations
-                          • Performance monitoring
-                        </Text>
-                      </BlockStack>
-                    </Card>
-                  </Layout.Section>
-                </Layout>
-
-
-              </BlockStack>
-            </Card>
-
-            {/* Payment History */}
-            <Card>
-              <BlockStack gap="400">
-                <Text as="h3" variant="headingMd">
-                  Payment History
-                </Text>
-                <Text as="p" variant="bodyMd" tone="subdued">
-                  No payments yet - you're currently on your free trial.
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Once you subscribe, your payment history will appear here including invoices and receipts.
-                </Text>
-              </BlockStack>
-            </Card>
-
-            {/* App Information */}
-            <Card>
-              <BlockStack gap="400">
-                <Text as="h3" variant="headingMd">
-                  App Information
-                </Text>
-                
-                <Layout>
-                  <Layout.Section variant="oneThird">
-                    <BlockStack gap="200">
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        App Version
-                      </Text>
-                      <Text as="p" variant="bodyMd">
-                        v1.0.0
-                      </Text>
-                    </BlockStack>
-                  </Layout.Section>
-                  
-                  <Layout.Section variant="oneThird">
-                    <BlockStack gap="200">
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Installed On
-                      </Text>
-                      <Text as="p" variant="bodyMd">
-                        October 5, 2025
-                      </Text>
-                    </BlockStack>
-                  </Layout.Section>
-                  
-                  <Layout.Section variant="oneThird">
-                    <BlockStack gap="200">
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Support
-                      </Text>
-                      <Text as="p" variant="bodyMd">
-                        hello@spector-app.com
-                      </Text>
-                    </BlockStack>
-                  </Layout.Section>
-                </Layout>
-              </BlockStack>
-            </Card>
-          </BlockStack>
+          <Settings
+            subscription={settingsData.subscription}
+            hasActiveSubscription={settingsData.hasActiveSubscription}
+            error={settingsData.error}
+            managedPricingUrl={settingsData.managedPricingUrl}
+          />
         );
       default:
         return (
@@ -315,6 +298,11 @@ export default function Index() {
     }
   };
 
+  // Don't render anything until hydrated to prevent hydration mismatch
+  if (!isHydrated) {
+    return null;
+  }
+  
   // Don't render modal until app is fully ready
   if (!isAppReady) {
     return (
@@ -355,6 +343,15 @@ export default function Index() {
           }}
         />
         
+        {/* Subscription Banner - Only shows if no active subscription AND not on settings tab */}
+        {!subscription.hasAccess && activeTab !== 'settings' && (
+          <SubscriptionBanner
+            subscription={subscription as any}
+            onSubscribe={handleSubscribe}
+            loading={false}
+          />
+        )}
+        
         <Layout>
           <Layout.Section>
             {renderActiveTabContent()}
@@ -362,11 +359,14 @@ export default function Index() {
         </Layout>
       </BlockStack>
 
-      {/* Welcome Modal - Only shows after app is stable and on first visit */}
+      {/* Unified Welcome Modal - Shows on first visit with subscription info + app features */}
       {isAppReady && (
         <WelcomeModal 
           isOpen={showWelcomeModal} 
           onClose={handleWelcomeModalClose}
+          hasSubscription={subscription.hasAccess}
+          onSubscribe={handleSubscribe}
+          subscriptionPrice={`$${subscription.price}/${subscription.currency === 'USD' ? 'month' : subscription.currency.toLowerCase()}`}
         />
       )}
     </Page>

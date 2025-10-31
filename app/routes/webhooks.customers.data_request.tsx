@@ -1,17 +1,37 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
+import { logger } from "~/utils/logger";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     // Clone the request to avoid body reading conflicts
     const webhookRequest = request.clone();
     
-    // Authenticate the webhook request
+    // Authenticate the webhook request (verifies HMAC)
     const { shop, payload, topic } = await authenticate.webhook(webhookRequest);
 
-    console.log(`✅ Verified webhook: ${topic} for shop: ${shop}`);
-    console.log(`🔐 HMAC signature verified successfully`);
+    logger.info(`✅ Verified webhook: ${topic} for shop: ${shop}`);
+    logger.debug(`🔐 HMAC signature verified successfully`);
 
+    // 🚀 CRITICAL: Respond with 200 OK immediately (Shopify requirement)
+    // Process webhook asynchronously to avoid timeout
+    processWebhookAsync(shop, payload, topic);
+
+    return new Response(null, { status: 200 });
+  } catch (error) {
+    logger.error('❌ Customer data request webhook failed:', error);
+    
+    if (error instanceof Error && error.message.includes('verify')) {
+      return new Response('Unauthorized - HMAC verification failed', { status: 401 });
+    }
+
+    return new Response('Internal Server Error', { status: 500 });
+  }
+};
+
+// Process webhook asynchronously after sending 200 OK
+async function processWebhookAsync(shop: string, payload: any, _topic: string) {
+  try {
     // Extract customer data request information
     const {
       customer,
@@ -28,9 +48,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       shop_domain: string;
     };
 
-    console.log(`📋 Customer data request for customer ID: ${customer.id}`);
-    console.log(`📧 Customer email: ${customer.email}`);
-    console.log(`🛍️ Orders requested: ${orders_requested.length} orders`);
+    logger.info(`📋 Customer data request for customer ID: ${customer.id}`);
+    logger.debug(`📧 Customer email: ${customer.email}`);
+    logger.debug(`🛍️ Orders requested: ${orders_requested.length} orders`);
 
     // GDPR/CCPA Compliance Implementation
     // Collect all customer data stored in our system
@@ -83,24 +103,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         },
       });
       
-      console.log(`✅ Compliance audit record created for customer data request`);
+      logger.info(`✅ Compliance audit record created for customer data request`);
     } catch (dbError) {
-      console.error('⚠️ Failed to create compliance audit record:', dbError);
+      logger.error('⚠️ Failed to create compliance audit record:', dbError);
       // Continue - audit logging failure shouldn't block webhook response
     }
 
     // Log the request for compliance (30-day retention)
-    console.log(`📝 Customer data request processed for shop: ${shop_domain}`);
-    console.log(`📦 Customer data package prepared: ${Object.keys(customerData).length} data categories`);
-
-    return new Response(null, { status: 200 });
+    logger.info(`📝 Customer data request processed for shop: ${shop_domain}`);
+    logger.debug(`📦 Customer data package prepared: ${Object.keys(customerData).length} data categories`);
   } catch (error) {
-    console.error('❌ Customer data request webhook failed:', error);
-    
-    if (error instanceof Error && error.message.includes('verify')) {
-      return new Response('Unauthorized - HMAC verification failed', { status: 401 });
-    }
-
-    return new Response('Internal Server Error', { status: 500 });
+    logger.error('❌ Async webhook processing failed:', error);
   }
-};
+}

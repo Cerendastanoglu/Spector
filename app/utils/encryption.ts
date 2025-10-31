@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { logger } from "~/utils/logger";
 
 // Encryption configuration
 const ALGORITHM = 'aes-256-gcm';
@@ -54,7 +55,7 @@ export function encryptData(data: any): string {
     
     return combined;
   } catch (error) {
-    console.error('Encryption error:', error);
+    logger.error('Encryption error:', error);
     throw new Error('Failed to encrypt data');
   }
 }
@@ -84,7 +85,7 @@ export function decryptData(encryptedData: string): any {
     
     return JSON.parse(decrypted);
   } catch (error) {
-    console.error('Decryption error:', error);
+    logger.error('Decryption error:', error);
     throw new Error('Failed to decrypt data');
   }
 }

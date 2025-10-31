@@ -3,6 +3,7 @@ import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { applyRateLimit } from "~/utils/rateLimit";
 import { RATE_LIMITS } from "~/utils/security";
+import { logger } from "~/utils/logger";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -716,7 +717,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           });
           
           const historyResult = await historyResponse.json();
-          console.log('✅ Bulk history recorded:', historyResult);
+          logger.info('✅ Bulk history recorded:', historyResult);
         } catch (historyError) {
           // Don't fail the main operation if history recording fails
           console.error('Failed to record price changes in history:', historyError);
@@ -757,7 +758,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           
           if (operation === 'add') {
             // Add products to each collection
-            console.log(`➕ Adding product ${productId} to collections:`, collectionIds);
+            logger.info(`➕ Adding product ${productId} to collections:`, collectionIds);
             for (const collectionId of collectionIds) {
               const addMutation = `#graphql
                 mutation collectionAddProducts($id: ID!, $productIds: [ID!]!) {
@@ -785,7 +786,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 variables: { id: collectionId, productIds: [productId] } 
               });
               const addJson = await addResponse.json();
-              console.log(`📤 Collection addition response for ${collectionId}:`, addJson);
+              logger.info(`📤 Collection addition response for ${collectionId}:`, addJson);
               
               if (addJson.data?.collectionAddProducts?.userErrors?.length > 0) {
                 results.push({
@@ -807,7 +808,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           } else if (operation === 'remove') {
             // Remove products from each collection
             // Removing product from collections
-            console.log(`🗑️ Removing product ${productId} from collections:`, collectionIds);
+            logger.info(`🗑️ Removing product ${productId} from collections:`, collectionIds);
             for (const collectionId of collectionIds) {
               const removeMutation = `#graphql
                 mutation collectionRemoveProducts($id: ID!, $productIds: [ID!]!) {
@@ -829,7 +830,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               const removeJson = await removeResponse.json();
               
               // Collection removal response processed
-              console.log(`📤 Collection removal response for ${collectionId}:`, removeJson);
+              logger.info(`📤 Collection removal response for ${collectionId}:`, removeJson);
               
               if (removeJson.data?.collectionRemoveProducts?.userErrors?.length > 0) {
                 results.push({

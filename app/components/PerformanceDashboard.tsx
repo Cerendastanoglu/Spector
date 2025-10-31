@@ -1,3 +1,4 @@
+import { logger } from "~/utils/logger";
 import { useEffect, useState } from 'react';
 import { Card, Text, BlockStack, InlineStack, ProgressBar, Button, Badge } from '@shopify/polaris';
 import { useWebVitalsDebug } from './WebVitals';
@@ -96,13 +97,13 @@ export function PerformanceDashboard() {
           try {
             observer.observe({ entryTypes: ['largest-contentful-paint', 'layout-shift'] });
           } catch (error) {
-            console.warn('Some performance metrics not available:', error);
+            logger.warn('Some performance metrics not available:', error);
           }
           
           return () => observer.disconnect();
         }
       } catch (error) {
-        console.warn('Performance monitoring not available:', error);
+        logger.warn('Performance monitoring not available:', error);
       }
     };
 

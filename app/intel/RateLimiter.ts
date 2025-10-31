@@ -7,6 +7,7 @@
 
 import type { RateLimiter as IRateLimiter, RateLimitState } from './types';
 import { providerRegistry } from './ProviderRegistry';
+import { logger } from '~/utils/logger';
 
 export class RateLimiter implements IRateLimiter {
   private rateLimitStates = new Map<string, Map<string, RateLimitState>>();
@@ -225,7 +226,7 @@ export class RateLimiter implements IRateLimiter {
       }
     }
     
-    console.log(`🧹 Cleaned up rate limiter: ${this.rateLimitStates.size} active states`);
+    logger.info(`🧹 Cleaned up rate limiter: ${this.rateLimitStates.size} active states`);
   }
 
   /**

@@ -1,3 +1,4 @@
+import { logger } from "~/utils/logger";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
@@ -37,10 +38,10 @@ interface StoreAnalysis {
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
-    console.log("🔍 Market Analysis API: Starting store analysis...");
+    logger.info("🔍 Market Analysis API: Starting store analysis...");
     
     const { admin } = await authenticate.admin(request);
-    console.log("✅ Market Analysis API: Authentication successful");
+    logger.info("✅ Market Analysis API: Authentication successful");
 
     // Fetch shop information
     const shopResponse = await admin.graphql(`
@@ -93,12 +94,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const productsData = await productsResponse.json();
     const products = productsData.data?.products?.edges || [];
 
-    console.log(`📊 Analyzing ${products.length} products for market insights...`);
+    logger.info(`📊 Analyzing ${products.length} products for market insights...`);
 
     // Analyze store data
     const analysis = analyzeStore(shop, products);
     
-    console.log("✅ Market Analysis completed successfully");
+    logger.info("✅ Market Analysis completed successfully");
 
     return json({
       success: true,
@@ -106,7 +107,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
 
   } catch (error) {
-    console.error("❌ Market Analysis API Error:", error);
+    logger.error("❌ Market Analysis API Error:", error);
     return json({ 
       success: false, 
       error: error instanceof Error ? error.message : "Unknown server error" 

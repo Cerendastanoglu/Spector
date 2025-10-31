@@ -5,6 +5,7 @@
 
 import db from '../db.server';
 import { encryptData, decryptData } from '../utils/encryption';
+import { logger } from '~/utils/logger';
 
 /**
  * Store encrypted credentials for a provider
@@ -39,10 +40,10 @@ export async function storeProviderCredentials(
       },
     });
     
-    console.log(`✅ Encrypted credentials stored for ${shop}:${providerId}`);
+    logger.info(`✅ Encrypted credentials stored for ${shop}:${providerId}`);
     return true;
   } catch (error) {
-    console.error(`❌ Error storing credentials for ${shop}:${providerId}:`, error);
+    logger.error(`❌ Error storing credentials for ${shop}:${providerId}:`, error);
     return false;
   }
 }
@@ -71,7 +72,7 @@ export async function checkProviderCredentials(
     // Return true if credentials exist and are active
     return !!credential?.isActive && !!credential?.encryptedApiKey;
   } catch (error) {
-    console.error(`❌ Error checking credentials for ${shop}:${providerId}:`, error);
+    logger.error(`❌ Error checking credentials for ${shop}:${providerId}:`, error);
     return false;
   }
 }
@@ -105,7 +106,7 @@ export async function getProviderCredentials(
     const decryptedData = decryptData(credential.encryptedApiKey);
     return decryptedData as string;
   } catch (error) {
-    console.error(`❌ Error retrieving credentials for ${shop}:${providerId}:`, error);
+    logger.error(`❌ Error retrieving credentials for ${shop}:${providerId}:`, error);
     return null;
   }
 }
@@ -131,10 +132,10 @@ export async function deactivateProviderCredentials(
       },
     });
     
-    console.log(`✅ Credentials deactivated for ${shop}:${providerId}`);
+    logger.info(`✅ Credentials deactivated for ${shop}:${providerId}`);
     return true;
   } catch (error) {
-    console.error(`❌ Error deactivating credentials for ${shop}:${providerId}:`, error);
+    logger.error(`❌ Error deactivating credentials for ${shop}:${providerId}:`, error);
     return false;
   }
 }
@@ -156,10 +157,10 @@ export async function deleteProviderCredentials(
       },
     });
     
-    console.log(`✅ Credentials deleted for ${shop}:${providerId}`);
+    logger.info(`✅ Credentials deleted for ${shop}:${providerId}`);
     return true;
   } catch (error) {
-    console.error(`❌ Error deleting credentials for ${shop}:${providerId}:`, error);
+    logger.error(`❌ Error deleting credentials for ${shop}:${providerId}:`, error);
     return false;
   }
 }
@@ -181,7 +182,7 @@ export async function getActiveProviders(shop: string): Promise<string[]> {
     
     return credentials.map(c => c.providerId);
   } catch (error) {
-    console.error(`❌ Error getting active providers for ${shop}:`, error);
+    logger.error(`❌ Error getting active providers for ${shop}:`, error);
     return [];
   }
 }

@@ -1,3 +1,4 @@
+import { logger } from "~/utils/logger";
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -32,7 +33,7 @@ export async function getRetentionPolicy(shop: string, dataType: DataType): Prom
     // Return default policy if no custom policy exists
     return DEFAULT_RETENTION_POLICIES[dataType];
   } catch (error) {
-    console.error(`Error getting retention policy for ${dataType}:`, error);
+    logger.error(`Error getting retention policy for ${dataType}:`, error);
     return DEFAULT_RETENTION_POLICIES[dataType];
   }
 }
@@ -66,7 +67,7 @@ export async function setRetentionPolicy(
       },
     });
   } catch (error) {
-    console.error(`Error setting retention policy for ${dataType}:`, error);
+    logger.error(`Error setting retention policy for ${dataType}:`, error);
     throw error;
   }
 }
@@ -124,13 +125,13 @@ export async function cleanupExpiredData(dataType: DataType, shop?: string): Pro
 
 
       default:
-        console.warn(`Unknown data type for cleanup: ${dataType}`);
+        logger.warn(`Unknown data type for cleanup: ${dataType}`);
     }
 
-    console.log(`Cleaned up ${deletedCount} expired ${dataType} records`);
+    logger.info(`Cleaned up ${deletedCount} expired ${dataType} records`);
     return deletedCount;
   } catch (error) {
-    console.error(`Error cleaning up ${dataType} data:`, error);
+    logger.error(`Error cleaning up ${dataType} data:`, error);
     throw error;
   }
 }
@@ -145,7 +146,7 @@ export async function cleanupAllExpiredData(shop: string): Promise<Record<string
     try {
       results[dataType] = await cleanupExpiredData(dataType, shop);
     } catch (error) {
-      console.error(`Failed to cleanup ${dataType} for shop ${shop}:`, error);
+      logger.error(`Failed to cleanup ${dataType} for shop ${shop}:`, error);
       results[dataType] = 0;
     }
   }
@@ -180,7 +181,7 @@ export async function getDataUsageStats(shop: string): Promise<{
       totalSize,
     };
   } catch (error) {
-    console.error('Error getting data usage stats:', error);
+    logger.error('Error getting data usage stats:', error);
     return {
       analytics: 0,
       products: 0,
@@ -194,7 +195,7 @@ export async function getDataUsageStats(shop: string): Promise<{
  * Schedule cleanup job (call this periodically)
  */
 export async function runScheduledCleanup(): Promise<void> {
-  console.log('Starting scheduled data cleanup...');
+  logger.info('Starting scheduled data cleanup...');
   
   try {
     // Get all unique shops
@@ -204,12 +205,12 @@ export async function runScheduledCleanup(): Promise<void> {
     });
 
     for (const { shop } of shops) {
-      console.log(`Cleaning up data for shop: ${shop}`);
+      logger.info(`Cleaning up data for shop: ${shop}`);
       await cleanupAllExpiredData(shop);
     }
 
-    console.log('Scheduled cleanup completed');
+    logger.info('Scheduled cleanup completed');
   } catch (error) {
-    console.error('Scheduled cleanup failed:', error);
+    logger.error('Scheduled cleanup failed:', error);
   }
 }

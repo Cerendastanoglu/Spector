@@ -1,3 +1,5 @@
+import { logger } from "~/utils/logger";
+
 /**
  * Namespace utility for avoiding global scope collisions
  * Implements IIFE (Immediately Invoked Function Expression) patterns
@@ -93,7 +95,7 @@ export const NamespaceUtils = (() => {
 
             return result;
           } catch (error) {
-            console.error('Scoped clipboard operation failed:', error);
+            logger.error('Scoped clipboard operation failed:', error);
             return false;
           }
         }
@@ -135,7 +137,7 @@ export const NamespaceUtils = (() => {
               }
             }, 100);
           } catch (error) {
-            console.error('Scoped download failed:', error);
+            logger.error('Scoped download failed:', error);
           }
         },
 
@@ -145,7 +147,7 @@ export const NamespaceUtils = (() => {
             try {
               window.URL.revokeObjectURL(url);
             } catch (error) {
-              console.error('Error cleaning up URL:', error);
+              logger.error('Error cleaning up URL:', error);
             }
           });
           activeUrls.clear();
@@ -170,7 +172,7 @@ export const NamespaceUtils = (() => {
               fallback?.();
             }
           } catch (error) {
-            console.error('Scoped window open failed:', error);
+            logger.error('Scoped window open failed:', error);
             fallback?.();
           }
         }
@@ -236,19 +238,7 @@ export const BrowserFeatures = (() => {
       );
     },
 
-    hasLocalStorage(): boolean {
-      return detectFeature('localStorage', () => {
-        if (typeof window === 'undefined') return false;
-        try {
-          const test = '__storage_test__';
-          window.localStorage.setItem(test, test);
-          window.localStorage.removeItem(test);
-          return true;
-        } catch {
-          return false;
-        }
-      });
-    },
+    // NOTE: hasLocalStorage() removed - localStorage not used per Shopify embedded app requirements
 
     clearCache(): void {
       featureCache.clear();

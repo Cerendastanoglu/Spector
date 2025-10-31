@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { logger } from "~/utils/logger";
 
 export interface RevertRecipe {
   metadata: {
@@ -98,7 +99,7 @@ export class RevertRecipeManager {
     }
 
     await fs.writeFile(filepath, iniContent, 'utf-8');
-    console.log(`📄 Generated revert recipe: ${filename}`);
+    logger.info(`📄 Generated revert recipe: ${filename}`);
     
     return filename;
   }
@@ -217,7 +218,7 @@ export class RevertRecipeManager {
   static async deleteRecipe(filename: string): Promise<void> {
     const filepath = path.join(this.getRecipesDir(), filename);
     await fs.unlink(filepath);
-    console.log(`🗑️ Deleted revert recipe: ${filename}`);
+    logger.info(`🗑️ Deleted revert recipe: ${filename}`);
   }
 }
 
@@ -231,7 +232,7 @@ export async function executeRevert(
   const errors: string[] = [];
   let processedChanges = 0;
 
-  console.log(`🔄 Starting revert operation: ${recipe.metadata.operation_name}`);
+  logger.info(`🔄 Starting revert operation: ${recipe.metadata.operation_name}`);
   
   // Group changes by resource type for batch processing
   const productChanges = recipe.changes.filter(c => c.resourceType === 'product');
@@ -260,7 +261,7 @@ export async function executeRevert(
   }
 
   const success = errors.length === 0;
-  console.log(`${success ? '✅' : '❌'} Revert completed: ${processedChanges} changes processed`);
+  logger.info(`${success ? '✅' : '❌'} Revert completed: ${processedChanges} changes processed`);
   
   return { success, processedChanges, errors };
 }
@@ -325,7 +326,7 @@ async function processProductChanges(
         errors.push(`Product ${productId}: ${data.data.productUpdate.userErrors[0].message}`);
       } else {
         processed += productChanges.length;
-        console.log(`✅ Reverted product ${productId}: ${productChanges.length} fields`);
+        logger.info(`✅ Reverted product ${productId}: ${productChanges.length} fields`);
       }
     } catch (error) {
       errors.push(`Product ${productGid}: ${error}`);
@@ -396,7 +397,7 @@ async function processVariantChanges(
         errors.push(`Variant ${variantId}: ${data.data.productVariantUpdate.userErrors[0].message}`);
       } else {
         processed += variantChanges.length;
-        console.log(`✅ Reverted variant ${variantId}: ${variantChanges.length} fields`);
+        logger.info(`✅ Reverted variant ${variantId}: ${variantChanges.length} fields`);
       }
     } catch (error) {
       errors.push(`Variant ${variantGid}: ${error}`);

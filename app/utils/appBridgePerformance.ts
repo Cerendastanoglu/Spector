@@ -1,6 +1,7 @@
 // App Bridge performance optimizations for Core Web Vitals
 import { useAppBridge } from '@shopify/app-bridge-react';
 import { useEffect } from 'react';
+import { logger } from "~/utils/logger";
 
 interface AppBridgePerformanceConfig {
   // Enable performance monitoring
@@ -57,7 +58,7 @@ export function useAppBridgePerformance(config: AppBridgePerformanceConfig = {})
         
         entries.forEach((entry) => {
           if (entry.name.includes('app-bridge') || entry.name.includes('shopify')) {
-            console.log('🚀 App Bridge Performance:', {
+            logger.info('🚀 App Bridge Performance:', {
               name: entry.name,
               duration: entry.duration,
               startTime: entry.startTime
@@ -69,7 +70,7 @@ export function useAppBridgePerformance(config: AppBridgePerformanceConfig = {})
       try {
         observer.observe({ entryTypes: ['navigation', 'resource', 'measure'] });
       } catch (error) {
-        console.warn('Performance Observer not fully supported:', error);
+        logger.warn('Performance Observer not fully supported:', error);
       }
 
       return () => observer.disconnect();
@@ -108,7 +109,7 @@ export function useAppBridgePerformance(config: AppBridgePerformanceConfig = {})
         try {
           performance.measure(`app-bridge-${name}`, `app-bridge-${startMark}`);
         } catch (error) {
-          console.warn('Performance measurement failed:', error);
+          logger.warn('Performance measurement failed:', error);
         }
       }
     }
@@ -201,7 +202,7 @@ export const ShopifyAppPerformance = {
       clearTimeout(interactionTimeout);
       interactionTimeout = setTimeout(() => {
         // Process interaction after debounce
-        console.log('Interaction processed:', event.target);
+        logger.info('Interaction processed:', event.target);
       }, 16); // ~1 frame at 60fps
     }, { passive: true });
 

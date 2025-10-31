@@ -1,3 +1,4 @@
+import { logger } from "~/utils/logger";
 import { useState } from "react";
 import {
   Card,
@@ -29,7 +30,7 @@ export function ProductManagementSkeleton({ isVisible }: ProductManagementSkelet
       // This would trigger a re-render with the full component
       // For now, we'll show a loading state
     } catch (error) {
-      console.error('Failed to load ProductManagement:', error);
+      logger.error('Failed to load ProductManagement:', error);
     }
   };
 

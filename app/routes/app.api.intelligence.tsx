@@ -1,3 +1,4 @@
+import { logger } from "~/utils/logger";
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import { authenticate } from '../shopify.server';
@@ -97,7 +98,7 @@ async function handleIntelligenceRequest(
     }
 
   } catch (error) {
-    console.error('Intelligence request error:', error);
+    logger.error('Intelligence request error:', error);
     return json({ 
       error: error instanceof Error ? error.message : 'Request failed' 
     }, { status: 500 });
@@ -237,7 +238,7 @@ async function handleCredentialsUpdate(
     });
 
   } catch (error) {
-    console.error('❌ Credential update error:', error);
+    logger.error('❌ Credential update error:', error);
     return json({ 
       error: error instanceof Error ? error.message : 'Update failed' 
     }, { status: 500 });

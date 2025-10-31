@@ -1,3 +1,4 @@
+import { logger } from "~/utils/logger";
 import { useEffect } from 'react';
 import type { CLSMetric, FCPMetric, LCPMetric, INPMetric, TTFBMetric } from 'web-vitals';
 
@@ -22,7 +23,7 @@ const THRESHOLDS = {
 
 function sendToAnalytics(metric: Metric) {
   // Send to analytics service (Google Analytics, Shopify Analytics, etc.)
-  console.log('📊 Web Vital:', {
+  logger.info('📊 Web Vital:', {
     name: metric.name,
     value: metric.value,
     rating: metric.rating,
@@ -114,7 +115,7 @@ export function WebVitals() {
         });
 
       } catch (error) {
-        console.error('Failed to load web-vitals:', error);
+        logger.error('Failed to load web-vitals:', error);
       }
     };
 
@@ -137,7 +138,7 @@ export function WebVitals() {
 export function useWebVitalsDebug() {
   useEffect(() => {
     const checkVitals = () => {
-      console.log('🔍 Web Vitals Debug - Check browser DevTools for performance metrics');
+      logger.info('🔍 Web Vitals Debug - Check browser DevTools for performance metrics');
       
       // Use Performance Observer API to get current metrics
       if (typeof PerformanceObserver !== 'undefined') {
@@ -154,7 +155,7 @@ export function useWebVitalsDebug() {
         try {
           observer.observe({ entryTypes: ['navigation', 'paint', 'largest-contentful-paint'] });
         } catch (error) {
-          console.log('Performance Observer not fully supported');
+          logger.info('Performance Observer not fully supported');
         }
       }
     };
