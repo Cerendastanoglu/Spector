@@ -1,7 +1,7 @@
 import { logger } from "~/utils/logger";
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData, useFetcher } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -189,6 +189,7 @@ export default function Index() {
   const [isAppReady, setIsAppReady] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const { preloadComponent } = useComponentPreloader();
+  const welcomeFetcher = useFetcher();
 
   // Fix hydration issues by marking when client has hydrated
   useEffect(() => {
@@ -216,20 +217,13 @@ export default function Index() {
     initializeApp();
   }, [hasSeenWelcomeModal]);
 
-  const handleWelcomeModalClose = async () => {
+  const handleWelcomeModalClose = () => {
     setShowWelcomeModal(false);
     
-    // Save preference to server (no localStorage!)
-    try {
-      const formData = new FormData();
-      formData.append('action', 'dismissWelcome');
-      await fetch('', {
-        method: 'POST',
-        body: formData,
-      });
-    } catch (error) {
-      logger.error('Failed to save welcome preference:', error);
-    }
+    // Save preference to server using fetcher (doesn't cause navigation)
+    const formData = new FormData();
+    formData.append('action', 'dismissWelcome');
+    welcomeFetcher.submit(formData, { method: 'POST' });
   };
 
   const handleTabChange = (tab: string) => {
@@ -250,15 +244,6 @@ export default function Index() {
 
   const renderActiveTabContent = () => {
     switch (activeTab) {
-      case "dashboard":
-        return (
-          <OptimizedComponents.Dashboard
-            isVisible={true}
-            outOfStockCount={outOfStockCount}
-            onNavigate={handleTabChange}
-            shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain}
-          />
-        );
       case "out-of-stock":
         return <OptimizedComponents.ProductManagement isVisible={true} shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} />;
 
@@ -302,32 +287,6 @@ export default function Index() {
   if (!isHydrated) {
     return null;
   }
-  
-  // Don't render modal until app is fully ready
-  if (!isAppReady) {
-    return (
-      <Page>
-        <BlockStack gap="500">
-          <AppHeader
-            onTabChange={handleTabChange}
-            activeTab={activeTab}
-            outOfStockCount={outOfStockCount}
-            onPreloadComponent={(componentName) => {
-              if (componentName === 'ProductManagement' || componentName === 'Dashboard') {
-                preloadComponent(componentName as keyof typeof OptimizedComponents);
-              }
-            }}
-          />
-          
-          <Layout>
-            <Layout.Section>
-              {renderActiveTabContent()}
-            </Layout.Section>
-          </Layout>
-        </BlockStack>
-      </Page>
-    );
-  }
 
   return (
     <Page>
@@ -354,7 +313,18 @@ export default function Index() {
         
         <Layout>
           <Layout.Section>
-            {renderActiveTabContent()}
+            {/* Always render Dashboard but hide when not active */}
+            <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
+              <OptimizedComponents.Dashboard
+                isVisible={activeTab === 'dashboard'}
+                outOfStockCount={outOfStockCount}
+                onNavigate={handleTabChange}
+                shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain}
+              />
+            </div>
+            
+            {/* Render other tabs conditionally */}
+            {activeTab !== 'dashboard' && renderActiveTabContent()}
           </Layout.Section>
         </Layout>
       </BlockStack>
