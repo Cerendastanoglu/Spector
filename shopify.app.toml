@@ -34,9 +34,11 @@ api_version = "2024-10"
 
   # NOTE: GDPR webhooks (customers/data_request, customers/redact, shop/redact)
   # CANNOT be added via shopify.app.toml - Shopify blocks automated registration.
-  # You MUST add them manually in the Partner Dashboard under:
-  # "Protected customer data access" → Complete the questionnaire first
-  # Then webhooks will appear after you submit for protected data review.
+  # These webhooks are automatically registered by Shopify when you:
+  # 1. Request "Protected customer data access" in Partner Dashboard
+  # 2. Get approved (usually 1-3 business days)
+  # 3. Shopify will automatically create these webhook subscriptions
+  # Your webhook handlers are already implemented and will verify HMAC correctly.
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes

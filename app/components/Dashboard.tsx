@@ -119,6 +119,9 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   const currentRevenueGenerationRef = useRef(0);
   const currentInventoryGenerationRef = useRef(0);
   
+  // Track if initial fetch has been started to prevent duplicate calls during React Strict Mode
+  const hasFetchedRef = useRef(false);
+  
   // Update refs when values change
   useEffect(() => {
     timePeriodRef.current = timePeriod;
@@ -288,36 +291,30 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   }, [loadStoreCurrency]);
 
 
-  // Reset loading flag when tab or period changes
+  // Smart data loading: fetch data when dashboard becomes visible
   useEffect(() => {
-    setHasLoadedInitialData(false);
-  }, [timePeriod]);
-
-
-
-  // Smart data loading: check cache first, then fetch if needed
-  useEffect(() => {
-    logger.debug("Dashboard: useEffect triggered - isVisible:", isVisible, "hasLoadedInitialData:", hasLoadedInitialData);
+    logger.debug("Dashboard: useEffect triggered - isVisible:", isVisible, "hasLoadedInitialData:", hasLoadedInitialData, "hasFetchedRef:", hasFetchedRef.current);
     
-    if (!isVisible) return;
+    // Prevent duplicate fetches during React Strict Mode or re-renders
+    if (!isVisible || hasLoadedInitialData || hasFetchedRef.current) return;
 
     // Always load product performance data (revenue type)
     const type = 'revenue';
     logger.debug("Dashboard: Loading data for type:", type, "timePeriod:", timePeriod);
     
-    // Skip if we've already loaded data for this combination
-    if (hasLoadedInitialData) return;
-    
     // Fetch fresh data (no caching to comply with Shopify requirements)
     logger.debug(`Dashboard: Fetching fresh ${type} data`);
+    
+    // Mark as loading to prevent duplicate fetches (both state and ref)
+    setHasLoadedInitialData(true);
+    hasFetchedRef.current = true;
+    
     // Use a timeout to allow UI to render first, then fetch data
     setTimeout(() => {
       fetchFreshData(type, false);
     }, 100);
-    
-    // Mark as loaded
-    setHasLoadedInitialData(true);
-  }, [isVisible, timePeriod, fetchFreshData, hasLoadedInitialData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible, timePeriod, hasLoadedInitialData]);
 
   // Handle revenue data response
   // Race condition protection: Store the generation when effect runs
