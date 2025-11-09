@@ -186,7 +186,6 @@ export default function Index() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [outOfStockCount] = useState(0);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
-  const [isAppReady, setIsAppReady] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const { preloadComponent } = useComponentPreloader();
   const welcomeFetcher = useFetcher();
@@ -197,25 +196,18 @@ export default function Index() {
   }, []);
 
 
-  // Wait for app to be fully loaded before checking welcome status
+  // Show welcome modal on first visit (after hydration)
   useEffect(() => {
-    const initializeApp = () => {
-      // Add a small delay to ensure everything is rendered
+    if (!isHydrated) return;
+    
+    // Check server-side preference (no localStorage!)
+    if (!hasSeenWelcomeModal) {
+      // Small delay to ensure dashboard has started loading
       setTimeout(() => {
-        setIsAppReady(true);
-        
-        // Check server-side preference (no localStorage!)
-        if (!hasSeenWelcomeModal) {
-          // Add another small delay to ensure smooth transition
-          setTimeout(() => {
-            setShowWelcomeModal(true);
-          }, 800); // Increased delay for better stability
-        }
-      }, 200); // Slightly increased initial delay
-    };
-
-    initializeApp();
-  }, [hasSeenWelcomeModal]);
+        setShowWelcomeModal(true);
+      }, 500);
+    }
+  }, [hasSeenWelcomeModal, isHydrated]);
 
   const handleWelcomeModalClose = () => {
     setShowWelcomeModal(false);
@@ -330,15 +322,13 @@ export default function Index() {
       </BlockStack>
 
       {/* Unified Welcome Modal - Shows on first visit with subscription info + app features */}
-      {isAppReady && (
-        <WelcomeModal 
-          isOpen={showWelcomeModal} 
-          onClose={handleWelcomeModalClose}
-          hasSubscription={subscription.hasAccess}
-          onSubscribe={handleSubscribe}
-          subscriptionPrice={`$${subscription.price}/${subscription.currency === 'USD' ? 'month' : subscription.currency.toLowerCase()}`}
-        />
-      )}
+      <WelcomeModal 
+        isOpen={showWelcomeModal} 
+        onClose={handleWelcomeModalClose}
+        hasSubscription={subscription.hasAccess}
+        onSubscribe={handleSubscribe}
+        subscriptionPrice={`$${subscription.price}/${subscription.currency === 'USD' ? 'month' : subscription.currency.toLowerCase()}`}
+      />
     </Page>
   );
 }

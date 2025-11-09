@@ -1,6 +1,7 @@
 export { AppHeader } from "./AppHeader";
 export { Dashboard } from "./Dashboard";
-export { ProductManagement } from "./ProductManagement";
+// ProductManagement is lazy-loaded via lazyLoader - don't export here to prevent eager imports
+// export { ProductManagement } from "./ProductManagement";
 export { WebVitals } from "./WebVitals";
 export { PerformanceDashboard } from "./PerformanceDashboard";
 export { WelcomeModal } from "./WelcomeModal";

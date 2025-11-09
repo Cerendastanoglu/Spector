@@ -80,6 +80,57 @@ CREATE TABLE "public"."ComplianceAudit" (
     CONSTRAINT "ComplianceAudit_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "public"."IntelligenceCredentials" (
+    "id" TEXT NOT NULL,
+    "shop" TEXT NOT NULL,
+    "providerId" TEXT NOT NULL,
+    "encryptedApiKey" TEXT NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "lastVerified" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "IntelligenceCredentials_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."UserPreferences" (
+    "id" TEXT NOT NULL,
+    "shop" TEXT NOT NULL,
+    "hasSeenWelcomeModal" BOOLEAN NOT NULL DEFAULT false,
+    "theme" TEXT,
+    "dashboardLayout" TEXT,
+    "notificationSettings" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "UserPreferences_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Subscription" (
+    "id" TEXT NOT NULL,
+    "shop" TEXT NOT NULL,
+    "shopifyChargeId" TEXT,
+    "plan" TEXT NOT NULL DEFAULT 'basic',
+    "status" TEXT NOT NULL DEFAULT 'trialing',
+    "trialStartedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "trialEndsAt" TIMESTAMP(3) NOT NULL,
+    "isTrialUsed" BOOLEAN NOT NULL DEFAULT false,
+    "billingStartedAt" TIMESTAMP(3),
+    "currentPeriodStart" TIMESTAMP(3),
+    "currentPeriodEnd" TIMESTAMP(3),
+    "cancelledAt" TIMESTAMP(3),
+    "price" DOUBLE PRECISION NOT NULL DEFAULT 9.99,
+    "currency" TEXT NOT NULL DEFAULT 'USD',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "lastCheckedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Subscription_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE INDEX "AnalyticsSnapshot_shop_dataType_idx" ON "public"."AnalyticsSnapshot"("shop", "dataType");
 
@@ -118,3 +169,33 @@ CREATE INDEX "ComplianceAudit_expiresAt_idx" ON "public"."ComplianceAudit"("expi
 
 -- CreateIndex
 CREATE INDEX "ComplianceAudit_status_idx" ON "public"."ComplianceAudit"("status");
+
+-- CreateIndex
+CREATE INDEX "IntelligenceCredentials_shop_idx" ON "public"."IntelligenceCredentials"("shop");
+
+-- CreateIndex
+CREATE INDEX "IntelligenceCredentials_providerId_idx" ON "public"."IntelligenceCredentials"("providerId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "IntelligenceCredentials_shop_providerId_key" ON "public"."IntelligenceCredentials"("shop", "providerId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "UserPreferences_shop_key" ON "public"."UserPreferences"("shop");
+
+-- CreateIndex
+CREATE INDEX "UserPreferences_shop_idx" ON "public"."UserPreferences"("shop");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Subscription_shop_key" ON "public"."Subscription"("shop");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Subscription_shopifyChargeId_key" ON "public"."Subscription"("shopifyChargeId");
+
+-- CreateIndex
+CREATE INDEX "Subscription_shop_idx" ON "public"."Subscription"("shop");
+
+-- CreateIndex
+CREATE INDEX "Subscription_status_idx" ON "public"."Subscription"("status");
+
+-- CreateIndex
+CREATE INDEX "Subscription_trialEndsAt_idx" ON "public"."Subscription"("trialEndsAt");

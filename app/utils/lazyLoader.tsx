@@ -21,9 +21,7 @@ const LazyProductManagement = lazy(() =>
 );
 
 const LazyDashboard = lazy(() => 
-  import('../components/Dashboard').then(module => ({ 
-    default: module.Dashboard 
-  }))
+  import('../components/Dashboard')
 );
 
 /**

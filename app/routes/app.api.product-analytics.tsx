@@ -122,16 +122,21 @@ function calculateDynamicPriceRanges(
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  // Apply rate limiting (60 requests per minute)
-  const rateLimitResponse = await applyRateLimit(request, RATE_LIMITS.API_DEFAULT);
-  if (rateLimitResponse) return rateLimitResponse;
-
   try {
-    logger.info("🔵 Product Analytics API: Starting analysis...");
-    logger.info("🔵 Product Analytics API: Request URL:", request.url);
+    logger.warn("🔵 Product Analytics API: Route hit! Request received");
+    logger.warn("🔵 Product Analytics API: Request URL:", request.url);
     
-    const { admin } = await authenticate.admin(request);
-    logger.info("🔵 Product Analytics API: Authentication successful");
+    // Apply rate limiting (60 requests per minute)
+    const rateLimitResponse = await applyRateLimit(request, RATE_LIMITS.API_DEFAULT);
+    if (rateLimitResponse) {
+      logger.warn("🔵 Product Analytics API: Rate limited");
+      return rateLimitResponse;
+    }
+
+    logger.warn("🔵 Product Analytics API: Starting analysis...");
+    
+    const { admin, session } = await authenticate.admin(request);
+    logger.warn("🔵 Product Analytics API: Authentication successful", { shop: session.shop });
 
     // GraphQL query to get products and orders
     const productsResponse = await admin.graphql(`
@@ -225,6 +230,34 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     
     logger.info(`🔵 Product Analytics API: Found ${products.length} products`);
     logger.info(`🔵 Product Analytics API: Found ${orders.length} orders`);
+    
+    // If no products, return empty state with a message
+    if (products.length === 0) {
+      logger.info("🟡 Product Analytics API: No products found in store");
+      return json({
+        success: true,
+        data: {
+          totalProducts: 0,
+          activeProducts: 0,
+          totalCatalogValue: 0,
+          avgProductPrice: 0,
+          catalogHealth: 0,
+          topProducts: [],
+          inventoryDistribution: {
+            wellStocked: 0,
+            lowStock: 0,
+            outOfStock: 0,
+          },
+          priceAnalysis: {
+            avgPrice: 0,
+            minPrice: 0,
+            maxPrice: 0,
+            priceDistribution: [],
+          },
+        },
+        warning: "No products found in your store. Please add products to see analytics.",
+      });
+    }
 
     // Process product data
     const totalProducts = products.length;
@@ -404,6 +437,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   } catch (error) {
     logger.error("🔴 Product Analytics API Error:", error);
+    logger.error("🔴 Error details:", {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+    });
     
     return json({
       success: false,
