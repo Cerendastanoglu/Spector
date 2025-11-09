@@ -22,7 +22,16 @@ if (!isPostgres) {
 }
 
 // prepare database
-await exec('npx prisma migrate deploy')
+// Skip migrations entirely if SKIP_MIGRATIONS is set (emergency bypass for broken migrations)
+if (process.env.SKIP_MIGRATIONS === 'true') {
+  console.log('⚠️  SKIP_MIGRATIONS enabled - Bypassing database migrations!')
+  console.log('⚠️  WARNING: App may not work correctly if schema is out of sync!')
+} else if (isPostgres && process.env.FORCE_DB_RESET === 'true') {
+  console.log('🔄 FORCE_DB_RESET enabled - Resetting database...')
+  await exec('npx prisma migrate reset --force --skip-seed')
+} else {
+  await exec('npx prisma migrate deploy')
+}
 
 // launch application
 if (!isPostgres && process.env.BUCKET_NAME) {
