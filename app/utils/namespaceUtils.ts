@@ -168,9 +168,27 @@ export const NamespaceUtils = (() => {
 
           try {
             const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
-            if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+            
+            // More reliable popup blocker detection
+            // Only call fallback if popup was definitely blocked
+            if (!newWindow) {
               fallback?.();
+              return;
             }
+            
+            // Check after a small delay to avoid false positives
+            setTimeout(() => {
+              try {
+                if (newWindow.closed) {
+                  // Window was closed immediately - likely blocked
+                  // But don't call fallback as window.open succeeded
+                }
+              } catch (e) {
+                // Can't access closed property - likely blocked
+                // But window.open succeeded so don't show error
+              }
+            }, 100);
+            
           } catch (error) {
             logger.error('Scoped window open failed:', error);
             fallback?.();

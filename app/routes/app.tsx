@@ -1,4 +1,4 @@
-import type { HeadersFunction, LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { Link, Outlet, useLoaderData, useRouteError } from "@remix-run/react";
 import { boundary } from "@shopify/shopify-app-remix/server";
@@ -11,59 +11,16 @@ import { useEffect } from "react";
 import { authenticate } from "../shopify.server";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import { ShopifyAppPerformance, useAppBridgePerformance } from "../utils/appBridgePerformance";
-import prisma from "../db.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
-  const shop = session.shop;
-
-  // Fetch user preferences from database (replaces localStorage for theme)
-  let userPreferences = await prisma.userPreferences.findUnique({
-    where: { shop },
-    select: { theme: true },
-  });
-
-  // Create default preferences if not found
-  if (!userPreferences) {
-    userPreferences = await prisma.userPreferences.create({
-      data: { shop, theme: 'light' },
-      select: { theme: true },
-    });
-  }
+  await authenticate.admin(request);
 
   return json({ 
     apiKey: process.env.SHOPIFY_API_KEY || "",
-    theme: userPreferences.theme || 'light',
+    theme: 'light', // Hardcoded for now - UserPreferences removed
   });
-};
-
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
-  const shop = session.shop;
-  const formData = await request.formData();
-  const actionType = formData.get('action');
-
-  if (actionType === 'setTheme') {
-    const theme = formData.get('theme') as string;
-    
-    // Validate theme value
-    if (theme !== 'light' && theme !== 'dark') {
-      return json({ error: 'Invalid theme' }, { status: 400 });
-    }
-
-    // Update theme preference in database
-    await prisma.userPreferences.upsert({
-      where: { shop },
-      update: { theme },
-      create: { shop, theme },
-    });
-
-    return json({ success: true, theme });
-  }
-
-  return json({ error: 'Unknown action' }, { status: 400 });
 };
 
 export default function App() {

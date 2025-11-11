@@ -1,4 +1,6 @@
 import { logger } from "~/utils/logger";
+import { useFetcher } from "@remix-run/react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   BlockStack,
@@ -25,7 +27,7 @@ import {
   ChevronRightIcon,
   ChevronUpIcon
 } from "@shopify/polaris-icons";
-import { useState, useEffect } from "react";
+
 
 interface ForecastItem {
   id: string;
@@ -66,18 +68,23 @@ interface InventoryForecastingData {
 
 interface ForecastingTabProps {
   shopDomain?: string;
+  initialForecastData?: InventoryForecastingData | null; // Add support for server-side loaded data
 }
 
-export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
+export function ForecastingTab({ shopDomain, initialForecastData = null }: ForecastingTabProps) {
   const [showAIMethodology, setShowAIMethodology] = useState(false);
-  const [forecastData, setForecastData] = useState<InventoryForecastingData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [forecastData, setForecastData] = useState<InventoryForecastingData | null>(initialForecastData);
+  const [loading, setLoading] = useState(!initialForecastData); // Don't show loading if we have initial data
   const [error, setError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState(0);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   
   // Currency state
   const [currencySymbol, setCurrencySymbol] = useState<string>('$');
+  
+  // Use fetchers for API calls
+  const currencyFetcher = useFetcher<{ shop: any }>();
+  const forecastFetcher = useFetcher<{ success: boolean; data?: InventoryForecastingData; error?: string }>();
 
   const toggleRowExpansion = (itemId: string) => {
     setExpandedRows(prev => {
@@ -93,79 +100,66 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
 
   // Load store currency from Shopify API
   useEffect(() => {
-    const loadStoreCurrency = async () => {
-      try {
-        const formData = new FormData();
-        formData.append('action', 'get-shop-info');
-        
-        const response = await fetch('/app/api/products', {
-          method: 'POST',
-          body: formData
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok && result.shop) {
-          const currencyCode = result.shop.currencyCode || 'USD';
-          
-          // Comprehensive currency symbol map
-          const currencySymbols: { [key: string]: string } = {
-            'USD': '$', 'EUR': '€', 'GBP': '£', 'CAD': 'C$', 'AUD': 'A$', 
-            'JPY': '¥', 'CHF': 'CHF ', 'SEK': 'kr', 'NOK': 'kr', 'DKK': 'kr',
-            'TRY': '₺', 'TL': '₺', 'INR': '₹', 'CNY': '¥', 'BRL': 'R$',
-            'MXN': '$', 'RUB': '₽', 'KRW': '₩', 'PLN': 'zł', 'CZK': 'Kč',
-            'HUF': 'Ft', 'ZAR': 'R', 'SGD': 'S$', 'HKD': 'HK$', 'NZD': 'NZ$',
-            'AED': 'د.إ', 'SAR': '﷼', 'ILS': '₪', 'PHP': '₱', 'THB': '฿',
-            'IDR': 'Rp', 'MYR': 'RM', 'VND': '₫', 'PKR': '₨', 'EGP': '£',
-            'NGN': '₦', 'KES': 'KSh', 'TWD': 'NT$', 'ARS': '$', 'CLP': '$',
-            'COP': '$', 'PEN': 'S/', 'UAH': '₴', 'RON': 'lei', 'BGN': 'лв',
-          };
-          
-          setCurrencySymbol(currencySymbols[currencyCode] || currencyCode + ' ');
-          logger.info(`💰 ForecastingTab: Currency loaded: ${currencyCode} (${currencySymbols[currencyCode] || currencyCode})`);
-        }
-      } catch (error) {
-        logger.error('ForecastingTab: Failed to load store currency:', error);
-        setCurrencySymbol('$'); // Fallback to USD
-      }
-    };
-
-    loadStoreCurrency();
+    currencyFetcher.submit(
+      { action: 'get-shop-info' },
+      { method: 'POST', action: '/app/api/products' }
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Fetch real inventory forecasting data
+  
+  // Handle currency data
   useEffect(() => {
-    const fetchForecastData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const response = await fetch('/app/api/inventory-forecasting');
-        const result = await response.json();
-        
-        if (result.success) {
-          setForecastData(result.data);
-        } else {
-          setError(result.error || 'Failed to fetch forecasting data');
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-        logger.error('Error fetching forecast data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (currencyFetcher.data?.shop) {
+      const currencyCode = currencyFetcher.data.shop.currencyCode || 'USD';
+      
+      // Comprehensive currency symbol map
+      const currencySymbols: { [key: string]: string } = {
+        'USD': '$', 'EUR': '€', 'GBP': '£', 'CAD': 'C$', 'AUD': 'A$', 
+        'JPY': '¥', 'CHF': 'CHF ', 'SEK': 'kr', 'NOK': 'kr', 'DKK': 'kr',
+        'TRY': '₺', 'TL': '₺', 'INR': '₹', 'CNY': '¥', 'BRL': 'R$',
+        'MXN': '$', 'RUB': '₽', 'KRW': '₩', 'PLN': 'zł', 'CZK': 'Kč',
+        'HUF': 'Ft', 'ZAR': 'R', 'SGD': 'S$', 'HKD': 'HK$', 'NZD': 'NZ$',
+        'AED': 'د.إ', 'SAR': '﷼', 'ILS': '₪', 'PHP': '₱', 'THB': '฿',
+        'IDR': 'Rp', 'MYR': 'RM', 'VND': '₫', 'PKR': '₨', 'EGP': '£',
+        'NGN': '₦', 'KES': 'KSh', 'TWD': 'NT$', 'ARS': '$', 'CLP': '$',
+        'COP': '$', 'PEN': 'S/', 'UAH': '₴', 'RON': 'lei', 'BGN': 'лв',
+      };
+      
+      setCurrencySymbol(currencySymbols[currencyCode] || currencyCode + ' ');
+      logger.info(`💰 ForecastingTab: Currency loaded: ${currencyCode} (${currencySymbols[currencyCode] || currencyCode})`);
+    }
+  }, [currencyFetcher.data]);
 
-    fetchForecastData();
+  // Fetch real inventory forecasting data (only if not already loaded)
+  useEffect(() => {
+    if (!initialForecastData) {
+      forecastFetcher.load('/app/api/inventory-forecasting');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+  // Handle forecast data
+  useEffect(() => {
+    if (forecastFetcher.state === 'loading') {
+      setLoading(true);
+    } else if (forecastFetcher.state === 'idle' && forecastFetcher.data) {
+      setLoading(false);
+      if (forecastFetcher.data.success && forecastFetcher.data.data) {
+        setForecastData(forecastFetcher.data.data);
+        setError(null);
+      } else {
+        setError(forecastFetcher.data.error || 'Failed to fetch forecasting data');
+      }
+    }
+  }, [forecastFetcher.state, forecastFetcher.data]);
 
   // Refresh function
   const handleRefresh = () => {
     setForecastData(null);
     setLoading(true);
     setError(null);
-    // Re-trigger useEffect
-    window.location.reload();
+    // Refetch data using the fetcher
+    forecastFetcher.load('/app/api/inventory-forecasting');
   };
 
   // Show loading state
@@ -294,9 +288,8 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
             {items.map((item, index) => {
               const isExpanded = expandedRows.has(item.id);
               return (
-                <>
+                <React.Fragment key={item.id}>
                   <tr 
-                    key={item.id}
                     style={{
                       borderBottom: isExpanded ? 'none' : '1px solid #f1f3f4',
                       backgroundColor: index % 2 === 0 ? '#ffffff' : '#fafbfc'
@@ -396,12 +389,9 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                             <BlockStack gap="400">
                               <Box background="bg-surface" padding="400" borderRadius="300" borderWidth="025" borderColor="border">
                                 <BlockStack gap="300">
-                                  <InlineStack gap="200" blockAlign="center" align="start">
-                                    <Icon source={ClockIcon} />
-                                    <Text as="h4" variant="headingMd" fontWeight="bold">
-                                      Inventory Management
-                                    </Text>
-                                  </InlineStack>
+                                  <Text as="h4" variant="headingMd" fontWeight="bold">
+                                    Inventory Management
+                                  </Text>
                                   <div style={{ display: 'grid', gap: '12px' }}>
                                     <InlineStack align="space-between">
                                       <Text as="p" variant="bodySm" tone="subdued">SKU</Text>
@@ -445,12 +435,9 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
 
                               <Box background="bg-surface" padding="400" borderRadius="300" borderWidth="025" borderColor="border">
                                 <BlockStack gap="300">
-                                  <InlineStack gap="200" blockAlign="center" align="start">
-                                    <Icon source={CashDollarIcon} tone="success" />
-                                    <Text as="h4" variant="headingMd" fontWeight="bold">
-                                      Financial Performance
-                                    </Text>
-                                  </InlineStack>
+                                  <Text as="h4" variant="headingMd" fontWeight="bold">
+                                    Financial Performance
+                                  </Text>
                                   <div style={{ display: 'grid', gap: '12px' }}>
                                     <InlineStack align="space-between">
                                       <Text as="p" variant="bodySm" tone="subdued">Revenue (60 days)</Text>
@@ -478,12 +465,9 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                             {/* Right Column - Order Statistics */}
                             <Box background="bg-surface" padding="400" borderRadius="300" borderWidth="025" borderColor="border">
                               <BlockStack gap="400">
-                                <InlineStack gap="200" blockAlign="center" align="start">
-                                  <Icon source={ChartVerticalIcon} tone="info" />
-                                  <Text as="h4" variant="headingMd" fontWeight="bold">
-                                    Order Trends
-                                  </Text>
-                                </InlineStack>
+                                <Text as="h4" variant="headingMd" fontWeight="bold">
+                                  Order Trends
+                                </Text>
                                 <div style={{
                                   display: 'grid',
                                   gridTemplateColumns: '1fr 1fr',
@@ -538,7 +522,7 @@ export function ForecastingTab({ shopDomain }: ForecastingTabProps) {
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               );
             })}
           </tbody>

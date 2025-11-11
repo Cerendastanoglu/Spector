@@ -50,6 +50,8 @@ interface Product {
   id: string;
   title: string;
   handle: string;
+  description?: string;
+  descriptionHtml?: string;
   featuredMedia?: {
     preview?: {
       image?: {
@@ -105,6 +107,7 @@ interface ProductManagementProps {
   isVisible: boolean;
   initialCategory?: InventoryCategory;
   shopDomain?: string;
+  initialProducts?: Product[] | null; // Add support for server-side loaded products
 }
 
 type InventoryCategory = 'all' | 'out-of-stock' | 'critical' | 'low-stock' | 'in-stock';
@@ -114,7 +117,7 @@ type SortDirection = 'asc' | 'desc';
 
 
 
-export function ProductManagement({ isVisible, initialCategory = 'all', shopDomain }: ProductManagementProps) {
+export function ProductManagement({ isVisible, initialCategory = 'all', shopDomain, initialProducts = null }: ProductManagementProps) {
   // Add CSS animations - Fixed to prevent header interference
   useEffect(() => {
     const styles = document.createElement('style');
@@ -162,8 +165,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   }, []);
 
   const fetcher = useFetcher<{ products: Product[]; hasNextPage: boolean; endCursor?: string; error?: string }>();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [products, setProducts] = useState<Product[]>(initialProducts || []);
+  const [isLoading, setIsLoading] = useState(!initialProducts); // Don't show loading if we have initial data
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<string[]>([]);
   const [currentCategory, setCurrentCategory] = useState<InventoryCategory>(initialCategory);
@@ -206,11 +209,19 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [availableCollections, setAvailableCollections] = useState<{id: string, title: string}[]>([]);
   
-  // Current Ads Management State
-  const [showCurrentAds, setShowCurrentAds] = useState<{[key: number]: boolean}>({});
-  const [currentAds, setCurrentAds] = useState<any[]>([]);
-  const [adsLoaded, setAdsLoaded] = useState<{[key: number]: boolean}>({});
-  const [fetchingAds, setFetchingAds] = useState(false);
+  // Inventory management state for current inventory display
+  const [showCurrentInventory, setShowCurrentInventory] = useState(false);
+  
+  // Variant Management State
+  const [variantOperation, setVariantOperation] = useState<'matrix' | 'template' | 'generator' | 'image-assign'>('matrix');
+  const [editingVariants, setEditingVariants] = useState<{[key: string]: any}>({}); // For matrix editing
+  const [variantTemplate, setVariantTemplate] = useState<{name: string, options: string[]}>({name: '', options: []});
+  const [option1Name, setOption1Name] = useState('');
+  const [option1Values, setOption1Values] = useState('');
+  const [option2Name, setOption2Name] = useState('');
+  const [option2Values, setOption2Values] = useState('');
+  const [option3Name, setOption3Name] = useState('');
+  const [option3Values, setOption3Values] = useState('');
   
   // Description Management State  
   const [descriptionOperation, setDescriptionOperation] = useState<'prefix' | 'suffix' | 'replace'>('prefix');
@@ -428,9 +439,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     }
   };
 
-  // Load products on mount with better error handling
+  // Load products on mount with better error handling (only if no initial data)
   useEffect(() => {
-    if (isVisible && products.length === 0) {
+    if (isVisible && products.length === 0 && !initialProducts) {
       fetchAllProducts();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -833,12 +844,15 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     
     // Directly apply changes without showing a modal
     setPendingBulkOperation({ type: 'price', data: operationData });
-    applyPriceChanges(); // Apply changes immediately
+    applyPriceChanges(operationData); // Pass data directly to avoid race condition
   };
   
   // This function is called after the user confirms the batch name
-  const applyPriceChanges = async () => {
-    if (!pendingBulkOperation || pendingBulkOperation.type !== 'price') {
+  const applyPriceChanges = async (operationData?: any) => {
+    // Use passed data if available, otherwise fall back to state
+    const data = operationData || pendingBulkOperation?.data;
+    
+    if (!data || (!operationData && (!pendingBulkOperation || pendingBulkOperation.type !== 'price'))) {
       setError("No pending price operation found.");
       return;
     }
@@ -852,7 +866,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       compareValue,
       comparePercentage,
       selectedVariants 
-    } = pendingBulkOperation.data;
+    } = data;
     
     setIsLoading(true);
     clearBulkMessages();
@@ -1222,28 +1236,33 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     setError("");
     
     // Store the pending operation
+    const operationData = {
+      productIds: selectedProducts,
+      tagOperation,
+      tagValue: tagOperation === 'add' ? tagValue : undefined,
+      tagRemoveValue: tagOperation === 'remove' ? tagRemoveValue : undefined,
+    };
+    
     setPendingBulkOperation({
       type: 'tags',
-      data: {
-        productIds: selectedProducts,
-        tagOperation,
-        tagValue: tagOperation === 'add' ? tagValue : undefined,
-        tagRemoveValue: tagOperation === 'remove' ? tagRemoveValue : undefined,
-      }
+      data: operationData
     });
     
     // Apply changes immediately without showing modal
-    applyTagChanges();
+    applyTagChanges(operationData);
   };
   
   // This function is called after the modal confirmation for tag operations
-  const applyTagChanges = async () => {
+  const applyTagChanges = async (operationData?: any) => {
+    // Use passed data if available, otherwise fall back to state
+    const data = operationData || pendingBulkOperation?.data;
+    
     const {
       productIds,
       tagOperation,
       tagValue,
       tagRemoveValue
-    } = pendingBulkOperation?.data || {};
+    } = data || {};
     
     if (!productIds || productIds.length === 0) {
       return;
@@ -1360,8 +1379,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       return;
     }
     
-    if (titleOperation === 'replace' && (!titleReplaceFrom || !titleReplaceTo)) {
-      setError("Please provide both find and replace text.");
+    if (titleOperation === 'replace' && !titleReplaceFrom) {
+      setError("Please provide text to find.");
       return;
     }
     
@@ -1398,15 +1417,17 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       }
 
       // Update local state with the new titles
-      setProducts(prevProducts => 
-        prevProducts.map(product => {
-          const updatedProduct = result.updatedProducts?.find((p: any) => p.id === product.id);
-          if (updatedProduct) {
-            return { ...product, title: updatedProduct.title };
-          }
-          return product;
-        })
-      );
+      if (result.updatedProducts) {
+        setProducts(prevProducts => 
+          prevProducts.map(product => {
+            const updatedProduct = result.updatedProducts.find((p: any) => p.id === product.id);
+            if (updatedProduct) {
+              return { ...product, title: updatedProduct.title };
+            }
+            return product;
+          })
+        );
+      }
       
       // Process results like other handlers
       const successful: string[] = [];
@@ -1422,12 +1443,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           }
         });
       }
-
-      // Update local state to reflect changes
-      if (result.success) {
-        // Fetch updated product data to refresh titles
-        await fetchAllProducts();
-      }
       
       let operationText = '';
       if (titleOperation === 'prefix') {
@@ -1440,11 +1455,21 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       
       if (successful.length > 0) {
         logger.info(`✅ Successfully ${operationText} ${successful.length} product titles!`);
+        setNotification({
+          show: true,
+          message: `✅ Successfully ${operationText} ${successful.length} product title${successful.length === 1 ? '' : 's'}!`,
+          error: false
+        });
       }
       
       if (failed.length > 0) {
         logger.info(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
         logger.info("Failed operations:", failed);
+        setNotification({
+          show: true,
+          message: `⚠️ ${successful.length} updated, ${failed.length} failed. Check console for details.`,
+          error: true
+        });
       }
       
       // Clear form only if completely successful
@@ -1470,8 +1495,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       return;
     }
     
-    if (descriptionOperation === 'replace' && (!titleReplaceFrom || !titleReplaceTo)) {
-      setError("Please provide both find and replace text for descriptions.");
+    if (descriptionOperation === 'replace' && !titleReplaceFrom) {
+      setError("Please provide text to find in descriptions.");
       return;
     }
     
@@ -1523,8 +1548,22 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       }
 
       // Update local state to reflect changes
-      if (result.success) {
-        await fetchAllProducts();
+      if (result.success && result.results) {
+        setProducts(prevProducts => {
+          const updatedProducts = [...prevProducts];
+          result.results.forEach((resultItem: any) => {
+            if (resultItem.success && resultItem.product) {
+              const index = updatedProducts.findIndex(p => p.id === resultItem.productId);
+              if (index !== -1) {
+                updatedProducts[index] = {
+                  ...updatedProducts[index],
+                  descriptionHtml: resultItem.product.descriptionHtml
+                };
+              }
+            }
+          });
+          return updatedProducts;
+        });
       }
       
       let operationText = '';
@@ -1538,11 +1577,21 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       
       if (successful.length > 0) {
         logger.info(`✅ Successfully ${operationText} ${successful.length} products!`);
+        setNotification({
+          show: true,
+          message: `✅ Successfully ${operationText} ${successful.length} product${successful.length === 1 ? '' : 's'}!`,
+          error: false
+        });
       }
       
       if (failed.length > 0) {
         logger.info(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
         logger.info("Failed operations:", failed);
+        setNotification({
+          show: true,
+          message: `⚠️ ${successful.length} updated, ${failed.length} failed. Check console for details.`,
+          error: true
+        });
       }
       
       // Clear form only if completely successful
@@ -1614,8 +1663,23 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       }
 
       // Update local state to reflect changes
-      if (result.success) {
-        await fetchAllProducts();
+      if (result.success && result.results) {
+        setProducts(prevProducts => {
+          const updatedProducts = [...prevProducts];
+          result.results.forEach((resultItem: any) => {
+            if (resultItem.success && resultItem.product) {
+              const index = updatedProducts.findIndex(p => p.id === resultItem.productId);
+              if (index !== -1) {
+                updatedProducts[index] = {
+                  ...updatedProducts[index],
+                  media: resultItem.product.media || updatedProducts[index].media,
+                  featuredMedia: resultItem.product.featuredMedia || updatedProducts[index].featuredMedia
+                };
+              }
+            }
+          });
+          return updatedProducts;
+        });
       }
       
       let operationText = '';
@@ -1629,11 +1693,21 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       
       if (successful.length > 0) {
         logger.info(`✅ Successfully ${operationText} ${successful.length} products!`);
+        setNotification({
+          show: true,
+          message: `✅ Successfully ${operationText} ${successful.length} product${successful.length === 1 ? '' : 's'}!`,
+          error: false
+        });
       }
       
       if (failed.length > 0) {
         logger.info(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
         logger.info("Failed operations:", failed);
+        setNotification({
+          show: true,
+          message: `⚠️ ${successful.length} updated, ${failed.length} failed. Check console for details.`,
+          error: true
+        });
       }
       
       // Clear form only if completely successful
@@ -1696,10 +1770,31 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           });
         }
 
-        // Update local state to reflect changes
-        if (result.success) {
-          // Fetch updated product data to refresh inventory
-          await fetchAllProducts();
+        // Update local state to reflect inventory changes
+        if (result.success && result.updatedVariants) {
+          setProducts(prevProducts => 
+            prevProducts.map(product => {
+              return {
+                ...product,
+                variants: {
+                  ...product.variants,
+                  edges: product.variants.edges.map(edge => {
+                    const variantUpdate = result.updatedVariants.find((v: any) => v.id === edge.node.id);
+                    if (variantUpdate) {
+                      return {
+                        ...edge,
+                        node: {
+                          ...edge.node,
+                          inventoryQuantity: variantUpdate.inventoryQuantity
+                        }
+                      };
+                    }
+                    return edge;
+                  })
+                }
+              };
+            })
+          );
         }
         
         const actionText = stockUpdateMethod === 'set' ? 'set stock to' : 
@@ -1707,11 +1802,21 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         
         if (successful.length > 0) {
           logger.info(`✅ Successfully ${actionText} ${stockQuantity} for ${successful.length} variants!`);
+          setNotification({
+            show: true,
+            message: `✅ Successfully ${actionText} ${stockQuantity} for ${successful.length} variant${successful.length === 1 ? '' : 's'}!`,
+            error: false
+          });
         }
         
         if (failed.length > 0) {
           logger.info(`⚠️ ${successful.length} variants updated successfully. ${failed.length} failed.`);
           logger.info("Failed operations:", failed);
+          setNotification({
+            show: true,
+            message: `⚠️ ${successful.length} updated, ${failed.length} failed. Check console for details.`,
+            error: true
+          });
         }
         
         // Clear form only if completely successful
@@ -1794,132 +1899,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       setIsLoading(false);
     }
   };
-
-  // Handler for fetching product details with lazy loading
-  const handleFetchProductDetails = async (tabIndex: number) => {
-    if (selectedProducts.length === 0) {
-      setNotification({
-        show: true,
-        message: 'Please select products first',
-        error: true
-      });
-      return;
-    }
-
-    // If details are already loaded for this tab, don't fetch again
-    if (adsLoaded[tabIndex]) {
-      return;
-    }
-
-    setFetchingAds(true);
-    try {
-      // Use the selected products that we already have in memory
-      const selectedProductDetails = products.filter(p => selectedProducts.includes(p.id));
-      
-      // Set the product details directly without an API call
-      setCurrentAds(selectedProductDetails);
-      setAdsLoaded(prev => ({ ...prev, [tabIndex]: true }));
-    } catch (error) {
-      logger.error('Error loading product details:', error);
-      setNotification({
-        show: true,
-        message: 'Failed to load product details. Please try again.',
-        error: true
-      });
-    } finally {
-      setFetchingAds(false);
-    }
-  };
-
-  // Reusable function to render Current Ads section
-  const renderCurrentAdsSection = () => (
-    <Card>
-      <BlockStack gap="300">
-        <InlineStack align="space-between" blockAlign="center">
-          <Text as="h4" variant="headingSm">Selected Product Details</Text>
-          <Button
-            variant="plain"
-            onClick={() => {
-              const isCurrentlyOpen = showCurrentAds[activeBulkTab] || false;
-              setShowCurrentAds(prev => ({
-                ...prev,
-                [activeBulkTab]: !isCurrentlyOpen
-              }));
-              // Lazy load product details when opening
-              if (!isCurrentlyOpen) {
-                handleFetchProductDetails(activeBulkTab);
-              }
-            }}
-            icon={showCurrentAds[activeBulkTab] ? ChevronUpIcon : ChevronDownIcon}
-            loading={fetchingAds}
-          >
-{`${showCurrentAds[activeBulkTab] ? 'Hide' : 'Show'} Details (${selectedProducts.length} products)`}
-          </Button>
-        </InlineStack>
-        
-        <Collapsible
-          open={showCurrentAds[activeBulkTab] || false}
-          id={`current-ads-collapsible-${activeBulkTab}`}
-          transition={{duration: '200ms', timingFunction: 'ease-in-out'}}
-          expandOnPrint
-        >
-          <BlockStack gap="300">
-            {selectedProducts.length > 0 && products.filter(p => selectedProducts.includes(p.id)).map((product) => (
-              <Box key={product.id} padding="300" background="bg-surface-secondary" borderRadius="200">
-                <BlockStack gap="200">
-                  <InlineStack align="space-between" blockAlign="center">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">{product.title}</Text>
-                    <Badge tone={product.status === 'ACTIVE' ? 'success' : 'attention'}>
-                      {product.status}
-                    </Badge>
-                  </InlineStack>
-                  
-                  {/* Product details information */}
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Product Information: {fetchingAds ? 'Loading...' : 'Available'}
-                  </Text>
-                  
-                  {!fetchingAds && currentAds.length > 0 && (
-                    <BlockStack gap="200">
-                      <InlineStack gap="100">
-                        <Text as="span" variant="bodyMd">Price:</Text>
-                        <Text as="span" variant="bodyMd" fontWeight="semibold">
-                          {product.variants && product.variants.edges && product.variants.edges.length > 0 
-                            ? `$${product.variants.edges[0].node.price}`
-                            : '$0.00'}
-                        </Text>
-                      </InlineStack>
-                      
-                      <InlineStack gap="100" wrap={false} blockAlign="start">
-                        <Text as="span" variant="bodyMd">Tags:</Text>
-                        <div style={{
-                          maxWidth: '300px',
-                          overflowX: 'auto',
-                          whiteSpace: 'nowrap',
-                          scrollbarWidth: 'none',
-                          msOverflowStyle: 'none',
-                          padding: '4px 0'
-                        }}>
-                          <InlineStack gap="100">
-                            {product.tags && product.tags.length > 0 ? 
-                              product.tags.map((tag, index) => (
-                                <Badge key={index} tone="info" size="small">{tag}</Badge>
-                              )) : 
-                              <Text as="span" variant="bodyMd" tone="subdued">No tags</Text>
-                            }
-                          </InlineStack>
-                        </div>
-                      </InlineStack>
-                    </BlockStack>
-                  )}
-                </BlockStack>
-              </Box>
-            ))}
-          </BlockStack>
-        </Collapsible>
-      </BlockStack>
-    </Card>
-  );
 
   // Load store currency from Shopify API
   const loadStoreCurrency = async () => {
@@ -2060,6 +2039,17 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   return (
     <>
       <style>{`
+        @keyframes slideInRight {
+          from {
+            transform: translateX(400px);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        
         @media (max-width: 768px) {
           .product-management-layout {
             flex-direction: column !important;
@@ -3088,15 +3078,230 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                 })()}
 
                 {/* Content Tab */}
-                {activeBulkTab === 3 && (
+                {activeBulkTab === 3 && (() => {
+                  const selectedProductObjects = filteredProducts.filter(p => selectedProducts.includes(p.id));
+                  
+                  // Generate live preview for titles
+                  const generateTitlePreview = (originalTitle: string) => {
+                    if (titleOperation === 'prefix') {
+                      return titleValue ? `${titleValue}${originalTitle}` : originalTitle;
+                    } else if (titleOperation === 'suffix') {
+                      return titleValue ? `${originalTitle}${titleValue}` : originalTitle;
+                    } else if (titleOperation === 'replace') {
+                      if (!titleReplaceFrom) return originalTitle;
+                      return originalTitle.replace(new RegExp(titleReplaceFrom, 'g'), titleReplaceTo);
+                    }
+                    return originalTitle;
+                  };
+                  
+                  return (
                   <BlockStack gap="400">
                     <Text as="h3" variant="headingSm">Content Management</Text>
                     <Text as="p" variant="bodySm" tone="subdued">
                       Update content for {selectedProducts.length} selected {selectedProducts.length === 1 ? 'product' : 'products'}.
                     </Text>
 
-                    {/* Current Ads Section */}
-                    {renderCurrentAdsSection()}
+                    {/* Selected Products Section with Content Preview */}
+                    <div style={{
+                      padding: '8px 12px',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <button
+                          onClick={() => setShowSelectedProducts(!showSelectedProducts)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            fontSize: '13px',
+                            fontWeight: '500',
+                            color: '#202223'
+                          }}
+                        >
+                          <Icon source={showSelectedProducts ? ChevronUpIcon : ChevronDownIcon} tone="base" />
+                          <span>{selectedProducts.length} {selectedProducts.length === 1 ? 'product' : 'products'}</span>
+                        </button>
+                        <Button
+                          variant="plain"
+                          size="slim"
+                          tone="critical"
+                          onClick={() => {
+                            setSelectedVariants([]);
+                            setSelectedProducts([]);
+                            setHasBulkOperationsCompleted(false);
+                          }}
+                        >
+                          Clear
+                        </Button>
+                      </div>
+
+                      <Collapsible
+                        open={showSelectedProducts}
+                        id="selected-products-collapsible-content"
+                        transition={{ duration: '150ms', timingFunction: 'ease-in-out' }}
+                      >
+                        <div style={{ 
+                          marginTop: '8px', 
+                          maxHeight: '300px', 
+                          overflowY: 'auto',
+                          scrollbarWidth: 'thin'
+                        }}>
+                          <BlockStack gap="100">
+                            {selectedProductObjects.map((product) => {
+                              const previewTitle = generateTitlePreview(product.title);
+                              const previewDescription = (() => {
+                                if (contentOperation !== 'description') return null;
+                                const desc = product.descriptionHtml?.replace(/<[^>]*>/g, '') || '';
+                                if (descriptionOperation === 'prefix' && descriptionValue) {
+                                  return descriptionValue + '\n' + desc;
+                                } else if (descriptionOperation === 'suffix' && descriptionValue) {
+                                  return desc + '\n' + descriptionValue;
+                                } else if (descriptionOperation === 'replace' && titleReplaceFrom) {
+                                  return desc.replace(new RegExp(titleReplaceFrom, 'g'), titleReplaceTo || '');
+                                }
+                                return null;
+                              })();
+                              const isExpanded = expandedProducts.has(product.id);
+                              
+                              // Show preview if on title tab and there are inputs
+                              const shouldShowTitlePreview = contentOperation === 'title' && (
+                                (titleOperation === 'prefix' && titleValue) ||
+                                (titleOperation === 'suffix' && titleValue) ||
+                                (titleOperation === 'replace' && titleReplaceFrom)
+                              );
+
+                              // Show preview if on description tab and there are inputs
+                              const shouldShowDescriptionPreview = contentOperation === 'description' && (
+                                (descriptionOperation === 'prefix' && descriptionValue) ||
+                                (descriptionOperation === 'suffix' && descriptionValue) ||
+                                (descriptionOperation === 'replace' && titleReplaceFrom)
+                              );
+
+                              return (
+                                <div
+                                  key={product.id}
+                                  style={{
+                                    backgroundColor: '#f9fafb',
+                                    borderRadius: '4px',
+                                    border: '1px solid #e5e7eb',
+                                  }}
+                                >
+                                  {/* Product Header */}
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      padding: '6px 8px',
+                                      cursor: 'pointer'
+                                    }}
+                                    onClick={() => toggleProductExpansion(product.id)}
+                                  >
+                                    <div style={{
+                                      width: '32px',
+                                      height: '32px',
+                                      borderRadius: '4px',
+                                      overflow: 'hidden',
+                                      backgroundColor: '#f1f5f9',
+                                      border: '1px solid #d1d5db',
+                                      flexShrink: 0
+                                    }}>
+                                      {product.featuredMedia?.preview?.image?.url ? (
+                                        <img
+                                          src={product.featuredMedia.preview.image.url}
+                                          alt={product.title}
+                                          style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            objectFit: 'cover'
+                                          }}
+                                        />
+                                      ) : (
+                                        <div style={{
+                                          width: '100%',
+                                          height: '100%',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          backgroundColor: '#f3f4f6'
+                                        }}>
+                                          <Icon source={ProductIcon} tone="subdued" />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      {shouldShowTitlePreview ? (
+                                        <>
+                                          <Text as="p" variant="bodyXs" tone="subdued">
+                                            <span style={{ textDecoration: 'line-through', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{product.title}</span>
+                                          </Text>
+                                          <Text as="p" variant="bodyXs" fontWeight="semibold" tone="success">
+                                            <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{previewTitle}</span>
+                                          </Text>
+                                        </>
+                                      ) : (
+                                        <Text as="span" variant="bodyXs" fontWeight="medium">
+                                          <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{product.title}</span>
+                                        </Text>
+                                      )}
+                                    </div>
+                                    <Icon source={isExpanded ? ChevronUpIcon : ChevronDownIcon} tone="base" />
+                                  </div>
+
+                                  {/* Expandable Details */}
+                                  {isExpanded && (
+                                    <div style={{
+                                      padding: '8px',
+                                      borderTop: '1px solid #e5e7eb',
+                                      backgroundColor: '#fff'
+                                    }}>
+                                      <BlockStack gap="200">
+                                        <div>
+                                          <Text as="p" variant="bodyXs" fontWeight="semibold">Description:</Text>
+                                          {shouldShowDescriptionPreview && previewDescription !== null ? (
+                                            <>
+                                              <Text as="p" variant="bodyXs" tone="subdued">
+                                                <span style={{ textDecoration: 'line-through' }}>
+                                                  {(product.descriptionHtml?.replace(/<[^>]*>/g, '') || 'No description').substring(0, 100)}
+                                                  {(product.descriptionHtml?.replace(/<[^>]*>/g, '') || '').length > 100 ? '...' : ''}
+                                                </span>
+                                              </Text>
+                                              <Text as="p" variant="bodyXs" fontWeight="semibold" tone="success">
+                                                {previewDescription.substring(0, 100)}
+                                                {previewDescription.length > 100 ? '...' : ''}
+                                              </Text>
+                                            </>
+                                          ) : (
+                                            <Text as="p" variant="bodyXs" tone="subdued">
+                                              {product.description || product.descriptionHtml ? 
+                                                (product.description || product.descriptionHtml?.replace(/<[^>]*>/g, '') || '').substring(0, 150) + (((product.description || product.descriptionHtml?.replace(/<[^>]*>/g, '') || '').length > 150) ? '...' : '') : 
+                                                'No description'
+                                              }
+                                            </Text>
+                                          )}
+                                        </div>
+                                        <div>
+                                          <Text as="p" variant="bodyXs" fontWeight="semibold">Variants:</Text>
+                                          <Text as="p" variant="bodyXs" tone="subdued">
+                                            {product.variants.edges.length} variant{product.variants.edges.length !== 1 ? 's' : ''}
+                                          </Text>
+                                        </div>
+                                      </BlockStack>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </BlockStack>
+                        </div>
+                      </Collapsible>
+                    </div>
 
                     {/* Content Sub-tabs */}
                     <div style={{ 
@@ -3167,13 +3372,15 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                               onChange={setTitleReplaceFrom}
                               placeholder="Text to find"
                               autoComplete="off"
+                              helpText="Text to search for in titles"
                             />
                             <TextField
                               label="Replace With"
                               value={titleReplaceTo}
                               onChange={setTitleReplaceTo}
-                              placeholder="Replacement text"
+                              placeholder="Replacement text (leave empty to delete)"
                               autoComplete="off"
+                              helpText="Leave empty to delete the found text"
                             />
                           </div>
                         ) : (
@@ -3195,7 +3402,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                           onClick={handleBulkTitleUpdate}
                           disabled={
                             selectedProducts.length === 0 || 
-                            (titleOperation === 'replace' && (!titleReplaceFrom || !titleReplaceTo)) ||
+                            (titleOperation === 'replace' && !titleReplaceFrom) ||
                             ((titleOperation === 'prefix' || titleOperation === 'suffix') && !titleValue)
                           }
                           loading={isLoading}
@@ -3252,14 +3459,16 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                               placeholder="Text to find in descriptions"
                               autoComplete="off"
                               multiline={3}
+                              helpText="Text to search for in descriptions"
                             />
                             <TextField
                               label="Replace With"
                               value={titleReplaceTo}
                               onChange={setTitleReplaceTo}
-                              placeholder="Replacement text"
+                              placeholder="Replacement text (leave empty to delete)"
                               autoComplete="off"
                               multiline={3}
+                              helpText="Leave empty to delete the found text"
                             />
                           </div>
                         ) : (
@@ -3283,7 +3492,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                           onClick={handleBulkDescriptionUpdate}
                           disabled={
                             selectedProducts.length === 0 || 
-                            (descriptionOperation === 'replace' && (!titleReplaceFrom || !titleReplaceTo)) ||
+                            (descriptionOperation === 'replace' && !titleReplaceFrom) ||
                             ((descriptionOperation === 'prefix' || descriptionOperation === 'suffix') && !descriptionValue)
                           }
                           loading={isLoading}
@@ -3484,18 +3693,247 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                       </BlockStack>
                     )}
                   </BlockStack>
-                )}
+                  );
+                })()}
 
                 {/* Inventory Tab */}
-                {activeBulkTab === 4 && (
+                {activeBulkTab === 4 && (() => {
+                  // Calculate current inventory summary
+                  const selectedProductObjects = filteredProducts.filter(p => selectedProducts.includes(p.id));
+                  
+                  return (
                   <BlockStack gap="400">
                     <Text as="h3" variant="headingSm">Inventory Management</Text>
                     <Text as="p" variant="bodySm" tone="subdued">
                       Manage inventory for {selectedVariants.length} selected variant{selectedVariants.length === 1 ? '' : 's'} across {selectedProducts.length} product{selectedProducts.length === 1 ? '' : 's'}.
                     </Text>
 
-                    {/* Current Ads Section */}
-                    {renderCurrentAdsSection()}
+                    {/* Selected Products with Inventory Preview */}
+                    {selectedVariants.length > 0 && (
+                      <div style={{
+                        padding: '8px 12px',
+                        backgroundColor: '#ffffff',
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <button
+                            onClick={() => setShowCurrentInventory(!showCurrentInventory)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              color: '#202223'
+                            }}
+                          >
+                            <Icon source={showCurrentInventory ? ChevronUpIcon : ChevronDownIcon} tone="base" />
+                            <span>{selectedProducts.length} {selectedProducts.length === 1 ? 'product' : 'products'} • {selectedVariants.length} {selectedVariants.length === 1 ? 'variant' : 'variants'}</span>
+                          </button>
+                          <Button
+                            variant="plain"
+                            size="slim"
+                            tone="critical"
+                            onClick={() => {
+                              setSelectedVariants([]);
+                              setSelectedProducts([]);
+                              setHasBulkOperationsCompleted(false);
+                            }}
+                          >
+                            Clear
+                          </Button>
+                        </div>
+
+                        <Collapsible
+                          open={showCurrentInventory}
+                          id="selected-products-collapsible-inventory"
+                          transition={{ duration: '150ms', timingFunction: 'ease-in-out' }}
+                        >
+                          <div style={{ 
+                            marginTop: '8px', 
+                            maxHeight: '300px', 
+                            overflowY: 'auto',
+                            scrollbarWidth: 'thin'
+                          }}>
+                            <BlockStack gap="100">
+                              {selectedProductObjects.map((product) => {
+                                const isExpanded = expandedProducts.has(product.id);
+                                const selectedProductVariants = product.variants.edges.filter(v =>
+                                  selectedVariants.includes(v.node.id)
+                                );
+
+                                return (
+                                  <div
+                                    key={product.id}
+                                    style={{
+                                      backgroundColor: '#f9fafb',
+                                      borderRadius: '4px',
+                                      border: '1px solid #e5e7eb',
+                                    }}
+                                  >
+                                    {/* Product Header */}
+                                    <div
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        padding: '6px 8px',
+                                        cursor: 'pointer'
+                                      }}
+                                      onClick={() => toggleProductExpansion(product.id)}
+                                    >
+                                      <div style={{
+                                        width: '32px',
+                                        height: '32px',
+                                        borderRadius: '4px',
+                                        overflow: 'hidden',
+                                        backgroundColor: '#f1f5f9',
+                                        border: '1px solid #d1d5db',
+                                        flexShrink: 0
+                                      }}>
+                                        {product.featuredMedia?.preview?.image?.url ? (
+                                          <img
+                                            src={product.featuredMedia.preview.image.url}
+                                            alt={product.title}
+                                            style={{
+                                              width: '100%',
+                                              height: '100%',
+                                              objectFit: 'cover'
+                                            }}
+                                          />
+                                        ) : (
+                                          <div style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundColor: '#f3f4f6'
+                                          }}>
+                                            <Icon source={ProductIcon} tone="subdued" />
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <Text as="span" variant="bodyXs" fontWeight="medium">
+                                          <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{product.title}</span>
+                                        </Text>
+                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginTop: '2px' }}>
+                                          <Text as="span" variant="bodyXs" tone="subdued">
+                                            {selectedProductVariants.length}/{product.variants.edges.length} {selectedProductVariants.length === 1 ? 'variant' : 'variants'}
+                                          </Text>
+                                        </div>
+                                      </div>
+                                      <Icon source={isExpanded ? ChevronUpIcon : ChevronDownIcon} tone="subdued" />
+                                    </div>
+
+                                    {/* Expandable Variants with Inventory Details */}
+                                    {isExpanded && (
+                                      <div style={{
+                                        padding: '8px',
+                                        borderTop: '1px solid #e5e7eb',
+                                        backgroundColor: '#ffffff'
+                                      }}>
+                                        <BlockStack gap="100">
+                                          {selectedProductVariants.map((variant) => {
+                                            const quantity = variant.node.inventoryQuantity || 0;
+                                            const isOutOfStock = quantity === 0;
+                                            const isLowStock = quantity > 0 && quantity <= ProductConstants.LOW_STOCK_THRESHOLD;
+
+                                            // Calculate preview stock based on operation
+                                            let previewStock = quantity;
+                                            const stockQty = parseInt(stockQuantity) || 0;
+                                            if (inventoryOperation === 'stock' && stockQuantity) {
+                                              if (stockUpdateMethod === 'set') {
+                                                previewStock = stockQty;
+                                              } else if (stockUpdateMethod === 'add') {
+                                                previewStock = quantity + stockQty;
+                                              } else if (stockUpdateMethod === 'subtract') {
+                                                previewStock = Math.max(0, quantity - stockQty);
+                                              }
+                                            }
+                                            const showPreview = inventoryOperation === 'stock' && stockQuantity && previewStock !== quantity;
+
+                                            return (
+                                              <div
+                                                key={variant.node.id}
+                                                style={{
+                                                  padding: '6px 8px',
+                                                  backgroundColor: '#f9fafb',
+                                                  borderRadius: '4px',
+                                                  border: `1px solid ${isOutOfStock ? '#fca5a5' : isLowStock ? '#fbbf24' : '#e5e7eb'}`
+                                                }}
+                                              >
+                                                <div style={{ marginBottom: '4px' }}>
+                                                  <Text as="span" variant="bodyXs" fontWeight="semibold">
+                                                    {variant.node.title}
+                                                  </Text>
+                                                  {variant.node.sku && (
+                                                    <Text as="span" variant="bodyXs" tone="subdued">
+                                                      {' • SKU: '}{variant.node.sku}
+                                                    </Text>
+                                                  )}
+                                                </div>
+                                                
+                                                {/* Inventory Details with Live Preview */}
+                                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                  <div>
+                                                    <Text as="p" variant="bodyXs" tone="subdued">
+                                                      Stock:
+                                                    </Text>
+                                                    {showPreview ? (
+                                                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <Text as="span" variant="bodyXs" tone="subdued">
+                                                          <span style={{ textDecoration: 'line-through' }}>{quantity} units</span>
+                                                        </Text>
+                                                        <span style={{ fontSize: '11px' }}>→</span>
+                                                        <Badge 
+                                                          tone={previewStock === 0 ? 'critical' : previewStock <= ProductConstants.LOW_STOCK_THRESHOLD ? 'warning' : 'success'}
+                                                          size="small"
+                                                        >
+                                                          {`${previewStock} units`}
+                                                        </Badge>
+                                                      </div>
+                                                    ) : (
+                                                      <Badge 
+                                                        tone={isOutOfStock ? 'critical' : isLowStock ? 'warning' : 'success'}
+                                                        size="small"
+                                                      >
+                                                        {`${quantity} units`}
+                                                      </Badge>
+                                                    )}
+                                                  </div>
+                                                  
+                                                  {variant.node.price && (
+                                                    <div>
+                                                      <Text as="p" variant="bodyXs" tone="subdued">
+                                                        Price:
+                                                      </Text>
+                                                      <Text as="span" variant="bodyXs" fontWeight="medium">
+                                                        {currencySymbol}{variant.node.price}
+                                                      </Text>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </BlockStack>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </BlockStack>
+                          </div>
+                        </Collapsible>
+                      </div>
+                    )}
 
                     {/* Inventory Operation Buttons */}
                     <div>
@@ -3640,117 +4078,488 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                       </div>
                     )}
                   </BlockStack>
-                )}
+                  );
+                })()}
 
-                {/* Variants Tab */}
-                {activeBulkTab === 5 && (
+                {/* Variants Tab - REVOLUTIONARY */}
+                {activeBulkTab === 5 && (() => {
+                  const selectedProductObjects = filteredProducts.filter(p => selectedProducts.includes(p.id));
+                  const isSingleProduct = selectedProducts.length === 1;
+                  const selectedProduct = isSingleProduct ? selectedProductObjects[0] : null;
+                  
+                  return (
                   <BlockStack gap="400">
-                    <Text as="h3" variant="headingSm">Variant Management</Text>
+                    <Text as="h3" variant="headingSm">🚀 Advanced Variant Management</Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      Manage variants across {selectedProducts.length} selected product{selectedProducts.length === 1 ? '' : 's'}. This helps with common variant operations that are tedious to do one-by-one.
+                      Bulk create, edit, and manage variants like a spreadsheet. Select exactly 1 product to unlock these powerful features.
                     </Text>
 
-                    {/* Current Ads Section */}
-                    {renderCurrentAdsSection()}
+                    {/* Multi-Product Warning */}
+                    {!isSingleProduct && (
+                      <Banner tone="warning">
+                        <Text as="p" fontWeight="semibold">Please select exactly 1 product</Text>
+                        <Text as="p" variant="bodySm">
+                          Advanced variant management works with a single product and its variants. You currently have {selectedProducts.length} products selected.
+                          This tool is designed for bulk operations within ONE product (e.g., creating all Size × Color combinations for a t-shirt).
+                        </Text>
+                      </Banner>
+                    )}
 
-                    {/* Variant Operations */}
-                    <div>
-                      <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
-                        Variant Operations
-                      </Text>
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
-                        gap: '8px', 
-                        marginTop: '8px' 
-                      }}>
-                        <Button
-                          variant="secondary"
-                          size="large"
-                          icon={PlusIcon}
-                        >
-                          Add Variant Options
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="large"
-                          icon={EditIcon}
-                        >
-                          Update Variant Titles
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="large"
-                          icon={MinusIcon}
-                        >
-                          Remove Variants
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Variant Insights */}
-                    <div style={{
-                      padding: '20px',
-                      backgroundColor: '#f6f6f7',
-                      borderRadius: '8px',
-                      border: '1px solid #e1e3e5'
-                    }}>
-                      <Text as="h4" variant="headingSm">
-                        Variant Overview
-                      </Text>
-                      <div style={{ marginTop: '12px' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                          <div>
-                            <Text as="p" variant="bodyMd" fontWeight="medium">
-                              Total Variants: {selectedVariants.length}
-                            </Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                              Across {selectedProducts.length} products
-                            </Text>
-                          </div>
-                          <div>
-                            <Text as="p" variant="bodyMd" fontWeight="medium">
-                              Common Pain Points
-                            </Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                              • Adding size/color options to multiple products<br/>
-                              • Standardizing variant names<br/>
-                              • Removing discontinued variants
-                            </Text>
+                    {/* Single Product - Revolutionary Features */}
+                    {isSingleProduct && selectedProduct && (
+                      <>
+                        {/* Selected Product Header */}
+                        <div style={{
+                          padding: '12px',
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          borderRadius: '8px',
+                          color: 'white'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                              width: '56px',
+                              height: '56px',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              border: '2px solid rgba(255,255,255,0.3)',
+                              flexShrink: 0
+                            }}>
+                              {selectedProduct.featuredMedia?.preview?.image?.url ? (
+                                <img
+                                  src={selectedProduct.featuredMedia.preview.image.url}
+                                  alt={selectedProduct.title}
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover'
+                                  }}
+                                />
+                              ) : (
+                                <div style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: 'rgba(255,255,255,0.2)'
+                                }}>
+                                  <Icon source={ProductIcon} tone="base" />
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <Text as="p" variant="headingMd" fontWeight="bold">
+                                {selectedProduct.title}
+                              </Text>
+                              <Text as="p" variant="bodySm">
+                                {selectedProduct.variants.edges.length} variant{selectedProduct.variants.edges.length === 1 ? '' : 's'} • {selectedProduct.status}
+                              </Text>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
 
-                    {/* Coming Soon */}
-                    <div style={{
-                      padding: '24px',
-                      backgroundColor: '#fff9e6',
-                      borderRadius: '8px',
-                      border: '1px solid #ffd666',
-                      textAlign: 'center'
-                    }}>
-                      <Text as="h4" variant="headingMd">
-                        Advanced Variant Management Coming Soon
-                      </Text>
-                      <div style={{ marginTop: '12px' }}>
-                        <Text as="p" variant="bodyMd" tone="subdued">
-                          This feature will help you efficiently manage variants across multiple products - a major time-saver for store owners with complex product catalogs.
-                        </Text>
-                      </div>
-                      <div style={{ marginTop: '16px' }}>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          <strong>Planned features:</strong><br/>
-                          • Bulk add variant options (Size: S, M, L, XL)<br/>
-                          • Standardize variant naming across products<br/>
-                          • Mass remove specific variants<br/>
-                          • Copy variant structure between products<br/>
-                          • Variant pricing synchronization
-                        </Text>
-                      </div>
-                    </div>
+                        {/* Operation Tabs */}
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+                          gap: '8px'
+                        }}>
+                          {[
+                            { id: 'matrix', label: '📊 Bulk Editor', desc: 'Edit all variants' },
+                            { id: 'generator', label: '✨ Generator', desc: 'Create combinations' },
+                            { id: 'template', label: '📋 Templates', desc: 'Save & reuse' },
+                            { id: 'image-assign', label: '🖼️ Auto-Images', desc: 'Smart matching' },
+                          ].map(({ id, label, desc }) => (
+                            <div
+                              key={id}
+                              onClick={() => setVariantOperation(id as any)}
+                              style={{
+                                padding: '12px',
+                                backgroundColor: variantOperation === id ? '#f0f9ff' : '#ffffff',
+                                border: `2px solid ${variantOperation === id ? '#0284c7' : '#e5e7eb'}`,
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                textAlign: 'center'
+                              }}
+                            >
+                              <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                {label}
+                              </Text>
+                              <Text as="p" variant="bodyXs" tone="subdued">
+                                {desc}
+                              </Text>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Matrix Editor - Spreadsheet-like bulk editing */}
+                        {variantOperation === 'matrix' && (
+                          <div style={{
+                            padding: '16px',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '8px',
+                            border: '1px solid #e5e7eb'
+                          }}>
+                            <Text as="h4" variant="headingMd">Spreadsheet-Style Bulk Editor</Text>
+                            <Text as="p" variant="bodySm" tone="subdued" >
+                              Edit multiple variant properties at once. Changes apply in real-time.
+                            </Text>
+                            
+                            <div style={{ 
+                              marginTop: '16px',
+                              overflowX: 'auto',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '6px'
+                            }}>
+                              <table style={{
+                                width: '100%',
+                                borderCollapse: 'collapse',
+                                fontSize: '13px'
+                              }}>
+                                <thead>
+                                  <tr style={{ backgroundColor: '#f9fafb' }}>
+                                    <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: 600 }}>Variant</th>
+                                    <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: 600 }}>SKU</th>
+                                    <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: 600 }}>Price</th>
+                                    <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: 600 }}>Compare Price</th>
+                                    <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: 600 }}>Stock</th>
+                                    <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: 600 }}>Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {selectedProduct.variants.edges.map((variant) => (
+                                    <tr key={variant.node.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                      <td style={{ padding: '10px' }}>
+                                        <Text as="span" variant="bodyXs" fontWeight="medium">
+                                          {variant.node.title}
+                                        </Text>
+                                      </td>
+                                      <td style={{ padding: '10px' }}>
+                                        <input
+                                          type="text"
+                                          defaultValue={variant.node.sku || ''}
+                                          style={{
+                                            width: '100px',
+                                            padding: '4px 8px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '4px',
+                                            fontSize: '13px'
+                                          }}
+                                          onChange={(e) => {
+                                            setEditingVariants(prev => ({
+                                              ...prev,
+                                              [variant.node.id]: {
+                                                ...prev[variant.node.id],
+                                                sku: e.target.value
+                                              }
+                                            }));
+                                          }}
+                                        />
+                                      </td>
+                                      <td style={{ padding: '10px' }}>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          defaultValue={variant.node.price}
+                                          style={{
+                                            width: '80px',
+                                            padding: '4px 8px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '4px',
+                                            fontSize: '13px'
+                                          }}
+                                          onChange={(e) => {
+                                            setEditingVariants(prev => ({
+                                              ...prev,
+                                              [variant.node.id]: {
+                                                ...prev[variant.node.id],
+                                                price: e.target.value
+                                              }
+                                            }));
+                                          }}
+                                        />
+                                      </td>
+                                      <td style={{ padding: '10px' }}>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          defaultValue={variant.node.compareAtPrice || ''}
+                                          placeholder="—"
+                                          style={{
+                                            width: '80px',
+                                            padding: '4px 8px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '4px',
+                                            fontSize: '13px'
+                                          }}
+                                          onChange={(e) => {
+                                            setEditingVariants(prev => ({
+                                              ...prev,
+                                              [variant.node.id]: {
+                                                ...prev[variant.node.id],
+                                                compareAtPrice: e.target.value
+                                              }
+                                            }));
+                                          }}
+                                        />
+                                      </td>
+                                      <td style={{ padding: '10px' }}>
+                                        <input
+                                          type="number"
+                                          defaultValue={variant.node.inventoryQuantity || 0}
+                                          style={{
+                                            width: '70px',
+                                            padding: '4px 8px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '4px',
+                                            fontSize: '13px'
+                                          }}
+                                          onChange={(e) => {
+                                            setEditingVariants(prev => ({
+                                              ...prev,
+                                              [variant.node.id]: {
+                                                ...prev[variant.node.id],
+                                                inventory: e.target.value
+                                              }
+                                            }));
+                                          }}
+                                        />
+                                      </td>
+                                      <td style={{ padding: '10px' }}>
+                                        <Button size="slim" variant="plain" tone="critical">
+                                          Delete
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            
+                            <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+                              <Button variant="primary" size="large">
+                                💾 Save All Changes
+                              </Button>
+                              <Button variant="secondary" size="large">
+                                ↻ Reset
+                              </Button>
+                              <Button variant="secondary" size="large">
+                                📤 Export CSV
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Variant Generator - Create all combinations */}
+                        {variantOperation === 'generator' && (
+                          <div style={{
+                            padding: '16px',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '8px',
+                            border: '1px solid #e5e7eb'
+                          }}>
+                            <Text as="h4" variant="headingMd">✨ Variant Combination Generator</Text>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              Create ALL possible combinations from your options (e.g., Size × Color = 12 variants)
+                            </Text>
+                            
+                            <BlockStack gap="400">
+                              <div>
+                                <Text as="p" variant="bodyMd" fontWeight="medium">Option 1 (Required)</Text>
+                                <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '8px', marginTop: '8px' }}>
+                                  <TextField
+                                    label=""
+                                    value={option1Name}
+                                    onChange={setOption1Name}
+                                    placeholder="e.g., Size"
+                                    autoComplete="off"
+                                  />
+                                  <TextField
+                                    label=""
+                                    value={option1Values}
+                                    onChange={setOption1Values}
+                                    placeholder="e.g., S, M, L, XL"
+                                    autoComplete="off"
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <Text as="p" variant="bodyMd" fontWeight="medium">Option 2 (Optional)</Text>
+                                <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '8px', marginTop: '8px' }}>
+                                  <TextField
+                                    label=""
+                                    value={option2Name}
+                                    onChange={setOption2Name}
+                                    placeholder="e.g., Color"
+                                    autoComplete="off"
+                                  />
+                                  <TextField
+                                    label=""
+                                    value={option2Values}
+                                    onChange={setOption2Values}
+                                    placeholder="e.g., Black, White, Red"
+                                    autoComplete="off"
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <Text as="p" variant="bodyMd" fontWeight="medium">Option 3 (Optional)</Text>
+                                <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '8px', marginTop: '8px' }}>
+                                  <TextField
+                                    label=""
+                                    value={option3Name}
+                                    onChange={setOption3Name}
+                                    placeholder="e.g., Material"
+                                    autoComplete="off"
+                                  />
+                                  <TextField
+                                    label=""
+                                    value={option3Values}
+                                    onChange={setOption3Values}
+                                    placeholder="e.g., Cotton, Polyester"
+                                    autoComplete="off"
+                                  />
+                                </div>
+                              </div>
+
+                              {option1Name && option1Values && (
+                                <div style={{
+                                  padding: '12px',
+                                  backgroundColor: '#f0fdf4',
+                                  borderRadius: '6px',
+                                  border: '1px solid #86efac'
+                                }}>
+                                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                    Preview: {(() => {
+                                      const o1 = option1Values.split(',').map(v => v.trim()).filter(Boolean).length;
+                                      const o2 = option2Values ? option2Values.split(',').map(v => v.trim()).filter(Boolean).length : 0;
+                                      const o3 = option3Values ? option3Values.split(',').map(v => v.trim()).filter(Boolean).length : 0;
+                                      const total = o1 * (o2 || 1) * (o3 || 1);
+                                      return `${total} variants will be created`;
+                                    })()}
+                                  </Text>
+                                  <Text as="p" variant="bodyXs" tone="subdued">
+                                    {option1Values.split(',').map(v => v.trim()).filter(Boolean).length} {option1Name || 'options'}
+                                    {option2Values && ` × ${option2Values.split(',').map(v => v.trim()).filter(Boolean).length} ${option2Name || 'options'}`}
+                                    {option3Values && ` × ${option3Values.split(',').map(v => v.trim()).filter(Boolean).length} ${option3Name || 'options'}`}
+                                  </Text>
+                                </div>
+                              )}
+
+                              <Button variant="primary" size="large" disabled={!option1Name || !option1Values}>
+                                🚀 Generate All Variants
+                              </Button>
+                            </BlockStack>
+                          </div>
+                        )}
+
+                        {/* Template System - Save & Reuse */}
+                        {variantOperation === 'template' && (
+                          <div style={{
+                            padding: '16px',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '8px',
+                            border: '1px solid #e5e7eb'
+                          }}>
+                            <Text as="h4" variant="headingMd">📋 Variant Templates</Text>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              Save variant structures as templates and apply them to other products instantly
+                            </Text>
+                            
+                            <BlockStack gap="400">
+                              <div>
+                                <Text as="p" variant="bodyMd" fontWeight="medium">Save Current Variant Structure</Text>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                  <div style={{ flex: 1 }}>
+                                    <TextField
+                                      label=""
+                                      value={variantTemplate.name}
+                                      onChange={(value) => setVariantTemplate({ ...variantTemplate, name: value })}
+                                      placeholder="Template name (e.g., 'T-Shirt Sizes')"
+                                      autoComplete="off"
+                                    />
+                                  </div>
+                                  <Button variant="primary">💾 Save Template</Button>
+                                </div>
+                              </div>
+
+                              <div style={{
+                                padding: '12px',
+                                backgroundColor: '#f9fafb',
+                                borderRadius: '6px',
+                                border: '1px solid #e5e7eb'
+                              }}>
+                                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                  Common Templates
+                                </Text>
+                                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  {[
+                                    { name: 'Apparel Sizes', desc: 'XS, S, M, L, XL, XXL' },
+                                    { name: 'Shoe Sizes US', desc: '6, 7, 8, 9, 10, 11, 12' },
+                                    { name: 'Basic Colors', desc: 'Black, White, Gray, Navy' },
+                                  ].map((template) => (
+                                    <div
+                                      key={template.name}
+                                      style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '8px',
+                                        backgroundColor: 'white',
+                                        borderRadius: '4px'
+                                      }}
+                                    >
+                                      <div>
+                                        <Text as="span" variant="bodyXs" fontWeight="semibold">{template.name}</Text>
+                                        <br />
+                                        <Text as="span" variant="bodyXs" tone="subdued">{template.desc}</Text>
+                                      </div>
+                                      <Button size="slim">Apply</Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </BlockStack>
+                          </div>
+                        )}
+
+                        {/* Auto Image Assignment */}
+                        {variantOperation === 'image-assign' && (
+                          <div style={{
+                            padding: '16px',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '8px',
+                            border: '1px solid #e5e7eb'
+                          }}>
+                            <Text as="h4" variant="headingMd">🖼️ Smart Image Assignment</Text>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              Automatically assign images to variants based on filename matching
+                            </Text>
+                            
+                            <div style={{ marginTop: '16px' }}>
+                              <Text as="p" variant="bodyMd">
+                                🎨 Feature Preview: Automatically match product images to variants by detecting color names, sizes, or patterns in filenames.
+                              </Text>
+                              <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#f0f9ff', borderRadius: '6px' }}>
+                                <Text as="p" variant="bodyXs">
+                                  <strong>Example:</strong> Image "tshirt-red.jpg" → Assigned to "Red" variant<br />
+                                  <strong>Example:</strong> Image "shoe-size-10.jpg" → Assigned to "Size 10" variant
+                                </Text>
+                              </div>
+                              <Button variant="primary" size="large" disabled>
+                                🚀 Coming Soon
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </BlockStack>
-                )}
+                  );
+                })()}
 
 
               </BlockStack>
@@ -3760,33 +4569,81 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       )}
 
       {notification.show && (
-        <>
+        <div style={{ 
+          position: 'fixed', 
+          bottom: '24px', 
+          right: '24px',
+          zIndex: 10000,
+          minWidth: '320px',
+          maxWidth: '500px',
+          animation: 'slideInRight 0.3s ease-out'
+        }}>
+          <div style={{
+            backgroundColor: notification.error ? '#FEF2F2' : '#F0FDF4',
+            border: `2px solid ${notification.error ? '#FCA5A5' : '#86EFAC'}`,
+            borderRadius: '12px',
+            padding: '16px',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px'
+          }}>
+            {/* Success/Error Icon */}
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              backgroundColor: notification.error ? '#FCA5A5' : '#22C55E',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <span style={{ fontSize: '24px', color: 'white' }}>
+                {notification.error ? '⚠️' : '✓'}
+              </span>
+            </div>
+            
+            {/* Message */}
+            <div style={{ flex: 1, paddingTop: '4px' }}>
+              <Text as="p" variant="bodyMd" fontWeight="semibold" tone={notification.error ? 'critical' : 'success'}>
+                {notification.error ? 'Update Error' : 'Success!'}
+              </Text>
+              <Text as="p" variant="bodySm">
+                {notification.message}
+              </Text>
+            </div>
+            
+            {/* Close Button */}
+            <button
+              onClick={() => setNotification({ show: false, message: '' })}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                color: '#6B7280',
+                fontSize: '20px',
+                lineHeight: '1',
+                flexShrink: 0
+              }}
+            >
+              ×
+            </button>
+          </div>
+          
+          {/* Polaris Toast as backup */}
           <Toast
             content={notification.message}
             error={notification.error}
             onDismiss={() => setNotification({ show: false, message: '' })}
-            duration={4000}
+            duration={5000}
             action={notification.actionLabel ? {
               content: notification.actionLabel,
               onAction: notification.onAction
             } : undefined}
           />
-          {/* Fallback banner in case Toast fails with frame error */}
-          {notification.message && (
-            <div style={{ 
-              position: 'fixed', 
-              bottom: '20px', 
-              right: '20px',
-              zIndex: 9999, 
-              display: 'none'
-            }}
-            className="toast-fallback">
-              <Banner tone={notification.error ? "critical" : "success"}>
-                <Text as="p">{notification.message}</Text>
-              </Banner>
-            </div>
-          )}
-        </>
+        </div>
       )}
 
       {/* Bulk Operation Modal removed - changes now apply directly */}

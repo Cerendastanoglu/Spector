@@ -1038,7 +1038,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (actionType === "update-titles") {
     try {
-      const body = await request.json();
+      // Use the already-parsed requestData instead of reading body again
+      const body = request.headers.get("Content-Type")?.includes("application/json") 
+        ? requestData 
+        : await request.json();
       const { productIds, titleOperation, titleValue, titleReplaceFrom, titleReplaceTo } = body;
 
       if (!productIds || !Array.isArray(productIds)) {
@@ -1228,12 +1231,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           // Calculate new description based on operation
           let newDescription = currentProduct.descriptionHtml || '';
           
-          if (descriptionOperation === 'append') {
-            newDescription = `${newDescription}\n${descriptionValue}`;
-          } else if (descriptionOperation === 'prepend') {
-            newDescription = `${descriptionValue}\n${newDescription}`;
+          if (descriptionOperation === 'prefix' || descriptionOperation === 'prepend') {
+            // Add to beginning - handle empty descriptions
+            newDescription = newDescription 
+              ? `${descriptionValue}\n${newDescription}` 
+              : descriptionValue;
+          } else if (descriptionOperation === 'suffix' || descriptionOperation === 'append') {
+            // Add to end - handle empty descriptions
+            newDescription = newDescription 
+              ? `${newDescription}\n${descriptionValue}` 
+              : descriptionValue;
           } else if (descriptionOperation === 'replace') {
-            newDescription = newDescription.replace(new RegExp(descriptionReplaceFrom, 'g'), descriptionReplaceTo);
+            // Replace text - if no existing description, nothing to replace
+            if (newDescription) {
+              newDescription = newDescription.replace(new RegExp(descriptionReplaceFrom, 'g'), descriptionReplaceTo || '');
+            }
           }
 
           // Update the product description
@@ -1275,8 +1287,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             results.push({
               productId,
               success: true,
-              oldDescription: currentProduct.descriptionHtml,
-              newDescription: updateJson.data?.productUpdate?.product?.descriptionHtml
+              product: {
+                id: productId,
+                descriptionHtml: updateJson.data?.productUpdate?.product?.descriptionHtml
+              }
             });
           }
           
@@ -1294,7 +1308,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         results,
         updatedProducts: results.filter(r => r.success).map(r => ({
           id: r.productId,
-          description: r.newDescription
+          description: r.product?.descriptionHtml
         })),
         successful: results.filter(r => r.success).length,
         failed: results.filter(r => !r.success).length
@@ -1310,7 +1324,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (actionType === "update-inventory") {
     try {
-      const body = await request.json();
+      // Reuse already-parsed request data instead of reading body again
+      const body = request.headers.get("Content-Type")?.includes("application/json") 
+        ? requestData 
+        : await request.json();
       const { variantIds, inventoryOperation, stockQuantity, stockUpdateMethod } = body;
 
       if (!variantIds || !Array.isArray(variantIds)) {
