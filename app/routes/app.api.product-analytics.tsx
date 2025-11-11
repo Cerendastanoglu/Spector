@@ -1,4 +1,4 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { applyRateLimit } from "~/utils/rateLimit";
@@ -34,6 +34,7 @@ interface ProductAnalyticsData {
       orders: number;
     }>;
   };
+  hasOrderAccess?: boolean; // Flag indicating if order data is available
 }
 
 // Function to create comprehensive price ranges that work for all price levels
@@ -121,7 +122,8 @@ function calculateDynamicPriceRanges(
   return Object.entries(ranges).map(([range, { count, orders }]) => ({ range, count, orders }));
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+// Shared function for both GET (loader) and POST (action) requests
+async function getProductAnalytics(request: Request) {
   // Apply rate limiting (60 requests per minute)
   const rateLimitResponse = await applyRateLimit(request, RATE_LIMITS.API_DEFAULT);
   if (rateLimitResponse) return rateLimitResponse;
@@ -129,6 +131,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     logger.info("🔵 Product Analytics API: Starting analysis...");
     logger.info("🔵 Product Analytics API: Request URL:", request.url);
+    logger.info("🔵 Product Analytics API: Request method:", request.method);
     
     const { admin } = await authenticate.admin(request);
     logger.info("🔵 Product Analytics API: Authentication successful");
@@ -159,35 +162,41 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     `);
 
     // GraphQL query to get recent orders (last 250 orders)
-    const ordersResponse = await admin.graphql(`
-      query {
-        orders(first: 250, sortKey: CREATED_AT, reverse: true) {
-          edges {
-            node {
-              id
-              name
-              createdAt
-              totalPriceSet {
-                shopMoney {
-                  amount
+    // Note: Orders require protected customer data access
+    let ordersData: any = { data: { orders: { edges: [] } } };
+    let hasOrderAccess = true;
+    
+    try {
+      const ordersResponse = await admin.graphql(`
+        query {
+          orders(first: 250, sortKey: CREATED_AT, reverse: true) {
+            edges {
+              node {
+                id
+                name
+                createdAt
+                totalPriceSet {
+                  shopMoney {
+                    amount
+                  }
                 }
-              }
-              lineItems(first: 50) {
-                edges {
-                  node {
-                    id
-                    quantity
-                    variant {
+                lineItems(first: 50) {
+                  edges {
+                    node {
                       id
-                      price
+                      quantity
+                      variant {
+                        id
+                        price
+                        product {
+                          id
+                          title
+                        }
+                      }
                       product {
                         id
                         title
                       }
-                    }
-                    product {
-                      id
-                      title
                     }
                   }
                 }
@@ -195,28 +204,31 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             }
           }
         }
+      `);
+      
+      ordersData = await ordersResponse.json();
+      
+      if (ordersData.errors) {
+        logger.warn("⚠️ Product Analytics API: Orders access denied (protected customer data)");
+        hasOrderAccess = false;
+        ordersData = { data: { orders: { edges: [] } } };
+      } else {
+        logger.info("🔵 Product Analytics API: Orders fetched successfully");
       }
-    `);
+    } catch (orderError) {
+      logger.warn("⚠️ Product Analytics API: Orders query failed, continuing without order data:", orderError);
+      hasOrderAccess = false;
+    }
 
     const productsData: any = await productsResponse.json();
-    const ordersData: any = await ordersResponse.json();
     
     logger.info("🔵 Product Analytics API: Products fetched successfully");
-    logger.info("🔵 Product Analytics API: Orders fetched successfully");
     
     if (productsData.errors) {
       logger.error("🔴 Product Analytics API: GraphQL errors:", productsData.errors);
       return json({ 
         success: false, 
         error: `GraphQL Error: ${productsData.errors[0]?.message || "Unknown error"}` 
-      }, { status: 500 });
-    }
-
-    if (ordersData.errors) {
-      logger.error("🔴 Product Analytics API: Orders GraphQL errors:", ordersData.errors);
-      return json({ 
-        success: false, 
-        error: `Orders GraphQL Error: ${ordersData.errors[0]?.message || "Unknown error"}` 
       }, { status: 500 });
     }
 
@@ -382,7 +394,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         minPrice: allPrices.length > 0 ? Math.min(...allPrices) : 0,
         maxPrice: allPrices.length > 0 ? Math.max(...allPrices) : 0,
         priceDistribution: calculateDynamicPriceRanges(allPrices, priceToOrdersMap)
-      }
+      },
+      hasOrderAccess // Include flag to show if order data is available
     };
 
     logger.info("🟢 Product Analytics API: Analysis complete:", {
@@ -411,4 +424,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       details: error instanceof Error ? error.stack : undefined
     }, { status: 500 });
   }
+}
+
+// Export loader for GET requests
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  return getProductAnalytics(request);
+};
+
+// Export action for POST requests  
+export const action = async ({ request }: ActionFunctionArgs) => {
+  return getProductAnalytics(request);
 };

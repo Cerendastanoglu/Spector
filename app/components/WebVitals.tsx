@@ -22,15 +22,17 @@ const THRESHOLDS = {
 };
 
 function sendToAnalytics(metric: Metric) {
-  // Send to analytics service (Google Analytics, Shopify Analytics, etc.)
-  logger.info('📊 Web Vital:', {
-    name: metric.name,
-    value: metric.value,
-    rating: metric.rating,
-    delta: metric.delta,
-    id: metric.id,
-    navigationType: metric.navigationType
-  });
+  // Only log in development mode, silent in production
+  if (process.env.NODE_ENV === 'development') {
+    logger.info('📊 Web Vital:', {
+      name: metric.name,
+      value: metric.value,
+      rating: metric.rating,
+      delta: metric.delta,
+      id: metric.id,
+      navigationType: metric.navigationType
+    });
+  }
 
   // Send to Shopify Partners dashboard if available
   if (typeof shopify !== 'undefined') {

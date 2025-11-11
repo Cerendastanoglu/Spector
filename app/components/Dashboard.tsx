@@ -29,6 +29,7 @@ interface DashboardProps {
   outOfStockCount: number;
   onNavigate: (tab: string) => void;
   shopDomain?: string;
+  productAnalytics?: ProductAnalyticsData | null; // ← Add analytics prop
 }
 
 interface ProductAnalyticsData {
@@ -60,6 +61,7 @@ interface ProductAnalyticsData {
       orders: number;
     }>;
   };
+  hasOrderAccess?: boolean; // Flag indicating if order data is available
 }
 
 interface InventoryData {
@@ -83,16 +85,16 @@ interface InventoryData {
   }>;
 }
 
-export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavigate: _onNavigate, shopDomain: _shopDomain }: DashboardProps) {
+export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavigate: _onNavigate, shopDomain: _shopDomain, productAnalytics }: DashboardProps) {
 
   // Core state
   const [timePeriod] = useState('30'); // Fixed at 30 days
-  const [productAnalyticsData, setProductAnalyticsData] = useState<ProductAnalyticsData | null>(null);
+  const [productAnalyticsData, setProductAnalyticsData] = useState<ProductAnalyticsData | null>(productAnalytics || null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isManualRefresh, setIsManualRefresh] = useState(false);
-  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
-  const [hasReceivedData, setHasReceivedData] = useState(false); // Track if we've ever received data
+  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(!!productAnalytics);
+  const [hasReceivedData, setHasReceivedData] = useState(!!productAnalytics); // Track if we've ever received data
   
   // Currency state
   const [storeCurrency, setStoreCurrency] = useState<string>('USD');
@@ -109,8 +111,6 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   
   // Refs to hold current values to prevent useEffect dependencies
   const timePeriodRef = useRef(timePeriod);
-  const productAnalyticsFetcherRef = useRef(productAnalyticsFetcher);
-  const inventoryFetcherRef = useRef(inventoryFetcher);
   
   // Request ID tracking to prevent race conditions
   // When user switches time periods rapidly, older requests may complete after newer ones
@@ -125,8 +125,6 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   // Update refs when values change
   useEffect(() => {
     timePeriodRef.current = timePeriod;
-    productAnalyticsFetcherRef.current = productAnalyticsFetcher;
-    inventoryFetcherRef.current = inventoryFetcher;
   });
 
   // NOTE: localStorage caching removed to comply with Shopify embedded app requirements
@@ -155,23 +153,21 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     setError(null);
     setIsManualRefresh(force);
     
-    const currentPeriod = timePeriodRef.current;
-    const currentProductAnalyticsFetcher = productAnalyticsFetcherRef.current;
-    const currentInventoryFetcher = inventoryFetcherRef.current;
-    
-    logger.debug("Dashboard: fetchFreshData called with type:", type, "force:", force, "generation:", fetchGeneration);
     if (type === 'revenue') {
       // Store this as the latest revenue fetch generation
       currentRevenueGenerationRef.current = fetchGeneration;
-      logger.debug("Dashboard: Calling product-analytics API (Generation #" + fetchGeneration + ")");
-      currentProductAnalyticsFetcher.load(`/app/api/product-analytics`);
+      logger.debug("Dashboard: Loading product-analytics data (Generation #" + fetchGeneration + ")");
+      
+      // Use the same pattern as ProductManagement - this works!
+      productAnalyticsFetcher.load('/app/api/product-analytics');
     } else {
-      // Store this as the latest inventory fetch generation
+      // Inventory API not yet implemented
       currentInventoryGenerationRef.current = fetchGeneration;
-      logger.debug("Dashboard: Calling inventory API (Generation #" + fetchGeneration + ")", currentPeriod);
-      currentInventoryFetcher.load(`/app/api/inventory?period=${currentPeriod}`);
+      logger.warn("Dashboard: Inventory API not implemented yet");
+      setIsLoading(false);
     }
-  }, []); // No dependencies to prevent recreation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - fetcher is stable
 
   // Load store currency from Shopify API
   const loadStoreCurrency = useCallback(async () => {
@@ -356,9 +352,6 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   }, [productAnalyticsFetcher.data, timePeriod]);
 
   // Handle product analytics fetcher state changes
-  // Note: This useEffect is intentionally dependent on fetcher state/data
-  // It's designed to react to state changes and won't cause memory leaks
-  // because the state transitions are finite (loading -> idle)
   useEffect(() => {
     if (productAnalyticsFetcher.state === 'idle' && productAnalyticsFetcher.data) {
       setIsLoading(false);

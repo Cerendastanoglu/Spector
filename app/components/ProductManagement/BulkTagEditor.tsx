@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   BlockStack,
   TextField,
@@ -8,12 +8,14 @@ import {
   Text,
   Icon,
   Collapsible,
+  Badge,
 } from '@shopify/polaris';
 import { ChevronDownIcon, ChevronUpIcon, ProductIcon } from '@shopify/polaris-icons';
 
 interface Product {
   id: string;
   title: string;
+  tags?: string[];
   variants: {
     edges: Array<{
       node: {
@@ -65,17 +67,125 @@ export function BulkTagEditor({
   setShowSelectedProducts,
   onClearAll,
 }: BulkTagEditorProps) {
+  const [showCurrentTags, setShowCurrentTags] = useState(false);
+
   const tagOperationOptions = [
     { label: 'Add tags', value: 'add' },
     { label: 'Remove tags', value: 'remove' },
     { label: 'Replace all tags', value: 'replace' },
   ];
 
+  // Aggregate existing tags from selected products
+  const currentTagsData = useMemo(() => {
+    const tagMap = new Map<string, number>();
+    
+    selectedProducts.forEach(product => {
+      if (product.tags) {
+        product.tags.forEach(tag => {
+          const trimmedTag = tag.trim();
+          if (trimmedTag) {
+            tagMap.set(trimmedTag, (tagMap.get(trimmedTag) || 0) + 1);
+          }
+        });
+      }
+    });
+
+    return Array.from(tagMap.entries())
+      .map(([tag, count]) => ({
+        tag,
+        count,
+        percentage: Math.round((count / selectedProducts.length) * 100)
+      }))
+      .sort((a, b) => b.count - a.count); // Most common tags first
+  }, [selectedProducts]);
+
   return (
     <BlockStack gap="400">
       <Text variant="headingMd" as="h3">
         Bulk Tag Management
       </Text>
+
+      {/* Current Tags Summary - Compact & Visual */}
+      {currentTagsData.length > 0 && (
+        <div style={{
+          padding: '8px 12px',
+          backgroundColor: '#ffffff',
+          borderRadius: '6px',
+          border: '1px solid #e5e7eb'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button
+              onClick={() => setShowCurrentTags(!showCurrentTags)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                fontSize: '13px',
+                fontWeight: '500',
+                color: '#202223'
+              }}
+            >
+              <Icon source={showCurrentTags ? ChevronUpIcon : ChevronDownIcon} tone="base" />
+              <span>Current Tags ({currentTagsData.length})</span>
+            </button>
+          </div>
+
+          <Collapsible
+            open={showCurrentTags}
+            id="current-tags-collapsible"
+            transition={{ duration: '200ms', timingFunction: 'ease' }}
+          >
+            <div style={{ 
+              marginTop: '12px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '6px',
+              maxHeight: '160px',
+              overflowY: 'auto'
+            }}>
+              {currentTagsData.map(({ tag, count, percentage }) => (
+                <div
+                  key={tag}
+                  style={{
+                    padding: '6px 10px',
+                    backgroundColor: '#fff',
+                    borderRadius: '16px',
+                    border: '1px solid #d1d5db',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => {
+                    // When clicking a tag, add it to remove field for easy removal
+                    if (tagOperation === 'remove') {
+                      setTagRemoveValue(tag);
+                    }
+                  }}
+                  title={`Click to ${tagOperation === 'remove' ? 'remove' : 'view'} this tag`}
+                >
+                  <Text as="span" variant="bodyXs" fontWeight="medium">
+                    {tag}
+                  </Text>
+                  <Badge tone={percentage >= 50 ? 'success' : 'info'} size="small">
+                    {`${count}/${selectedProducts.length}`}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #e1e3e5' }}>
+              <Text as="p" variant="bodyXs" tone="subdued">
+                💡 Tip: Click a tag to quickly select it for removal
+              </Text>
+            </div>
+          </Collapsible>
+        </div>
+      )}
 
       {/* Collapsible Selected Products Section - Compact Design */}
       <div style={{

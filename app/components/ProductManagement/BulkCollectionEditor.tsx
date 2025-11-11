@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   BlockStack,
   Button,
   ButtonGroup,
-  ChoiceList,
   InlineStack,
   Text,
   Collapsible,
   Icon,
+  Badge,
 } from '@shopify/polaris';
 import { Collection } from './types';
 import { ChevronDownIcon, ChevronUpIcon, ProductIcon } from '@shopify/polaris-icons';
@@ -19,6 +19,14 @@ interface Product {
     edges: Array<{
       node: {
         id: string;
+      };
+    }>;
+  };
+  collections?: {
+    edges: Array<{
+      node: {
+        id: string;
+        title: string;
       };
     }>;
   };
@@ -63,23 +71,119 @@ export function BulkCollectionEditor({
   onClearAll,
 }: BulkCollectionEditorProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCurrentCollections, setShowCurrentCollections] = useState(false);
+
+  // Aggregate existing collections from selected products
+  const currentCollectionsData = useMemo(() => {
+    const collectionMap = new Map<string, { title: string; count: number }>();
+    
+    selectedProducts.forEach(product => {
+      if (product.collections?.edges) {
+        product.collections.edges.forEach(edge => {
+          const existing = collectionMap.get(edge.node.id);
+          if (existing) {
+            existing.count += 1;
+          } else {
+            collectionMap.set(edge.node.id, {
+              title: edge.node.title,
+              count: 1
+            });
+          }
+        });
+      }
+    });
+
+    return Array.from(collectionMap.entries())
+      .map(([id, data]) => ({
+        id,
+        title: data.title,
+        count: data.count,
+        percentage: Math.round((data.count / selectedProducts.length) * 100)
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [selectedProducts]);
 
   // Filter collections based on search
   const filteredCollections = availableCollections.filter(collection =>
     collection.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Convert collections to choice list format
-  const collectionChoices = filteredCollections.map(collection => ({
-    label: collection.title,
-    value: collection.id,
-  }));
-
   return (
     <BlockStack gap="400">
       <Text as="h3" variant="headingMd">
         Collection Management
       </Text>
+
+      {/* Current Collections Summary - Compact & Visual */}
+      {currentCollectionsData.length > 0 && (
+        <div style={{
+          padding: '8px 12px',
+          backgroundColor: '#ffffff',
+          borderRadius: '6px',
+          border: '1px solid #e5e7eb'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button
+              onClick={() => setShowCurrentCollections(!showCurrentCollections)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                fontSize: '13px',
+                fontWeight: '500',
+                color: '#202223'
+              }}
+            >
+              <Icon source={showCurrentCollections ? ChevronUpIcon : ChevronDownIcon} tone="base" />
+              <span>Current Collections ({currentCollectionsData.length})</span>
+            </button>
+          </div>
+
+          <Collapsible
+            open={showCurrentCollections}
+            id="current-collections-collapsible"
+            transition={{ duration: '200ms', timingFunction: 'ease' }}
+          >
+            <div style={{ 
+              marginTop: '12px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gap: '8px',
+              maxHeight: '160px',
+              overflowY: 'auto'
+            }}>
+              {currentCollectionsData.map(({ id, title, count, percentage }) => (
+                <div
+                  key={id}
+                  style={{
+                    padding: '8px 10px',
+                    backgroundColor: '#fff',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <Text as="span" variant="bodyXs" fontWeight="semibold" truncate>
+                      {title}
+                    </Text>
+                    <Badge tone="info" size="small">
+                      {`${percentage}%`}
+                    </Badge>
+                  </div>
+                  <Text as="p" variant="bodyXs" tone="subdued">
+                    {count} of {selectedProducts.length} products
+                  </Text>
+                </div>
+              ))}
+            </div>
+          </Collapsible>
+        </div>
+      )}
 
       {/* Collapsible Selected Products Section - Compact Design */}
       <div style={{
@@ -254,14 +358,82 @@ export function BulkCollectionEditor({
                 {searchQuery ? 'No collections found matching your search' : 'No collections available'}
               </Text>
             ) : (
-              <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                <ChoiceList
-                  title=""
-                  allowMultiple
-                  choices={collectionChoices}
-                  selected={selectedCollections}
-                  onChange={onSelectedCollectionsChange}
-                />
+              <div style={{ 
+                maxHeight: '240px', 
+                overflowY: 'auto',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                gap: '8px',
+                padding: '4px'
+              }}>
+                {filteredCollections.map(collection => {
+                  const isSelected = selectedCollections.includes(collection.id);
+                  return (
+                    <button
+                      key={collection.id}
+                      onClick={() => {
+                        if (isSelected) {
+                          onSelectedCollectionsChange(selectedCollections.filter(id => id !== collection.id));
+                        } else {
+                          onSelectedCollectionsChange([...selectedCollections, collection.id]);
+                        }
+                      }}
+                      style={{
+                        padding: '10px 12px',
+                        backgroundColor: isSelected ? '#e0f2fe' : '#fff',
+                        border: isSelected ? '2px solid #0284c7' : '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.15s ease',
+                        fontWeight: isSelected ? '600' : '400',
+                        fontSize: '13px',
+                        color: '#202223'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.backgroundColor = '#f9fafb';
+                          e.currentTarget.style.borderColor = '#9ca3af';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.backgroundColor = '#fff';
+                          e.currentTarget.style.borderColor = '#d1d5db';
+                        }
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '3px',
+                          border: isSelected ? '2px solid #0284c7' : '1px solid #d1d5db',
+                          backgroundColor: isSelected ? '#0284c7' : '#fff',
+                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.15s ease'
+                        }}>
+                          {isSelected && (
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                              <path d="M8 2L3.5 7L2 5.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </div>
+                        <span style={{ 
+                          overflow: 'hidden', 
+                          textOverflow: 'ellipsis', 
+                          whiteSpace: 'nowrap',
+                          flex: 1
+                        }}>
+                          {collection.title}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

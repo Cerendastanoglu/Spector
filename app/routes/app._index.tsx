@@ -32,25 +32,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     shop
   );
   
-  // Fetch user preferences from database (replaces localStorage)
-  const prisma = (await import("../db.server")).default;
-  let userPreferences;
-  try {
-    userPreferences = await prisma.userPreferences.findUnique({
-      where: { shop },
-    });
-    
-    // Create preferences if they don't exist
-    if (!userPreferences) {
-      userPreferences = await prisma.userPreferences.create({
-        data: { shop },
-      });
-    }
-  } catch (err) {
-    logger.error('Error fetching user preferences:', err);
-    userPreferences = { hasSeenWelcomeModal: false };
-  }
-  
   // Fetch shop information
   try {
     const response = await admin.graphql(
@@ -69,9 +50,59 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     
     const data = await response.json();
     
+    // Load product analytics directly in loader
+    let productAnalytics = null;
+    try {
+      logger.info("🔵 Main Loader: Fetching product analytics...");
+      const analyticsModule = await import("./app.api.product-analytics");
+      // Call the loader function from product-analytics route
+      const analyticsResponse = await analyticsModule.loader({ request } as any);
+      const analyticsJson = await analyticsResponse.json();
+      productAnalytics = analyticsJson.success ? analyticsJson.data : null;
+      logger.info("🔵 Main Loader: Product analytics loaded successfully");
+    } catch (err) {
+      logger.error('🔴 Main Loader: Error loading product analytics:', err);
+    }
+    
+    // Load products directly in loader
+    let initialProducts = null;
+    try {
+      logger.info("🔵 Main Loader: Fetching products...");
+      const productsModule = await import("./app.api.products");
+      // Call the action function with get-all-products action
+      const formData = new FormData();
+      formData.append('action', 'get-all-products');
+      const productsRequest = new Request(request.url, {
+        method: 'POST',
+        body: formData,
+      });
+      const productsResponse = await productsModule.action({ request: productsRequest } as any);
+      const productsJson = await productsResponse.json();
+      initialProducts = productsJson.products || null;
+      logger.info("🔵 Main Loader: Products loaded successfully");
+    } catch (err) {
+      logger.error('🔴 Main Loader: Error loading products:', err);
+    }
+    
+    // Load forecasting data directly in loader
+    let forecastingData = null;
+    try {
+      logger.info("🔵 Main Loader: Fetching forecasting data...");
+      const forecastingModule = await import("./app.api.inventory-forecasting");
+      const forecastingResponse = await forecastingModule.loader({ request } as any);
+      const forecastingJson = await forecastingResponse.json();
+      forecastingData = (forecastingJson.success && 'data' in forecastingJson) ? forecastingJson.data : null;
+      logger.info("🔵 Main Loader: Forecasting data loaded successfully");
+    } catch (err) {
+      logger.error('🔴 Main Loader: Error loading forecasting data:', err);
+    }
+    
     return {
       shop: data.data?.shop || null,
-      hasSeenWelcomeModal: userPreferences?.hasSeenWelcomeModal || false,
+      hasSeenWelcomeModal: false, // Hardcoded since UserPreferences removed
+      productAnalytics, // ← Pass analytics data directly
+      initialProducts, // ← Pass products data directly
+      forecastingData, // ← Pass forecasting data directly
       subscription: {
         status: shopifySubscription?.status || 'none',
         hasAccess,
@@ -100,7 +131,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     logger.error('Error fetching shop data:', error);
     return { 
       shop: null,
-      hasSeenWelcomeModal: userPreferences?.hasSeenWelcomeModal || false,
+      hasSeenWelcomeModal: false,
+      productAnalytics: null,
+      initialProducts: null,
+      forecastingData: null,
       subscription: {
         status: 'error',
         hasAccess: true, // Allow access on error
@@ -182,7 +216,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Index() {
-  const { shop, hasSeenWelcomeModal, subscription, settingsData } = useLoaderData<typeof loader>();
+  const { shop, hasSeenWelcomeModal, subscription, settingsData, productAnalytics, initialProducts, forecastingData } = useLoaderData<typeof loader>();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [outOfStockCount] = useState(0);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
@@ -245,10 +279,10 @@ export default function Index() {
   const renderActiveTabContent = () => {
     switch (activeTab) {
       case "out-of-stock":
-        return <OptimizedComponents.ProductManagement isVisible={true} shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} />;
+        return <OptimizedComponents.ProductManagement isVisible={true} shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} initialProducts={initialProducts} />;
 
       case "forecasting":
-        return <ForecastingTab shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} />;
+        return <ForecastingTab shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} initialForecastData={forecastingData} />;
 
       case "help":
         return <Help isVisible={true} />;
@@ -320,6 +354,7 @@ export default function Index() {
                 outOfStockCount={outOfStockCount}
                 onNavigate={handleTabChange}
                 shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain}
+                productAnalytics={productAnalytics}
               />
             </div>
             

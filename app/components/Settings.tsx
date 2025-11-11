@@ -258,20 +258,6 @@ export function Settings({
                     </div>
                     <BlockStack gap="050">
                       <Text as="p" variant="bodyMd" fontWeight="semibold">
-                        Automated Email Notifications
-                      </Text>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Get alerts when products are low or out of stock
-                      </Text>
-                    </BlockStack>
-                  </div>
-                  
-                  <div className={styles.featureItem}>
-                    <div className={styles.featureIcon}>
-                      <Icon source={CheckIcon} />
-                    </div>
-                    <BlockStack gap="050">
-                      <Text as="p" variant="bodyMd" fontWeight="semibold">
                         Product Analytics & Insights
                       </Text>
                       <Text as="p" variant="bodySm" tone="subdued">
@@ -307,21 +293,6 @@ export function Settings({
                       </Text>
                     </BlockStack>
                   </div>
-                </BlockStack>
-                
-                <Divider />
-                
-                {/* Help Section - Moved inside Features Card */}
-                <BlockStack gap="300">
-                  <Text as="h3" variant="headingMd">
-                    Need Help?
-                  </Text>
-                  <Text as="p" variant="bodyMd">
-                    If you have questions about billing, subscriptions, or need support, please contact us at{' '}
-                    <Text as="span" fontWeight="semibold" tone="success">
-                      support@spector.app
-                    </Text>
-                  </Text>
                 </BlockStack>
               </BlockStack>
             </Card>

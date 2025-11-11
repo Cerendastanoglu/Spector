@@ -198,11 +198,10 @@ export const ShopifyAppPerformance = {
     // Debounce rapid interactions
     let interactionTimeout: NodeJS.Timeout;
     
-    document.addEventListener('click', (event) => {
+    document.addEventListener('click', () => {
       clearTimeout(interactionTimeout);
       interactionTimeout = setTimeout(() => {
-        // Process interaction after debounce
-        logger.info('Interaction processed:', event.target);
+        // Process interaction after debounce (silent)
       }, 16); // ~1 frame at 60fps
     }, { passive: true });
 
