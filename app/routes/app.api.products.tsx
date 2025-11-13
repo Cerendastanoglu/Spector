@@ -83,7 +83,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                       }
                     }
                   }
-                  collections(first: 10) {
+                  collections(first: 250) {
                     edges {
                       node {
                         id
@@ -375,11 +375,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         title
                         sku
                         price
+                        compareAtPrice
+                        taxable
                         inventoryQuantity
                         inventoryPolicy
                         inventoryItem {
                           id
                           tracked
+                          unitCost {
+                            amount
+                          }
                         }
                       }
                     }
@@ -596,7 +601,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           update.oldPrice = originalPriceData.price;
           update.oldCompareAtPrice = originalPriceData.compareAtPrice;
           
-          // Update product variant price using bulk update
+          // Build variant input object - only price, compareAtPrice, and taxable are supported
+          const variantInput: any = {
+            id: update.variantId,
+            price: update.price,
+            compareAtPrice: update.compareAtPrice || null
+          };
+          
+          // Add taxable if defined
+          if (update.taxable !== undefined) {
+            variantInput.taxable = update.taxable;
+          }
+          
+          console.log('📦 Updating variant:', {
+            variantId: update.variantId,
+            input: variantInput,
+            hasCost: update.cost !== undefined,
+            hasUnitPrice: update.unitPrice !== undefined
+          });
+          
+          // Update product variant (price, compare price, taxable)
           const response = await admin.graphql(
             `#graphql
               mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
@@ -609,6 +633,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                           id
                           price
                           compareAtPrice
+                          taxable
                         }
                       }
                     }
@@ -623,11 +648,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             {
               variables: {
                 productId: update.productId,
-                variants: [{
-                  id: update.variantId,
-                  price: update.price,
-                  compareAtPrice: update.compareAtPrice || null
-                }]
+                variants: [variantInput]
               }
             }
           );
@@ -641,16 +662,132 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               success: false,
               error: data.data.productVariantsBulkUpdate.userErrors[0].message
             });
-          } else {
-            const updatedVariant = data.data?.productVariantsBulkUpdate?.product?.variants?.edges?.[0]?.node;
-            results.push({
-              productId: update.productId,
-              variantId: update.variantId,
-              success: true,
-              newPrice: updatedVariant?.price || update.price,
-              newCompareAtPrice: updatedVariant?.compareAtPrice || update.compareAtPrice
-            });
+            continue; // Skip cost/unit price updates if variant update failed
           }
+          
+          const updatedVariant = data.data?.productVariantsBulkUpdate?.product?.variants?.edges?.[0]?.node;
+          
+          // Update cost per item if provided (requires separate mutation)
+          if (update.cost !== undefined && update.cost !== null) {
+            console.log('💰 Updating cost for variant:', update.variantId, 'to', update.cost);
+            try {
+              // First get the inventory item ID
+              const variantResponse = await admin.graphql(
+                `#graphql
+                  query getInventoryItem($id: ID!) {
+                    productVariant(id: $id) {
+                      id
+                      inventoryItem {
+                        id
+                      }
+                    }
+                  }
+                `,
+                { variables: { id: update.variantId } }
+              );
+              
+              const variantData = await variantResponse.json();
+              const inventoryItemId = variantData.data?.productVariant?.inventoryItem?.id;
+              
+              if (inventoryItemId) {
+                await admin.graphql(
+                  `#graphql
+                    mutation inventoryItemUpdate($id: ID!, $input: InventoryItemInput!) {
+                      inventoryItemUpdate(id: $id, input: $input) {
+                        inventoryItem {
+                          id
+                        }
+                        userErrors {
+                          field
+                          message
+                        }
+                      }
+                    }
+                  `,
+                  {
+                    variables: {
+                      id: inventoryItemId,
+                      input: {
+                        cost: parseFloat(update.cost),
+                        tracked: true
+                      }
+                    }
+                  }
+                );
+              }
+            } catch (costError) {
+              console.error('Error updating cost:', costError);
+            }
+          }
+          
+          // Update unit price if provided
+          if (update.unitPrice !== undefined && update.unitPrice !== null) {
+            console.log('📏 Updating unit price for variant:', update.variantId, 'to', update.unitPrice);
+            try {
+              const variantResponse = await admin.graphql(
+                `#graphql
+                  query getInventoryItem($id: ID!) {
+                    productVariant(id: $id) {
+                      id
+                      inventoryItem {
+                        id
+                        measurement {
+                          weight {
+                            unit
+                          }
+                        }
+                      }
+                    }
+                  }
+                `,
+                { variables: { id: update.variantId } }
+              );
+              
+              const variantData = await variantResponse.json();
+              const inventoryItemId = variantData.data?.productVariant?.inventoryItem?.id;
+              
+              if (inventoryItemId) {
+                await admin.graphql(
+                  `#graphql
+                    mutation inventoryItemUpdate($id: ID!, $input: InventoryItemInput!) {
+                      inventoryItemUpdate(id: $id, input: $input) {
+                        inventoryItem {
+                          id
+                          unitCost {
+                            amount
+                          }
+                        }
+                        userErrors {
+                          field
+                          message
+                        }
+                      }
+                    }
+                  `,
+                  {
+                    variables: {
+                      id: inventoryItemId,
+                      input: {
+                        unitCost: {
+                          amount: parseFloat(update.unitPrice)
+                        }
+                      }
+                    }
+                  }
+                );
+              }
+            } catch (unitPriceError) {
+              console.error('Error updating unit price:', unitPriceError);
+            }
+          }
+          
+          results.push({
+            productId: update.productId,
+            variantId: update.variantId,
+            success: true,
+            newPrice: updatedVariant?.price || update.price,
+            newCompareAtPrice: updatedVariant?.compareAtPrice || update.compareAtPrice
+          });
         } catch (error) {
           results.push({
             productId: update.productId,
@@ -1323,7 +1460,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const { variantIds, stockQuantity, stockUpdateMethod } = requestData;
 
       console.log('📦 Inventory Update Request:', {
-        variantIds,
+        variantCount: variantIds?.length,
         stockQuantity,
         stockUpdateMethod
       });
@@ -1334,9 +1471,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       // Simplified to stock-only operations
       const quantity = parseInt(stockQuantity) || 0;
-      const results = [];
 
-      // Fetch location once instead of for each variant
+      // Fetch location once
       const locationsResponse = await admin.graphql(
         `#graphql
           query getLocations {
@@ -1359,182 +1495,252 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }, { status: 400 });
       }
 
-      for (const variantId of variantIds) {
-        try {
-          // First get the variant to get its inventory item
-          const getVariantResponse = await admin.graphql(
-            `#graphql
-              query getVariant($id: ID!) {
-                productVariant(id: $id) {
-                  id
-                  inventoryQuantity
-                  inventoryItem {
-                    id
-                  }
-                  product {
-                    id
-                    title
-                  }
-                }
-              }`,
-            {
-              variables: {
-                id: variantId,
-              },
-            }
-          );
-
-          const getVariantJson: any = await getVariantResponse.json();
-          
-          if (getVariantJson.errors) {
-            results.push({
-              variantId,
-              success: false,
-              error: `Failed to get variant: ${getVariantJson.errors[0]?.message || 'Unknown error'}`
-            });
-            continue;
-          }
-
-          const variant = getVariantJson.data?.productVariant;
-          if (!variant) {
-            results.push({
-              variantId,
-              success: false,
-              error: 'Variant not found'
-            });
-            continue;
-          }
-
-          // Calculate the delta based on update method
-          let delta = 0;
-          if (stockUpdateMethod === 'set') {
-            delta = quantity - variant.inventoryQuantity;
-          } else if (stockUpdateMethod === 'add') {
-            delta = quantity;
-          } else if (stockUpdateMethod === 'subtract') {
-            delta = -quantity;
-          }
-
-          console.log(`🔢 Delta calculation for ${variantId}:`, {
-            method: stockUpdateMethod,
-            currentQuantity: variant.inventoryQuantity,
-            inputQuantity: quantity,
-            calculatedDelta: delta
-          });
-
-          if (delta === 0) {
-            results.push({
-              variantId,
-              success: true,
-              message: 'No change needed'
-            });
-            continue;
-          }
-
-          // Check if inventory is tracked for this variant
-          if (!variant.inventoryItem?.tracked) {
-            results.push({
-              variantId,
-              success: false,
-              error: 'Inventory tracking is not enabled for this variant'
-            });
-            continue;
-          }
-
-          // Adjust inventory using the inventoryAdjustQuantities mutation
-          console.log(`🔧 Adjusting inventory for ${variantId}:`, {
-            delta,
-            inventoryItemId: variant.inventoryItem.id,
-            locationId,
-            currentQuantity: variant.inventoryQuantity
-          });
-          
-          const adjustResponse = await admin.graphql(
-            `#graphql
-              mutation InventoryAdjustQuantities($input: InventoryAdjustQuantitiesInput!) {
-                inventoryAdjustQuantities(input: $input) {
-                  inventoryAdjustmentGroup {
-                    createdAt
-                    reason
-                    changes {
-                      name
-                      delta
+      // Fetch ALL variant data in batches (Shopify allows up to 250 items per query)
+      const BATCH_SIZE = 100; // Reduced to avoid query complexity limits
+      const allVariantsData: any[] = [];
+      
+      for (let i = 0; i < variantIds.length; i += BATCH_SIZE) {
+        const batchIds = variantIds.slice(i, i + BATCH_SIZE);
+        
+        // Build query with multiple variant queries
+        const variantQueries = batchIds.map((id: string, index: number) => {
+          return `
+            variant${index}: productVariant(id: "${id}") {
+              id
+              inventoryQuantity
+              inventoryItem {
+                id
+                tracked
+                inventoryLevels(first: 10) {
+                  edges {
+                    node {
+                      id
+                      location {
+                        id
+                      }
                     }
                   }
-                  userErrors {
-                    field
-                    message
-                    code
-                  }
                 }
-              }`,
-            {
-              variables: {
-                input: {
-                  reason: "correction",
-                  name: "available",
-                  referenceDocumentUri: "gid://spector-app/BulkUpdate/" + Date.now(),
-                  changes: [{
-                    delta: delta,
-                    inventoryItemId: variant.inventoryItem.id,
-                    locationId: locationId
-                  }]
-                }
-              },
+              }
             }
-          );
+          `;
+        }).join('\n');
 
-          const adjustJson: any = await adjustResponse.json();
-          
-          console.log(`📦 Inventory adjust response for ${variantId}:`, JSON.stringify(adjustJson, null, 2));
-          
-          if (adjustJson.errors || adjustJson.data?.inventoryAdjustQuantities?.userErrors?.length > 0) {
-            const errorMessage = adjustJson.errors?.[0]?.message || 
-                               adjustJson.data?.inventoryAdjustQuantities?.userErrors?.[0]?.message || 
-                               'Unknown error';
-            console.error(`❌ Inventory adjust failed for ${variantId}:`, errorMessage);
-            results.push({
-              variantId,
-              success: false,
-              error: errorMessage
-            });
-          } else {
-            console.log(`✅ Inventory adjusted successfully for ${variantId}: ${variant.inventoryQuantity} + ${delta} = ${variant.inventoryQuantity + delta}`);
-            results.push({
-              variantId,
-              success: true,
-              oldQuantity: variant.inventoryQuantity,
-              newQuantity: variant.inventoryQuantity + delta,
-              delta: delta
-            });
+        const batchResponse = await admin.graphql(`#graphql
+          query getBatchVariants {
+            ${variantQueries}
           }
-          
-        } catch (error) {
-          results.push({
-            variantId,
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error'
+        `);
+
+        const batchJson: any = await batchResponse.json();
+        
+        if (batchJson.errors) {
+          console.error('Error fetching variants:', batchJson.errors);
+          continue;
+        }
+
+        // Extract variant data from response
+        Object.values(batchJson.data || {}).forEach((variant: any) => {
+          if (variant) {
+            allVariantsData.push(variant);
+          }
+        });
+      }
+
+      console.log(`📊 Fetched ${allVariantsData.length} variants in ${Math.ceil(variantIds.length / BATCH_SIZE)} batches`);
+
+      // First, activate inventory items at the location if needed
+      const itemsToActivate: string[] = [];
+      
+      for (const variant of allVariantsData) {
+        if (!variant.inventoryItem?.tracked) {
+          continue;
+        }
+
+        // Check if inventory item is stocked at this location
+        const hasInventoryAtLocation = variant.inventoryItem.inventoryLevels?.edges?.some(
+          (edge: any) => edge.node.location.id === locationId
+        );
+
+        if (!hasInventoryAtLocation) {
+          console.log(`📍 Need to activate inventory for ${variant.id} at location`);
+          itemsToActivate.push(variant.inventoryItem.id);
+        }
+      }
+
+      // Activate inventory items at location if needed
+      if (itemsToActivate.length > 0) {
+        console.log(`🔓 Activating ${itemsToActivate.length} inventory items at location...`);
+        
+        // Activate ALL items (Shopify requires one mutation per item)
+        for (const inventoryItemId of itemsToActivate) {
+          try {
+            const activateResponse = await admin.graphql(
+              `#graphql
+                mutation InventoryActivate($inventoryItemId: ID!, $locationId: ID!) {
+                  inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) {
+                    inventoryLevel {
+                      id
+                    }
+                    userErrors {
+                      field
+                      message
+                    }
+                  }
+                }`,
+              {
+                variables: {
+                  inventoryItemId: inventoryItemId,
+                  locationId: locationId
+                }
+              }
+            );
+
+            const activateJson: any = await activateResponse.json();
+            
+            if (activateJson.data?.inventoryActivate?.userErrors?.length > 0) {
+              console.warn(`⚠️ Failed to activate ${inventoryItemId}:`, activateJson.data.inventoryActivate.userErrors);
+            } else {
+              console.log(`✅ Activated ${inventoryItemId}`);
+            }
+          } catch (error) {
+            console.error(`❌ Error activating ${inventoryItemId}:`, error);
+          }
+        }
+        
+        console.log(`✅ Completed activation of ${itemsToActivate.length} inventory items`);
+      }
+
+      // Prepare changes for bulk update
+      const changes: any[] = [];
+      const variantMap = new Map();
+      const skippedVariants: any[] = [];
+
+      for (const variant of allVariantsData) {
+        // Skip if inventory tracking is not enabled
+        if (!variant.inventoryItem?.tracked) {
+          console.log(`⚠️ Skipping ${variant.id} - inventory not tracked`);
+          skippedVariants.push({
+            variantId: variant.id,
+            reason: 'Inventory tracking not enabled'
+          });
+          continue;
+        }
+
+        // Calculate the delta based on update method
+        let delta = 0;
+        if (stockUpdateMethod === 'set') {
+          delta = quantity - (variant.inventoryQuantity || 0);
+        } else if (stockUpdateMethod === 'add') {
+          delta = quantity;
+        } else if (stockUpdateMethod === 'subtract') {
+          delta = -quantity;
+        }
+
+        if (delta !== 0) {
+          changes.push({
+            delta: delta,
+            inventoryItemId: variant.inventoryItem.id,
+            locationId: locationId
+          });
+
+          variantMap.set(variant.id, {
+            oldQuantity: variant.inventoryQuantity || 0,
+            newQuantity: (variant.inventoryQuantity || 0) + delta,
+            delta: delta
           });
         }
       }
+
+      console.log(`🔧 Preparing to adjust ${changes.length} variants in a single mutation`);
+      if (skippedVariants.length > 0) {
+        console.log(`⚠️ Skipped ${skippedVariants.length} variants (inventory not tracked)`);
+      }
+
+      if (changes.length === 0) {
+        return json({
+          success: skippedVariants.length === 0, // Only success if nothing was skipped
+          results: [],
+          updatedVariants: [],
+          skippedVariants: skippedVariants,
+          successful: 0,
+          failed: 0,
+          skipped: skippedVariants.length,
+          message: skippedVariants.length > 0 
+            ? `All ${skippedVariants.length} variants were skipped (inventory tracking not enabled)` 
+            : 'No changes needed'
+        });
+      }
+
+      // Execute SINGLE bulk mutation with ALL changes
+      const adjustResponse = await admin.graphql(
+        `#graphql
+          mutation InventoryAdjustQuantities($input: InventoryAdjustQuantitiesInput!) {
+            inventoryAdjustQuantities(input: $input) {
+              inventoryAdjustmentGroup {
+                createdAt
+                reason
+                changes {
+                  name
+                  delta
+                }
+              }
+              userErrors {
+                field
+                message
+                code
+              }
+            }
+          }`,
+        {
+          variables: {
+            input: {
+              reason: "correction",
+              name: "available",
+              referenceDocumentUri: "gid://spector-app/BulkUpdate/" + Date.now(),
+              changes: changes
+            }
+          },
+        }
+      );
+
+      const adjustJson: any = await adjustResponse.json();
+      
+      if (adjustJson.errors || adjustJson.data?.inventoryAdjustQuantities?.userErrors?.length > 0) {
+        const errorMessage = adjustJson.errors?.[0]?.message || 
+                           adjustJson.data?.inventoryAdjustQuantities?.userErrors?.[0]?.message || 
+                           'Unknown error';
+        console.error(`❌ Bulk inventory adjust failed:`, errorMessage);
+        return json({ error: errorMessage }, { status: 500 });
+      }
+
+      console.log(`✅ Bulk inventory adjustment successful for ${changes.length} variants`);
+
+      // Prepare results
+      const results = Array.from(variantMap.entries()).map(([variantId, data]) => ({
+        variantId,
+        success: true,
+        oldQuantity: data.oldQuantity,
+        newQuantity: data.newQuantity,
+        delta: data.delta
+      }));
       
       // Prepare updated variants data for immediate UI update
-      const updatedVariants = results
-        .filter(r => r.success && r.newQuantity !== undefined)
-        .map(r => ({
-          id: r.variantId,
-          inventoryQuantity: r.newQuantity
-        }));
+      const updatedVariants = results.map(r => ({
+        id: r.variantId,
+        inventoryQuantity: r.newQuantity
+      }));
       
-      console.log('📤 API returning updatedVariants:', updatedVariants.length, 'items');
-      console.log('📋 Sample variant:', updatedVariants[0]);
+      console.log(`📤 API returning ${updatedVariants.length} updated variants`);
       
       return json({
         success: true,
         results,
         updatedVariants,
-        successful: results.filter(r => r.success).length,
-        failed: results.filter(r => !r.success).length
+        skippedVariants: skippedVariants,
+        successful: results.length,
+        failed: 0,
+        skipped: skippedVariants.length
       });
       
     } catch (error) {

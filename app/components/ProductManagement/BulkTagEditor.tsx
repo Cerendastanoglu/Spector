@@ -220,8 +220,8 @@ export function BulkTagEditor({
                     <Icon source={isExpanded ? ChevronUpIcon : ChevronDownIcon} tone="subdued" />
                   </div>
 
-                  {/* Expandable Tags */}
-                  {isExpanded && productTags.length > 0 && (
+                  {/* Expandable Tags - ALWAYS SHOW */}
+                  {isExpanded && (
                     <div style={{
                       padding: '8px',
                       borderTop: '1px solid #e5e7eb',
@@ -237,11 +237,17 @@ export function BulkTagEditor({
                         flexWrap: 'wrap',
                         gap: '4px'
                       }}>
-                        {productTags.map((tag) => (
-                          <Badge key={tag} tone="info" size="small">
-                            {tag}
-                          </Badge>
-                        ))}
+                        {productTags.length > 0 ? (
+                          productTags.map((tag) => (
+                            <Badge key={tag} tone="info" size="small">
+                              {tag}
+                            </Badge>
+                          ))
+                        ) : (
+                          <Text as="span" variant="bodyXs" tone="subdued">
+                            No tags
+                          </Text>
+                        )}
                       </div>
                     </div>
                   )}
