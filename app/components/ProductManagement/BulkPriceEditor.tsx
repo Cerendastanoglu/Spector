@@ -25,6 +25,7 @@ interface Product {
         compareAtPrice?: string;
         inventoryQuantity?: number;
         sku?: string;
+        barcode?: string;
         taxable?: boolean;
         inventoryItem?: {
           id: string;
