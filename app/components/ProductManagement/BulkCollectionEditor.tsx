@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
   BlockStack,
   Button,
@@ -71,37 +71,17 @@ export function BulkCollectionEditor({
   onClearAll,
 }: BulkCollectionEditorProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [showCurrentCollections, setShowCurrentCollections] = useState(false);
+  const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
 
-  // Aggregate existing collections from selected products
-  const currentCollectionsData = useMemo(() => {
-    const collectionMap = new Map<string, { title: string; count: number }>();
-    
-    selectedProducts.forEach(product => {
-      if (product.collections?.edges) {
-        product.collections.edges.forEach(edge => {
-          const existing = collectionMap.get(edge.node.id);
-          if (existing) {
-            existing.count += 1;
-          } else {
-            collectionMap.set(edge.node.id, {
-              title: edge.node.title,
-              count: 1
-            });
-          }
-        });
-      }
-    });
-
-    return Array.from(collectionMap.entries())
-      .map(([id, data]) => ({
-        id,
-        title: data.title,
-        count: data.count,
-        percentage: Math.round((data.count / selectedProducts.length) * 100)
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [selectedProducts]);
+  const toggleProductExpansion = (productId: string) => {
+    const newExpanded = new Set(expandedProducts);
+    if (newExpanded.has(productId)) {
+      newExpanded.delete(productId);
+    } else {
+      newExpanded.add(productId);
+    }
+    setExpandedProducts(newExpanded);
+  };
 
   // Filter collections based on search
   const filteredCollections = availableCollections.filter(collection =>
@@ -113,77 +93,6 @@ export function BulkCollectionEditor({
       <Text as="h3" variant="headingMd">
         Collection Management
       </Text>
-
-      {/* Current Collections Summary - Compact & Visual */}
-      {currentCollectionsData.length > 0 && (
-        <div style={{
-          padding: '8px 12px',
-          backgroundColor: '#ffffff',
-          borderRadius: '6px',
-          border: '1px solid #e5e7eb'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <button
-              onClick={() => setShowCurrentCollections(!showCurrentCollections)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '4px',
-                fontSize: '13px',
-                fontWeight: '500',
-                color: '#202223'
-              }}
-            >
-              <Icon source={showCurrentCollections ? ChevronUpIcon : ChevronDownIcon} tone="base" />
-              <span>Current Collections ({currentCollectionsData.length})</span>
-            </button>
-          </div>
-
-          <Collapsible
-            open={showCurrentCollections}
-            id="current-collections-collapsible"
-            transition={{ duration: '200ms', timingFunction: 'ease' }}
-          >
-            <div style={{ 
-              marginTop: '12px',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-              gap: '8px',
-              maxHeight: '160px',
-              overflowY: 'auto'
-            }}>
-              {currentCollectionsData.map(({ id, title, count, percentage }) => (
-                <div
-                  key={id}
-                  style={{
-                    padding: '8px 10px',
-                    backgroundColor: '#fff',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <Text as="span" variant="bodyXs" fontWeight="semibold" truncate>
-                      {title}
-                    </Text>
-                    <Badge tone="info" size="small">
-                      {`${percentage}%`}
-                    </Badge>
-                  </div>
-                  <Text as="p" variant="bodyXs" tone="subdued">
-                    {count} of {selectedProducts.length} products
-                  </Text>
-                </div>
-              ))}
-            </div>
-          </Collapsible>
-        </div>
-      )}
 
       {/* Collapsible Selected Products Section - Compact Design */}
       <div style={{
@@ -228,34 +137,43 @@ export function BulkCollectionEditor({
         >
           <div style={{ 
             marginTop: '8px', 
-            maxHeight: '200px', 
+            maxHeight: '300px', 
             overflowY: 'auto',
             scrollbarWidth: 'thin'
           }}>
             <BlockStack gap="100">
               {selectedProducts.map((product) => {
+                const isExpanded = expandedProducts.has(product.id);
                 const selectedVariantCount = product.variants.edges.filter(v =>
                   selectedVariants.includes(v.node.id)
                 ).length;
                 const totalVariants = product.variants.edges.length;
+                const productCollections = product.collections?.edges || [];
 
                 return (
                   <div
                     key={product.id}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '6px 8px',
                       backgroundColor: '#f9fafb',
                       borderRadius: '4px',
                       border: '1px solid #e5e7eb',
                     }}
                   >
+                    {/* Product Header */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '6px 8px',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => toggleProductExpansion(product.id)}
+                    >
                     <div style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '3px',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '4px',
                       overflow: 'hidden',
                       backgroundColor: '#f1f5f9',
                       border: '1px solid #d1d5db',
@@ -285,15 +203,50 @@ export function BulkCollectionEditor({
                       )}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <Text as="span" variant="bodyXs" fontWeight="medium" truncate>
-                        {product.title}
+                      <Text as="span" variant="bodyXs" fontWeight="medium">
+                        <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{product.title}</span>
                       </Text>
                       <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginTop: '2px' }}>
                         <Text as="span" variant="bodyXs" tone="subdued">
                           {selectedVariantCount}/{totalVariants} variants
                         </Text>
+                        {productCollections.length > 0 && (
+                          <>
+                            <Text as="span" variant="bodyXs" tone="subdued">•</Text>
+                            <Text as="span" variant="bodyXs" tone="subdued">
+                              {productCollections.length} {productCollections.length === 1 ? 'collection' : 'collections'}
+                            </Text>
+                          </>
+                        )}
                       </div>
                     </div>
+                    <Icon source={isExpanded ? ChevronUpIcon : ChevronDownIcon} tone="subdued" />
+                  </div>
+
+                  {isExpanded && productCollections.length > 0 && (
+                    <div style={{
+                      padding: '8px',
+                      borderTop: '1px solid #e5e7eb',
+                      backgroundColor: '#ffffff'
+                    }}>
+                      <div style={{ marginBottom: '6px' }}>
+                        <Text as="p" variant="bodyXs" tone="subdued" fontWeight="semibold">
+                          Current Collections:
+                        </Text>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '4px'
+                      }}>
+                        {productCollections.map((collection) => (
+                          <Badge key={collection.node.id} tone="info" size="small">
+                            {collection.node.title}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   </div>
                 );
               })}

@@ -25,8 +25,6 @@ import {
   EmptyState,
   Icon,
   Collapsible,
-  Toast,
-  Banner,
 } from '@shopify/polaris';
 // Import only the icons we actually use
 import { 
@@ -41,8 +39,6 @@ import {
   PlusIcon,
   MinusIcon,
   PackageIcon,
-  CalculatorIcon,
-  LocationIcon,
   HashtagIcon
 } from "@shopify/polaris-icons";
 
@@ -212,20 +208,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   // Inventory management state for current inventory display
   const [showCurrentInventory, setShowCurrentInventory] = useState(false);
   
-  // Variant Management State
-  const [variantOperation, setVariantOperation] = useState<'matrix' | 'template' | 'generator' | 'image-assign'>('matrix');
-  const [editingVariants, setEditingVariants] = useState<{[key: string]: any}>({}); // For matrix editing
-  const [variantTemplate, setVariantTemplate] = useState<{name: string, options: string[]}>({name: '', options: []});
-  const [option1Name, setOption1Name] = useState('');
-  const [option1Values, setOption1Values] = useState('');
-  const [option2Name, setOption2Name] = useState('');
-  const [option2Values, setOption2Values] = useState('');
-  const [option3Name, setOption3Name] = useState('');
-  const [option3Values, setOption3Values] = useState('');
-  
   // Description Management State  
-  const [descriptionOperation, setDescriptionOperation] = useState<'prefix' | 'suffix' | 'replace'>('prefix');
+  const [descriptionOperation, setDescriptionOperation] = useState<'prefix' | 'suffix' | 'replace' | 'set'>('prefix');
   const [descriptionValue, setDescriptionValue] = useState('');
+  const [descriptionReplaceFrom, setDescriptionReplaceFrom] = useState('');
+  const [descriptionReplaceTo, setDescriptionReplaceTo] = useState('');
   
   // Image Management State
   const [imageOperation, setImageOperation] = useState<'add' | 'remove' | 'replace'>('add');
@@ -273,20 +260,17 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   // Content operation state
   const [contentOperation, setContentOperation] = useState<'title' | 'description' | 'images'>('title');
   
-  const [costValue, setCostValue] = useState('');
-  const [weightValue, setWeightValue] = useState('');
-  const [originCountry, setOriginCountry] = useState('');
-  
   // Enhanced Inventory Management State
-  const [inventoryOperation, setInventoryOperation] = useState<'stock' | 'sku' | 'cost'>('stock');
   const [stockUpdateMethod, setStockUpdateMethod] = useState<'set' | 'add' | 'subtract'>('set');
   const [stockQuantity, setStockQuantity] = useState('');
-  const [skuUpdateMethod] = useState<'prefix' | 'suffix' | 'replace' | 'generate'>('prefix');
+  
+  // SKU & Metadata Management State
+  const [metadataOperation, setMetadataOperation] = useState<'sku' | 'cost' | 'weight'>('sku');
+  const [skuUpdateMethod, setSkuUpdateMethod] = useState<'set' | 'prefix' | 'suffix'>('set');
   const [skuValue, setSkuValue] = useState('');
-  const [skuFindText, setSkuFindText] = useState('');
-  const [skuReplaceText, setSkuReplaceText] = useState('');
-  const [skuPattern, setSkuPattern] = useState('');
-  const [trackInventory] = useState(true);
+  const [costValue, setCostValue] = useState('');
+  const [weightValue, setWeightValue] = useState('');
+  const [weightUnit, setWeightUnit] = useState<'GRAMS' | 'KILOGRAMS' | 'POUNDS' | 'OUNCES'>('POUNDS');
   
   // SEO & Metadata State
 
@@ -446,6 +430,36 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisible]);
+
+  // Process initial products to extract collections
+  useEffect(() => {
+    if (initialProducts && initialProducts.length > 0) {
+      const collectionsMap = new Map<string, {id: string, title: string}>();
+      
+      initialProducts.forEach((product: Product) => {
+        if (product.collections?.edges) {
+          product.collections.edges.forEach(edge => {
+            collectionsMap.set(edge.node.id, { id: edge.node.id, title: edge.node.title });
+          });
+        }
+      });
+      
+      const uniqueCollections = Array.from(collectionsMap.values()).sort((a, b) => a.title.localeCompare(b.title));
+      setCollections(uniqueCollections);
+      setAvailableCollections(uniqueCollections);
+    }
+  }, [initialProducts]);
+
+  // Auto-hide notifications after 2 seconds
+  useEffect(() => {
+    if (notification.show) {
+      const timer = setTimeout(() => {
+        setNotification({ show: false, message: '' });
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification.show]);
+
 
   const fetchAllProducts = async () => {
     // Prevent duplicate requests
@@ -1495,13 +1509,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       return;
     }
     
-    if (descriptionOperation === 'replace' && !titleReplaceFrom) {
+    if (descriptionOperation === 'replace' && !descriptionReplaceFrom) {
       setError("Please provide text to find in descriptions.");
       return;
     }
     
-    if ((descriptionOperation === 'prefix' || descriptionOperation === 'suffix') && !descriptionValue) {
-      setError(`Please provide ${descriptionOperation} text for descriptions.`);
+    if ((descriptionOperation === 'prefix' || descriptionOperation === 'suffix' || descriptionOperation === 'set') && !descriptionValue) {
+      setError(`Please provide ${descriptionOperation === 'set' ? 'description' : descriptionOperation} text.`);
       return;
     }
     
@@ -1521,8 +1535,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           productIds,
           descriptionOperation,
           descriptionValue: descriptionOperation !== 'replace' ? descriptionValue : undefined,
-          descriptionReplaceFrom: descriptionOperation === 'replace' ? titleReplaceFrom : undefined,
-          descriptionReplaceTo: descriptionOperation === 'replace' ? titleReplaceTo : undefined,
+          descriptionReplaceFrom: descriptionOperation === 'replace' ? descriptionReplaceFrom : undefined,
+          descriptionReplaceTo: descriptionOperation === 'replace' ? descriptionReplaceTo : undefined,
         }),
       });
 
@@ -1567,7 +1581,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       }
       
       let operationText = '';
-      if (descriptionOperation === 'prefix') {
+      if (descriptionOperation === 'set') {
+        operationText = `set descriptions for`;
+      } else if (descriptionOperation === 'prefix') {
         operationText = `added prefix to descriptions of`;
       } else if (descriptionOperation === 'suffix') {
         operationText = `added suffix to descriptions of`;
@@ -1735,161 +1751,112 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     setError("");
     
     try {
-      if (inventoryOperation === 'stock') {
-        const response = await fetch('/app/api/products', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'update-inventory',
-            variantIds: selectedVariants,
-            inventoryOperation,
-            stockQuantity,
-            stockUpdateMethod,
-          }),
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'update-inventory',
+          variantIds: selectedVariants,
+          stockQuantity,
+          stockUpdateMethod,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update inventory');
+      }
+
+      // Process results like other handlers
+      const successful: string[] = [];
+      const failed: string[] = [];
+      
+      if (result.results) {
+        result.results.forEach((resultItem: any) => {
+          if (resultItem.success) {
+            successful.push(resultItem.variantId);
+          } else {
+            failed.push(`${resultItem.variantId}: ${resultItem.error}`);
+          }
         });
+      }
 
-        const result = await response.json();
+      // Update local state immediately to reflect inventory changes
+      if (result.success && result.updatedVariants && result.updatedVariants.length > 0) {
+        logger.info(`🔄 Updating local state with ${result.updatedVariants.length} variant changes`);
         
-        if (!response.ok) {
-          throw new Error(result.error || 'Failed to update inventory');
-        }
-
-        // Process results like other handlers
-        const successful: string[] = [];
-        const failed: string[] = [];
-        
-        if (result.results) {
-          result.results.forEach((resultItem: any) => {
-            if (resultItem.success) {
-              successful.push(resultItem.variantId);
-            } else {
-              failed.push(`${resultItem.variantId}: ${resultItem.error}`);
-            }
-          });
-        }
-
-        // Update local state to reflect inventory changes
-        if (result.success && result.updatedVariants) {
-          setProducts(prevProducts => 
-            prevProducts.map(product => {
+        setProducts(prevProducts => {
+          const updatedProducts = prevProducts.map(product => {
+            let totalInventory = 0;
+            let hasChanges = false;
+            
+            const updatedVariants = product.variants.edges.map(edge => {
+              const variantUpdate = result.updatedVariants.find((v: any) => v.id === edge.node.id);
+              if (variantUpdate) {
+                hasChanges = true;
+                totalInventory += variantUpdate.inventoryQuantity;
+                return {
+                  ...edge,
+                  node: {
+                    ...edge.node,
+                    inventoryQuantity: variantUpdate.inventoryQuantity
+                  }
+                };
+              }
+              totalInventory += edge.node.inventoryQuantity || 0;
+              return edge;
+            });
+            
+            if (hasChanges) {
               return {
                 ...product,
+                totalInventory,
                 variants: {
                   ...product.variants,
-                  edges: product.variants.edges.map(edge => {
-                    const variantUpdate = result.updatedVariants.find((v: any) => v.id === edge.node.id);
-                    if (variantUpdate) {
-                      return {
-                        ...edge,
-                        node: {
-                          ...edge.node,
-                          inventoryQuantity: variantUpdate.inventoryQuantity
-                        }
-                      };
-                    }
-                    return edge;
-                  })
-                }
-              };
-            })
-          );
-        }
-        
-        const actionText = stockUpdateMethod === 'set' ? 'set stock to' : 
-                          stockUpdateMethod === 'add' ? 'added' : 'subtracted';
-        
-        if (successful.length > 0) {
-          logger.info(`✅ Successfully ${actionText} ${stockQuantity} for ${successful.length} variants!`);
-          setNotification({
-            show: true,
-            message: `✅ Successfully ${actionText} ${stockQuantity} for ${successful.length} variant${successful.length === 1 ? '' : 's'}!`,
-            error: false
-          });
-        }
-        
-        if (failed.length > 0) {
-          logger.info(`⚠️ ${successful.length} variants updated successfully. ${failed.length} failed.`);
-          logger.info("Failed operations:", failed);
-          setNotification({
-            show: true,
-            message: `⚠️ ${successful.length} updated, ${failed.length} failed. Check console for details.`,
-            error: true
-          });
-        }
-        
-        // Clear form only if completely successful
-        if (failed.length === 0) {
-          setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
-          setStockQuantity('');
-        }
-        
-      } else if (inventoryOperation === 'sku') {
-        // Update SKUs based on the selected method
-        setProducts(prevProducts => 
-          prevProducts.map(product => {
-            if (selectedProducts.includes(product.id)) {
-              return {
-                ...product,
-                variants: {
-                  ...product.variants,
-                  edges: product.variants.edges.map((edge, index) => {
-                    let newSku = edge.node.sku || '';
-                    
-                    if (skuUpdateMethod === 'prefix') {
-                      newSku = `${skuValue}${newSku}`;
-                    } else if (skuUpdateMethod === 'suffix') {
-                      newSku = `${newSku}${skuValue}`;
-                    } else if (skuUpdateMethod === 'replace') {
-                      newSku = newSku.replace(new RegExp(skuFindText, 'g'), skuReplaceText);
-                    } else if (skuUpdateMethod === 'generate') {
-                      newSku = skuPattern
-                        .replace('{id}', product.id)
-                        .replace('{variant}', (index + 1).toString());
-                    }
-                    
-                    return {
-                      ...edge,
-                      node: {
-                        ...edge.node,
-                        sku: newSku
-                      }
-                    };
-                  })
+                  edges: updatedVariants
                 }
               };
             }
+            
             return product;
-          })
-        );
-        
-        logger.info(`Successfully updated SKUs for ${selectedProducts.length} products using ${skuUpdateMethod} method!`);
-        
-      } else if (inventoryOperation === 'cost') {
-        // This would typically update cost, weight, origin country, and tracking settings
-        // For now, we'll just log the operation since these are meta fields
-        logger.info(`Successfully updated inventory metadata for ${selectedProducts.length} products!`);
-        logger.info({
-          cost: costValue,
-          weight: weightValue,
-          originCountry: originCountry,
-          trackingEnabled: trackInventory
+          });
+          
+          logger.info(`✅ State update complete`);
+          return updatedProducts;
+        });
+      } else {
+        logger.warn('⚠️ No updatedVariants in response or update failed');
+      }
+      
+      const actionText = stockUpdateMethod === 'set' ? 'set stock to' : 
+                        stockUpdateMethod === 'add' ? 'added' : 'subtracted';
+      
+      if (successful.length > 0) {
+        logger.info(`✅ Successfully ${actionText} ${stockQuantity} for ${successful.length} variants!`);
+        setNotification({
+          show: true,
+          message: `✅ Successfully ${actionText} ${stockQuantity} for ${successful.length} variant${successful.length === 1 ? '' : 's'}!`,
+          error: false
         });
       }
       
-      // Reset form fields but keep product selections
-      if (inventoryOperation === 'stock') {
+      if (failed.length > 0) {
+        logger.info(`⚠️ ${successful.length} variants updated successfully. ${failed.length} failed.`);
+        logger.info("Failed operations:", failed);
+        setNotification({
+          show: true,
+          message: `⚠️ ${successful.length} updated, ${failed.length} failed. Check console for details.`,
+          error: true
+        });
+      }
+      
+      // Clear form only if completely successful
+      if (failed.length === 0) {
+        setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
         setStockQuantity('');
-      } else if (inventoryOperation === 'sku') {
-        setSkuValue('');
-        setSkuFindText('');
-        setSkuReplaceText('');
-        setSkuPattern('');
-      } else if (inventoryOperation === 'cost') {
-        setCostValue('');
-        setWeightValue('');
-        setOriginCountry('');
       }
       
     } catch (error) {
@@ -2388,7 +2355,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                 { id: 2, label: 'Tags', icon: HashtagIcon },
                 { id: 3, label: 'Content', icon: EditIcon },
                 { id: 4, label: 'Inventory', icon: InventoryIcon },
-                { id: 5, label: 'Variants', icon: ProductIcon },
+                { id: 5, label: 'SKU & Metadata', icon: PackageIcon },
               ].map(({ id, label, icon }) => (
                 <Button
                   key={id}
@@ -2806,6 +2773,21 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                         variant="tertiary"
                         size="slim"
                         onClick={() => {
+                          const allVariants = filteredProducts.flatMap(p => 
+                            p.variants.edges.map(v => v.node.id)
+                          );
+                          setSelectedVariants(allVariants);
+                          const allProductIds = filteredProducts.map(p => p.id);
+                          setSelectedProducts(allProductIds);
+                        }}
+                        disabled={filteredProducts.length === 0}
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        variant="tertiary"
+                        size="slim"
+                        onClick={() => {
                           const activeProducts = filteredProducts.filter(p => p.status === 'ACTIVE');
                           const allVariants = activeProducts.flatMap(p => 
                             p.variants.edges.map(v => v.node.id)
@@ -2851,25 +2833,38 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                       </Button>
                     </InlineStack>
                     
-                    {/* Right side: Statistics */}
+                    {/* Right side: Product Status Statistics */}
                     <InlineStack gap="150" wrap>
                       <Text as="span" variant="bodySm" fontWeight="medium">{filteredProducts.length}</Text>
-                      <Text as="span" variant="bodySm" tone="subdued">Products Found</Text>
-                      <Text as="span" variant="bodySm" tone="subdued">•</Text>
-                      <Text as="span" variant="bodySm" fontWeight="medium">{selectedVariants.length}</Text>
-                      <Text as="span" variant="bodySm" tone="subdued">Variants Selected</Text>
-                      <Text as="span" variant="bodySm" tone="subdued">•</Text>
+                      <Text as="span" variant="bodySm" tone="subdued">Products Found:</Text>
                       <Text as="span" variant="bodySm" fontWeight="medium">
                         {filteredProducts.filter(p => p.status === 'ACTIVE').length}
                       </Text>
-                      <Text as="span" variant="bodySm" tone="subdued">Active</Text>
-                      <Text as="span" variant="bodySm" tone="subdued">•</Text>
+                      <Text as="span" variant="bodySm" tone="subdued">Active,</Text>
                       <Text as="span" variant="bodySm" fontWeight="medium">
                         {filteredProducts.filter(p => p.totalInventory === 0).length}
                       </Text>
                       <Text as="span" variant="bodySm" tone="subdued">Out of Stock</Text>
                     </InlineStack>
                   </InlineStack>
+                  
+                  {/* Selection Summary - Below filtering */}
+                  {(selectedProducts.length > 0 || selectedVariants.length > 0) && (
+                    <div style={{ 
+                      padding: '12px 16px', 
+                      backgroundColor: '#F0F9FF', 
+                      borderRadius: '8px',
+                      border: '1px solid #BFDBFE',
+                      marginTop: '12px'
+                    }}>
+                      <InlineStack gap="150" wrap>
+                        <Text as="span" variant="bodyMd" fontWeight="semibold">{selectedProducts.length}</Text>
+                        <Text as="span" variant="bodyMd" tone="subdued">Products &</Text>
+                        <Text as="span" variant="bodyMd" fontWeight="semibold">{selectedVariants.length}</Text>
+                        <Text as="span" variant="bodyMd" tone="subdued">Variants Selected</Text>
+                      </InlineStack>
+                    </div>
+                  )}
                 </div>
                     </BlockStack>
                   </div>
@@ -3422,10 +3417,17 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                           </Text>
                           <div style={{ 
                             display: 'grid', 
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', 
                             gap: '8px', 
                             marginTop: '8px' 
                           }}>
+                            <Button
+                              variant={descriptionOperation === 'set' ? 'primary' : 'secondary'}
+                              onClick={() => setDescriptionOperation('set')}
+                              size="large"
+                            >
+                              Set All
+                            </Button>
                             <Button
                               variant={descriptionOperation === 'prefix' ? 'primary' : 'secondary'}
                               onClick={() => setDescriptionOperation('prefix')}
@@ -3454,8 +3456,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                             <TextField
                               label="Find Text in Description"
-                              value={titleReplaceFrom}
-                              onChange={setTitleReplaceFrom}
+                              value={descriptionReplaceFrom}
+                              onChange={setDescriptionReplaceFrom}
                               placeholder="Text to find in descriptions"
                               autoComplete="off"
                               multiline={3}
@@ -3463,8 +3465,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                             />
                             <TextField
                               label="Replace With"
-                              value={titleReplaceTo}
-                              onChange={setTitleReplaceTo}
+                              value={descriptionReplaceTo}
+                              onChange={setDescriptionReplaceTo}
                               placeholder="Replacement text (leave empty to delete)"
                               autoComplete="off"
                               multiline={3}
@@ -3473,17 +3475,25 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                           </div>
                         ) : (
                           <TextField
-                            label={descriptionOperation === 'prefix' ? 'Prefix Text' : 'Suffix Text'}
+                            label={
+                              descriptionOperation === 'set' ? 'New Description (HTML supported)' :
+                              descriptionOperation === 'prefix' ? 'Prefix Text' : 'Suffix Text'
+                            }
                             value={descriptionValue}
                             onChange={setDescriptionValue}
                             placeholder={
+                              descriptionOperation === 'set' ? 'New description for all selected products' :
                               descriptionOperation === 'prefix' 
                                 ? 'Text to add at beginning of descriptions' 
                                 : 'Text to add at end of descriptions'
                             }
                             autoComplete="off"
                             multiline={4}
-                            helpText="This text will be added to all selected product descriptions"
+                            helpText={
+                              descriptionOperation === 'set' 
+                                ? 'This will replace all descriptions with this text'
+                                : 'This text will be added to all selected product descriptions'
+                            }
                           />
                         )}
 
@@ -3492,8 +3502,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                           onClick={handleBulkDescriptionUpdate}
                           disabled={
                             selectedProducts.length === 0 || 
-                            (descriptionOperation === 'replace' && !titleReplaceFrom) ||
-                            ((descriptionOperation === 'prefix' || descriptionOperation === 'suffix') && !descriptionValue)
+                            (descriptionOperation === 'replace' && !descriptionReplaceFrom) ||
+                            ((descriptionOperation === 'prefix' || descriptionOperation === 'suffix' || descriptionOperation === 'set') && !descriptionValue)
                           }
                           loading={isLoading}
                           size="large"
@@ -3848,7 +3858,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                                             // Calculate preview stock based on operation
                                             let previewStock = quantity;
                                             const stockQty = parseInt(stockQuantity) || 0;
-                                            if (inventoryOperation === 'stock' && stockQuantity) {
+                                            if (stockQuantity) {
                                               if (stockUpdateMethod === 'set') {
                                                 previewStock = stockQty;
                                               } else if (stockUpdateMethod === 'add') {
@@ -3857,7 +3867,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                                                 previewStock = Math.max(0, quantity - stockQty);
                                               }
                                             }
-                                            const showPreview = inventoryOperation === 'stock' && stockQuantity && previewStock !== quantity;
+                                            const showPreview = stockQuantity && previewStock !== quantity;
 
                                             return (
                                               <div
@@ -3935,632 +3945,254 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                       </div>
                     )}
 
-                    {/* Inventory Operation Buttons */}
+                    {/* Stock Management Interface - Direct, simplified */}
+                    <BlockStack gap="400">
+                      <div>
+                        <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
+                          Update Method
+                        </Text>
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', 
+                          gap: '8px', 
+                          marginTop: '8px' 
+                        }}>
+                          <Button
+                            variant={stockUpdateMethod === 'set' ? 'primary' : 'secondary'}
+                            onClick={() => setStockUpdateMethod('set')}
+                            size="large"
+                          >
+                            Set Exact Amount
+                          </Button>
+                          <Button
+                            variant={stockUpdateMethod === 'add' ? 'primary' : 'secondary'}
+                            onClick={() => setStockUpdateMethod('add')}
+                            size="large"
+                          >
+                            Add to Current
+                          </Button>
+                          <Button
+                            variant={stockUpdateMethod === 'subtract' ? 'primary' : 'secondary'}
+                            onClick={() => setStockUpdateMethod('subtract')}
+                            size="large"
+                          >
+                            Subtract from Current
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <TextField
+                          label="Quantity"
+                          type="number"
+                          value={stockQuantity}
+                          onChange={setStockQuantity}
+                          autoComplete="off"
+                          min="0"
+                        />
+                      </div>
+
+                      <Button
+                        variant="primary"
+                        onClick={handleBulkInventoryUpdate}
+                        loading={isLoading}
+                        disabled={!stockQuantity}
+                        size="large"
+                      >
+                        Update Inventory for {String(selectedVariants.length)} Variant{selectedVariants.length !== 1 ? 's' : ''}
+                      </Button>
+                    </BlockStack>
+                  </BlockStack>
+                  );
+                })()}
+
+                {/* SKU & Metadata Tab */}
+                {activeBulkTab === 5 && (
+                  <BlockStack gap="400">
+                    <div>
+                      <Text as="h3" variant="headingSm">SKU & Product Metadata</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Manage SKU, cost, and weight for {selectedVariants.length} selected variant{selectedVariants.length !== 1 ? 's' : ''}
+                      </Text>
+                    </div>
+
+                    {/* Operation Tabs */}
                     <div>
                       <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
-                        Inventory Operations
+                        Metadata Type
                       </Text>
                       <div style={{ 
                         display: 'grid', 
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
                         gap: '8px', 
                         marginTop: '8px' 
                       }}>
                         <Button
-                          variant={inventoryOperation === 'stock' ? 'primary' : 'secondary'}
-                          onClick={() => setInventoryOperation('stock')}
+                          variant={metadataOperation === 'sku' ? 'primary' : 'secondary'}
+                          onClick={() => setMetadataOperation('sku')}
                           size="large"
-                          icon={PackageIcon}
-                        >
-                          Stock Quantities
-                        </Button>
-                        <Button
-                          variant={inventoryOperation === 'sku' ? 'primary' : 'secondary'}
-                          onClick={() => setInventoryOperation('sku')}
-                          size="large"
-                          icon={CalculatorIcon}
                         >
                           SKU Management
                         </Button>
                         <Button
-                          variant={inventoryOperation === 'cost' ? 'primary' : 'secondary'}
-                          onClick={() => setInventoryOperation('cost')}
+                          variant={metadataOperation === 'cost' ? 'primary' : 'secondary'}
+                          onClick={() => setMetadataOperation('cost')}
                           size="large"
-                          icon={LocationIcon}
                         >
-                          Cost & Weight
+                          Cost/Price
+                        </Button>
+                        <Button
+                          variant={metadataOperation === 'weight' ? 'primary' : 'secondary'}
+                          onClick={() => setMetadataOperation('weight')}
+                          size="large"
+                        >
+                          Weight
                         </Button>
                       </div>
                     </div>
 
-                    {/* Stock Management Interface */}
-                    {inventoryOperation === 'stock' && (
+                    {/* SKU Management */}
+                    {metadataOperation === 'sku' && (
                       <BlockStack gap="400">
                         <div>
                           <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
-                            Update Method
+                            SKU Update Method
                           </Text>
                           <div style={{ 
                             display: 'grid', 
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', 
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
                             gap: '8px', 
                             marginTop: '8px' 
                           }}>
                             <Button
-                              variant={stockUpdateMethod === 'set' ? 'primary' : 'secondary'}
-                              onClick={() => setStockUpdateMethod('set')}
+                              variant={skuUpdateMethod === 'set' ? 'primary' : 'secondary'}
+                              onClick={() => setSkuUpdateMethod('set')}
                               size="large"
                             >
-                              Set Exact Amount
+                              Set SKU
                             </Button>
                             <Button
-                              variant={stockUpdateMethod === 'add' ? 'primary' : 'secondary'}
-                              onClick={() => setStockUpdateMethod('add')}
+                              variant={skuUpdateMethod === 'prefix' ? 'primary' : 'secondary'}
+                              onClick={() => setSkuUpdateMethod('prefix')}
                               size="large"
-                              icon={PlusIcon}
                             >
-                              Add to Current
+                              Add Prefix
                             </Button>
                             <Button
-                              variant={stockUpdateMethod === 'subtract' ? 'primary' : 'secondary'}
-                              onClick={() => setStockUpdateMethod('subtract')}
+                              variant={skuUpdateMethod === 'suffix' ? 'primary' : 'secondary'}
+                              onClick={() => setSkuUpdateMethod('suffix')}
                               size="large"
-                              icon={MinusIcon}
                             >
-                              Subtract from Current
+                              Add Suffix
                             </Button>
                           </div>
                         </div>
-                        
-                        <div style={{ maxWidth: '300px' }}>
+
+                        <TextField
+                          label={skuUpdateMethod === 'set' ? 'New SKU Value' : skuUpdateMethod === 'prefix' ? 'SKU Prefix' : 'SKU Suffix'}
+                          value={skuValue}
+                          onChange={setSkuValue}
+                          placeholder={
+                            skuUpdateMethod === 'set' ? 'e.g., PROD-001' : 
+                            skuUpdateMethod === 'prefix' ? 'e.g., NEW-' : 
+                            'e.g., -V2'
+                          }
+                          autoComplete="off"
+                          helpText={
+                            skuUpdateMethod === 'set' ? 'All selected variants will have this SKU' :
+                            skuUpdateMethod === 'prefix' ? 'This will be added before existing SKUs' :
+                            'This will be added after existing SKUs'
+                          }
+                        />
+
+                        <Button
+                          variant="primary"
+                          onClick={() => {
+                            // TODO: Implement SKU update
+                            setError('SKU update coming soon!');
+                          }}
+                          loading={isLoading}
+                          disabled={!skuValue}
+                          size="large"
+                        >
+                          Update SKU for {String(selectedVariants.length)} Variant{selectedVariants.length !== 1 ? 's' : ''}
+                        </Button>
+                      </BlockStack>
+                    )}
+
+                    {/* Cost Management */}
+                    {metadataOperation === 'cost' && (
+                      <BlockStack gap="400">
+                        <TextField
+                          label="Cost per Item"
+                          type="number"
+                          value={costValue}
+                          onChange={setCostValue}
+                          placeholder="0.00"
+                          autoComplete="off"
+                          prefix="$"
+                          helpText="Cost to produce or purchase this item"
+                          min="0"
+                        />
+
+                        <Button
+                          variant="primary"
+                          onClick={() => {
+                            // TODO: Implement cost update
+                            setError('Cost update coming soon!');
+                          }}
+                          loading={isLoading}
+                          disabled={!costValue}
+                          size="large"
+                        >
+                          Update Cost for {String(selectedVariants.length)} Variant{selectedVariants.length !== 1 ? 's' : ''}
+                        </Button>
+                      </BlockStack>
+                    )}
+
+                    {/* Weight Management */}
+                    {metadataOperation === 'weight' && (
+                      <BlockStack gap="400">
+                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
                           <TextField
-                            label="Quantity"
+                            label="Weight Value"
                             type="number"
-                            value={stockQuantity}
-                            onChange={setStockQuantity}
-                            placeholder="0"
+                            value={weightValue}
+                            onChange={setWeightValue}
+                            placeholder="0.0"
                             autoComplete="off"
-                            helpText={`${stockUpdateMethod === 'set' ? 'Set inventory to' : stockUpdateMethod === 'add' ? 'Add to current inventory:' : 'Subtract from current inventory:'} this amount`}
+                            helpText="Product weight for shipping"
+                            min="0"
+                          />
+                          <Select
+                            label="Unit"
+                            options={[
+                              { label: 'Pounds (lb)', value: 'POUNDS' },
+                              { label: 'Ounces (oz)', value: 'OUNCES' },
+                              { label: 'Kilograms (kg)', value: 'KILOGRAMS' },
+                              { label: 'Grams (g)', value: 'GRAMS' },
+                            ]}
+                            value={weightUnit}
+                            onChange={(value) => setWeightUnit(value as any)}
                           />
                         </div>
 
                         <Button
                           variant="primary"
-                          onClick={handleBulkInventoryUpdate}
-                          disabled={
-                            selectedVariants.length === 0 || 
-                            !stockQuantity || 
-                            stockQuantity === '0'
-                          }
+                          onClick={() => {
+                            // TODO: Implement weight update
+                            setError('Weight update coming soon!');
+                          }}
                           loading={isLoading}
+                          disabled={!weightValue}
                           size="large"
                         >
-{`Update ${selectedVariants.length} Variant${selectedVariants.length === 1 ? '' : 's'} Stock`}
+                          Update Weight for {String(selectedVariants.length)} Variant{selectedVariants.length !== 1 ? 's' : ''}
                         </Button>
                       </BlockStack>
                     )}
-
-                    {/* SKU Management Interface */}
-                    {inventoryOperation === 'sku' && (
-                      <div style={{
-                        padding: '24px',
-                        backgroundColor: '#f6f6f7',
-                        borderRadius: '8px',
-                        textAlign: 'center'
-                      }}>
-                        <Text as="h4" variant="headingMd">
-                          SKU Management
-                        </Text>
-                        <div style={{ marginTop: '8px' }}>
-                          <Text as="p" variant="bodyMd" tone="subdued">
-                            SKU bulk operations are coming soon! For now, manage SKUs individually in each product variant.
-                          </Text>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Cost & Weight Interface */}
-                    {inventoryOperation === 'cost' && (
-                      <div style={{
-                        padding: '24px',
-                        backgroundColor: '#f6f6f7',
-                        borderRadius: '8px',
-                        textAlign: 'center'
-                      }}>
-                        <Text as="h4" variant="headingMd">
-                          Cost & Weight Management
-                        </Text>
-                        <div style={{ marginTop: '8px' }}>
-                          <Text as="p" variant="bodyMd" tone="subdued">
-                            Bulk cost and weight updates coming soon! This will include shipping weight, cost per item, and origin country.
-                          </Text>
-                        </div>
-                      </div>
-                    )}
                   </BlockStack>
-                  );
-                })()}
-
-                {/* Variants Tab - REVOLUTIONARY */}
-                {activeBulkTab === 5 && (() => {
-                  const selectedProductObjects = filteredProducts.filter(p => selectedProducts.includes(p.id));
-                  const isSingleProduct = selectedProducts.length === 1;
-                  const selectedProduct = isSingleProduct ? selectedProductObjects[0] : null;
-                  
-                  return (
-                  <BlockStack gap="400">
-                    <Text as="h3" variant="headingSm">🚀 Advanced Variant Management</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Bulk create, edit, and manage variants like a spreadsheet. Select exactly 1 product to unlock these powerful features.
-                    </Text>
-
-                    {/* Multi-Product Warning */}
-                    {!isSingleProduct && (
-                      <Banner tone="warning">
-                        <Text as="p" fontWeight="semibold">Please select exactly 1 product</Text>
-                        <Text as="p" variant="bodySm">
-                          Advanced variant management works with a single product and its variants. You currently have {selectedProducts.length} products selected.
-                          This tool is designed for bulk operations within ONE product (e.g., creating all Size × Color combinations for a t-shirt).
-                        </Text>
-                      </Banner>
-                    )}
-
-                    {/* Single Product - Revolutionary Features */}
-                    {isSingleProduct && selectedProduct && (
-                      <>
-                        {/* Selected Product Header */}
-                        <div style={{
-                          padding: '12px',
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                          borderRadius: '8px',
-                          color: 'white'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{
-                              width: '56px',
-                              height: '56px',
-                              borderRadius: '8px',
-                              overflow: 'hidden',
-                              border: '2px solid rgba(255,255,255,0.3)',
-                              flexShrink: 0
-                            }}>
-                              {selectedProduct.featuredMedia?.preview?.image?.url ? (
-                                <img
-                                  src={selectedProduct.featuredMedia.preview.image.url}
-                                  alt={selectedProduct.title}
-                                  style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    objectFit: 'cover'
-                                  }}
-                                />
-                              ) : (
-                                <div style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  backgroundColor: 'rgba(255,255,255,0.2)'
-                                }}>
-                                  <Icon source={ProductIcon} tone="base" />
-                                </div>
-                              )}
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <Text as="p" variant="headingMd" fontWeight="bold">
-                                {selectedProduct.title}
-                              </Text>
-                              <Text as="p" variant="bodySm">
-                                {selectedProduct.variants.edges.length} variant{selectedProduct.variants.edges.length === 1 ? '' : 's'} • {selectedProduct.status}
-                              </Text>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Operation Tabs */}
-                        <div style={{ 
-                          display: 'grid', 
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
-                          gap: '8px'
-                        }}>
-                          {[
-                            { id: 'matrix', label: '📊 Bulk Editor', desc: 'Edit all variants' },
-                            { id: 'generator', label: '✨ Generator', desc: 'Create combinations' },
-                            { id: 'template', label: '📋 Templates', desc: 'Save & reuse' },
-                            { id: 'image-assign', label: '🖼️ Auto-Images', desc: 'Smart matching' },
-                          ].map(({ id, label, desc }) => (
-                            <div
-                              key={id}
-                              onClick={() => setVariantOperation(id as any)}
-                              style={{
-                                padding: '12px',
-                                backgroundColor: variantOperation === id ? '#f0f9ff' : '#ffffff',
-                                border: `2px solid ${variantOperation === id ? '#0284c7' : '#e5e7eb'}`,
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s ease',
-                                textAlign: 'center'
-                              }}
-                            >
-                              <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                {label}
-                              </Text>
-                              <Text as="p" variant="bodyXs" tone="subdued">
-                                {desc}
-                              </Text>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Matrix Editor - Spreadsheet-like bulk editing */}
-                        {variantOperation === 'matrix' && (
-                          <div style={{
-                            padding: '16px',
-                            backgroundColor: '#ffffff',
-                            borderRadius: '8px',
-                            border: '1px solid #e5e7eb'
-                          }}>
-                            <Text as="h4" variant="headingMd">Spreadsheet-Style Bulk Editor</Text>
-                            <Text as="p" variant="bodySm" tone="subdued" >
-                              Edit multiple variant properties at once. Changes apply in real-time.
-                            </Text>
-                            
-                            <div style={{ 
-                              marginTop: '16px',
-                              overflowX: 'auto',
-                              border: '1px solid #e5e7eb',
-                              borderRadius: '6px'
-                            }}>
-                              <table style={{
-                                width: '100%',
-                                borderCollapse: 'collapse',
-                                fontSize: '13px'
-                              }}>
-                                <thead>
-                                  <tr style={{ backgroundColor: '#f9fafb' }}>
-                                    <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: 600 }}>Variant</th>
-                                    <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: 600 }}>SKU</th>
-                                    <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: 600 }}>Price</th>
-                                    <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: 600 }}>Compare Price</th>
-                                    <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: 600 }}>Stock</th>
-                                    <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: 600 }}>Actions</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {selectedProduct.variants.edges.map((variant) => (
-                                    <tr key={variant.node.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                                      <td style={{ padding: '10px' }}>
-                                        <Text as="span" variant="bodyXs" fontWeight="medium">
-                                          {variant.node.title}
-                                        </Text>
-                                      </td>
-                                      <td style={{ padding: '10px' }}>
-                                        <input
-                                          type="text"
-                                          defaultValue={variant.node.sku || ''}
-                                          style={{
-                                            width: '100px',
-                                            padding: '4px 8px',
-                                            border: '1px solid #d1d5db',
-                                            borderRadius: '4px',
-                                            fontSize: '13px'
-                                          }}
-                                          onChange={(e) => {
-                                            setEditingVariants(prev => ({
-                                              ...prev,
-                                              [variant.node.id]: {
-                                                ...prev[variant.node.id],
-                                                sku: e.target.value
-                                              }
-                                            }));
-                                          }}
-                                        />
-                                      </td>
-                                      <td style={{ padding: '10px' }}>
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          defaultValue={variant.node.price}
-                                          style={{
-                                            width: '80px',
-                                            padding: '4px 8px',
-                                            border: '1px solid #d1d5db',
-                                            borderRadius: '4px',
-                                            fontSize: '13px'
-                                          }}
-                                          onChange={(e) => {
-                                            setEditingVariants(prev => ({
-                                              ...prev,
-                                              [variant.node.id]: {
-                                                ...prev[variant.node.id],
-                                                price: e.target.value
-                                              }
-                                            }));
-                                          }}
-                                        />
-                                      </td>
-                                      <td style={{ padding: '10px' }}>
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          defaultValue={variant.node.compareAtPrice || ''}
-                                          placeholder="—"
-                                          style={{
-                                            width: '80px',
-                                            padding: '4px 8px',
-                                            border: '1px solid #d1d5db',
-                                            borderRadius: '4px',
-                                            fontSize: '13px'
-                                          }}
-                                          onChange={(e) => {
-                                            setEditingVariants(prev => ({
-                                              ...prev,
-                                              [variant.node.id]: {
-                                                ...prev[variant.node.id],
-                                                compareAtPrice: e.target.value
-                                              }
-                                            }));
-                                          }}
-                                        />
-                                      </td>
-                                      <td style={{ padding: '10px' }}>
-                                        <input
-                                          type="number"
-                                          defaultValue={variant.node.inventoryQuantity || 0}
-                                          style={{
-                                            width: '70px',
-                                            padding: '4px 8px',
-                                            border: '1px solid #d1d5db',
-                                            borderRadius: '4px',
-                                            fontSize: '13px'
-                                          }}
-                                          onChange={(e) => {
-                                            setEditingVariants(prev => ({
-                                              ...prev,
-                                              [variant.node.id]: {
-                                                ...prev[variant.node.id],
-                                                inventory: e.target.value
-                                              }
-                                            }));
-                                          }}
-                                        />
-                                      </td>
-                                      <td style={{ padding: '10px' }}>
-                                        <Button size="slim" variant="plain" tone="critical">
-                                          Delete
-                                        </Button>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                            
-                            <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-                              <Button variant="primary" size="large">
-                                💾 Save All Changes
-                              </Button>
-                              <Button variant="secondary" size="large">
-                                ↻ Reset
-                              </Button>
-                              <Button variant="secondary" size="large">
-                                📤 Export CSV
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Variant Generator - Create all combinations */}
-                        {variantOperation === 'generator' && (
-                          <div style={{
-                            padding: '16px',
-                            backgroundColor: '#ffffff',
-                            borderRadius: '8px',
-                            border: '1px solid #e5e7eb'
-                          }}>
-                            <Text as="h4" variant="headingMd">✨ Variant Combination Generator</Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                              Create ALL possible combinations from your options (e.g., Size × Color = 12 variants)
-                            </Text>
-                            
-                            <BlockStack gap="400">
-                              <div>
-                                <Text as="p" variant="bodyMd" fontWeight="medium">Option 1 (Required)</Text>
-                                <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '8px', marginTop: '8px' }}>
-                                  <TextField
-                                    label=""
-                                    value={option1Name}
-                                    onChange={setOption1Name}
-                                    placeholder="e.g., Size"
-                                    autoComplete="off"
-                                  />
-                                  <TextField
-                                    label=""
-                                    value={option1Values}
-                                    onChange={setOption1Values}
-                                    placeholder="e.g., S, M, L, XL"
-                                    autoComplete="off"
-                                  />
-                                </div>
-                              </div>
-
-                              <div>
-                                <Text as="p" variant="bodyMd" fontWeight="medium">Option 2 (Optional)</Text>
-                                <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '8px', marginTop: '8px' }}>
-                                  <TextField
-                                    label=""
-                                    value={option2Name}
-                                    onChange={setOption2Name}
-                                    placeholder="e.g., Color"
-                                    autoComplete="off"
-                                  />
-                                  <TextField
-                                    label=""
-                                    value={option2Values}
-                                    onChange={setOption2Values}
-                                    placeholder="e.g., Black, White, Red"
-                                    autoComplete="off"
-                                  />
-                                </div>
-                              </div>
-
-                              <div>
-                                <Text as="p" variant="bodyMd" fontWeight="medium">Option 3 (Optional)</Text>
-                                <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '8px', marginTop: '8px' }}>
-                                  <TextField
-                                    label=""
-                                    value={option3Name}
-                                    onChange={setOption3Name}
-                                    placeholder="e.g., Material"
-                                    autoComplete="off"
-                                  />
-                                  <TextField
-                                    label=""
-                                    value={option3Values}
-                                    onChange={setOption3Values}
-                                    placeholder="e.g., Cotton, Polyester"
-                                    autoComplete="off"
-                                  />
-                                </div>
-                              </div>
-
-                              {option1Name && option1Values && (
-                                <div style={{
-                                  padding: '12px',
-                                  backgroundColor: '#f0fdf4',
-                                  borderRadius: '6px',
-                                  border: '1px solid #86efac'
-                                }}>
-                                  <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                    Preview: {(() => {
-                                      const o1 = option1Values.split(',').map(v => v.trim()).filter(Boolean).length;
-                                      const o2 = option2Values ? option2Values.split(',').map(v => v.trim()).filter(Boolean).length : 0;
-                                      const o3 = option3Values ? option3Values.split(',').map(v => v.trim()).filter(Boolean).length : 0;
-                                      const total = o1 * (o2 || 1) * (o3 || 1);
-                                      return `${total} variants will be created`;
-                                    })()}
-                                  </Text>
-                                  <Text as="p" variant="bodyXs" tone="subdued">
-                                    {option1Values.split(',').map(v => v.trim()).filter(Boolean).length} {option1Name || 'options'}
-                                    {option2Values && ` × ${option2Values.split(',').map(v => v.trim()).filter(Boolean).length} ${option2Name || 'options'}`}
-                                    {option3Values && ` × ${option3Values.split(',').map(v => v.trim()).filter(Boolean).length} ${option3Name || 'options'}`}
-                                  </Text>
-                                </div>
-                              )}
-
-                              <Button variant="primary" size="large" disabled={!option1Name || !option1Values}>
-                                🚀 Generate All Variants
-                              </Button>
-                            </BlockStack>
-                          </div>
-                        )}
-
-                        {/* Template System - Save & Reuse */}
-                        {variantOperation === 'template' && (
-                          <div style={{
-                            padding: '16px',
-                            backgroundColor: '#ffffff',
-                            borderRadius: '8px',
-                            border: '1px solid #e5e7eb'
-                          }}>
-                            <Text as="h4" variant="headingMd">📋 Variant Templates</Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                              Save variant structures as templates and apply them to other products instantly
-                            </Text>
-                            
-                            <BlockStack gap="400">
-                              <div>
-                                <Text as="p" variant="bodyMd" fontWeight="medium">Save Current Variant Structure</Text>
-                                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                                  <div style={{ flex: 1 }}>
-                                    <TextField
-                                      label=""
-                                      value={variantTemplate.name}
-                                      onChange={(value) => setVariantTemplate({ ...variantTemplate, name: value })}
-                                      placeholder="Template name (e.g., 'T-Shirt Sizes')"
-                                      autoComplete="off"
-                                    />
-                                  </div>
-                                  <Button variant="primary">💾 Save Template</Button>
-                                </div>
-                              </div>
-
-                              <div style={{
-                                padding: '12px',
-                                backgroundColor: '#f9fafb',
-                                borderRadius: '6px',
-                                border: '1px solid #e5e7eb'
-                              }}>
-                                <Text as="p" variant="bodyMd" fontWeight="semibold">
-                                  Common Templates
-                                </Text>
-                                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                  {[
-                                    { name: 'Apparel Sizes', desc: 'XS, S, M, L, XL, XXL' },
-                                    { name: 'Shoe Sizes US', desc: '6, 7, 8, 9, 10, 11, 12' },
-                                    { name: 'Basic Colors', desc: 'Black, White, Gray, Navy' },
-                                  ].map((template) => (
-                                    <div
-                                      key={template.name}
-                                      style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        padding: '8px',
-                                        backgroundColor: 'white',
-                                        borderRadius: '4px'
-                                      }}
-                                    >
-                                      <div>
-                                        <Text as="span" variant="bodyXs" fontWeight="semibold">{template.name}</Text>
-                                        <br />
-                                        <Text as="span" variant="bodyXs" tone="subdued">{template.desc}</Text>
-                                      </div>
-                                      <Button size="slim">Apply</Button>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </BlockStack>
-                          </div>
-                        )}
-
-                        {/* Auto Image Assignment */}
-                        {variantOperation === 'image-assign' && (
-                          <div style={{
-                            padding: '16px',
-                            backgroundColor: '#ffffff',
-                            borderRadius: '8px',
-                            border: '1px solid #e5e7eb'
-                          }}>
-                            <Text as="h4" variant="headingMd">🖼️ Smart Image Assignment</Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                              Automatically assign images to variants based on filename matching
-                            </Text>
-                            
-                            <div style={{ marginTop: '16px' }}>
-                              <Text as="p" variant="bodyMd">
-                                🎨 Feature Preview: Automatically match product images to variants by detecting color names, sizes, or patterns in filenames.
-                              </Text>
-                              <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#f0f9ff', borderRadius: '6px' }}>
-                                <Text as="p" variant="bodyXs">
-                                  <strong>Example:</strong> Image "tshirt-red.jpg" → Assigned to "Red" variant<br />
-                                  <strong>Example:</strong> Image "shoe-size-10.jpg" → Assigned to "Size 10" variant
-                                </Text>
-                              </div>
-                              <Button variant="primary" size="large" disabled>
-                                🚀 Coming Soon
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </BlockStack>
-                  );
-                })()}
-
+                )}
 
               </BlockStack>
             </Card>
@@ -4631,18 +4263,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
               ×
             </button>
           </div>
-          
-          {/* Polaris Toast as backup */}
-          <Toast
-            content={notification.message}
-            error={notification.error}
-            onDismiss={() => setNotification({ show: false, message: '' })}
-            duration={5000}
-            action={notification.actionLabel ? {
-              content: notification.actionLabel,
-              onAction: notification.onAction
-            } : undefined}
-          />
         </div>
       )}
 

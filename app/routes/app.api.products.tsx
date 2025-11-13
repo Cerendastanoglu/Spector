@@ -71,6 +71,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   id
                   title
                   handle
+                  description
                   status
                   totalInventory
                   tags
@@ -79,19 +80,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                       image {
                         url
                         altText
-                      }
-                    }
-                  }
-                  media(first: 10) {
-                    edges {
-                      node {
-                        ... on MediaImage {
-                          id
-                          image {
-                            url
-                            altText
-                          }
-                        }
                       }
                     }
                   }
@@ -129,7 +117,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           }`,
         {
           variables: {
-            first: 100,
+            first: 250,
           },
         }
       );
@@ -353,6 +341,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   id
                   title
                   handle
+                  description
                   status
                   totalInventory
                   tags
@@ -1231,7 +1220,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           // Calculate new description based on operation
           let newDescription = currentProduct.descriptionHtml || '';
           
-          if (descriptionOperation === 'prefix' || descriptionOperation === 'prepend') {
+          if (descriptionOperation === 'set') {
+            // Set/replace entire description
+            newDescription = descriptionValue || '';
+          } else if (descriptionOperation === 'prefix' || descriptionOperation === 'prepend') {
             // Add to beginning - handle empty descriptions
             newDescription = newDescription 
               ? `${descriptionValue}\n${newDescription}` 
@@ -1243,8 +1235,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               : descriptionValue;
           } else if (descriptionOperation === 'replace') {
             // Replace text - if no existing description, nothing to replace
-            if (newDescription) {
-              newDescription = newDescription.replace(new RegExp(descriptionReplaceFrom, 'g'), descriptionReplaceTo || '');
+            // Allow empty descriptionReplaceTo to delete the found text
+            if (newDescription && descriptionReplaceFrom) {
+              newDescription = newDescription.replace(
+                new RegExp(descriptionReplaceFrom, 'g'), 
+                descriptionReplaceTo !== undefined ? descriptionReplaceTo : ''
+              );
             }
           }
 
@@ -1324,22 +1320,44 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (actionType === "update-inventory") {
     try {
-      // Reuse already-parsed request data instead of reading body again
-      const body = request.headers.get("Content-Type")?.includes("application/json") 
-        ? requestData 
-        : await request.json();
-      const { variantIds, inventoryOperation, stockQuantity, stockUpdateMethod } = body;
+      const { variantIds, stockQuantity, stockUpdateMethod } = requestData;
+
+      console.log('📦 Inventory Update Request:', {
+        variantIds,
+        stockQuantity,
+        stockUpdateMethod
+      });
 
       if (!variantIds || !Array.isArray(variantIds)) {
         return json({ error: "Variant IDs are required" }, { status: 400 });
       }
 
-      if (inventoryOperation !== 'stock') {
-        return json({ error: "Only stock operations are currently supported" }, { status: 400 });
-      }
-
+      // Simplified to stock-only operations
       const quantity = parseInt(stockQuantity) || 0;
       const results = [];
+
+      // Fetch location once instead of for each variant
+      const locationsResponse = await admin.graphql(
+        `#graphql
+          query getLocations {
+            locations(first: 1) {
+              edges {
+                node {
+                  id
+                }
+              }
+            }
+          }`
+      );
+
+      const locationsJson: any = await locationsResponse.json();
+      const locationId = locationsJson.data?.locations?.edges?.[0]?.node?.id;
+
+      if (!locationId) {
+        return json({ 
+          error: 'No location found for this shop. Please set up a location in Shopify first.' 
+        }, { status: 400 });
+      }
 
       for (const variantId of variantIds) {
         try {
@@ -1397,6 +1415,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             delta = -quantity;
           }
 
+          console.log(`🔢 Delta calculation for ${variantId}:`, {
+            method: stockUpdateMethod,
+            currentQuantity: variant.inventoryQuantity,
+            inputQuantity: quantity,
+            calculatedDelta: delta
+          });
+
           if (delta === 0) {
             results.push({
               variantId,
@@ -1406,33 +1431,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             continue;
           }
 
-          // Get the first location (we'll use the first available location)
-          const locationsResponse = await admin.graphql(
-            `#graphql
-              query getLocations {
-                locations(first: 1) {
-                  edges {
-                    node {
-                      id
-                    }
-                  }
-                }
-              }`
-          );
-
-          const locationsJson: any = await locationsResponse.json();
-          const locationId = locationsJson.data?.locations?.edges?.[0]?.node?.id;
-
-          if (!locationId) {
+          // Check if inventory is tracked for this variant
+          if (!variant.inventoryItem?.tracked) {
             results.push({
               variantId,
               success: false,
-              error: 'No location found'
+              error: 'Inventory tracking is not enabled for this variant'
             });
             continue;
           }
 
           // Adjust inventory using the inventoryAdjustQuantities mutation
+          console.log(`🔧 Adjusting inventory for ${variantId}:`, {
+            delta,
+            inventoryItemId: variant.inventoryItem.id,
+            locationId,
+            currentQuantity: variant.inventoryQuantity
+          });
+          
           const adjustResponse = await admin.graphql(
             `#graphql
               mutation InventoryAdjustQuantities($input: InventoryAdjustQuantitiesInput!) {
@@ -1470,16 +1486,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
           const adjustJson: any = await adjustResponse.json();
           
+          console.log(`📦 Inventory adjust response for ${variantId}:`, JSON.stringify(adjustJson, null, 2));
+          
           if (adjustJson.errors || adjustJson.data?.inventoryAdjustQuantities?.userErrors?.length > 0) {
             const errorMessage = adjustJson.errors?.[0]?.message || 
                                adjustJson.data?.inventoryAdjustQuantities?.userErrors?.[0]?.message || 
                                'Unknown error';
+            console.error(`❌ Inventory adjust failed for ${variantId}:`, errorMessage);
             results.push({
               variantId,
               success: false,
               error: errorMessage
             });
           } else {
+            console.log(`✅ Inventory adjusted successfully for ${variantId}: ${variant.inventoryQuantity} + ${delta} = ${variant.inventoryQuantity + delta}`);
             results.push({
               variantId,
               success: true,
@@ -1498,9 +1518,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
       }
       
+      // Prepare updated variants data for immediate UI update
+      const updatedVariants = results
+        .filter(r => r.success && r.newQuantity !== undefined)
+        .map(r => ({
+          id: r.variantId,
+          inventoryQuantity: r.newQuantity
+        }));
+      
+      console.log('📤 API returning updatedVariants:', updatedVariants.length, 'items');
+      console.log('📋 Sample variant:', updatedVariants[0]);
+      
       return json({
         success: true,
         results,
+        updatedVariants,
         successful: results.filter(r => r.success).length,
         failed: results.filter(r => !r.success).length
       });

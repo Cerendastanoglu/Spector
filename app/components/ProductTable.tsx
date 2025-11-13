@@ -33,6 +33,7 @@ interface Product {
   id: string;
   title: string;
   handle: string;
+  description?: string;
   featuredMedia?: {
     preview?: {
       image?: {
@@ -472,13 +473,15 @@ export function ProductTable({
                     verticalAlign: 'middle' 
                   }}>
                     <InlineStack gap="100">
-                      <Button
-                        variant="plain"
-                        size="micro"
-                        icon={isExpanded ? ChevronUpIcon : ChevronDownIcon}
-                        onClick={() => onExpandProduct(product.id)}
-                        accessibilityLabel={`${isExpanded ? 'Hide' : 'Show'} details for ${product.title}`}
-                      />
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="plain"
+                          size="micro"
+                          icon={isExpanded ? ChevronUpIcon : ChevronDownIcon}
+                          onClick={() => onExpandProduct(product.id)}
+                          accessibilityLabel={`${isExpanded ? 'Hide' : 'Show'} details for ${product.title}`}
+                        />
+                      </div>
                       
                       <Button
                         variant="plain"
@@ -612,6 +615,36 @@ export function ProductTable({
                               </div>
                             </BlockStack>
                           </div>
+                        </div>
+                        
+                        {/* Description Section */}
+                        <div>
+                          <BlockStack gap="150">
+                            <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
+                              Description
+                            </Text>
+                            <div style={{
+                              padding: '8px',
+                              backgroundColor: '#ffffff',
+                              borderRadius: '6px',
+                              border: '1px solid #e5e7eb',
+                              maxHeight: '80px',
+                              overflowY: 'auto',
+                              minHeight: '28px',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}>
+                              {product.description ? (
+                                <Text as="p" variant="bodyXs" tone="base">
+                                  {product.description}
+                                </Text>
+                              ) : (
+                                <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
+                                  No description
+                                </Text>
+                              )}
+                            </div>
+                          </BlockStack>
                         </div>
                         
                         {/* Variants section */}
