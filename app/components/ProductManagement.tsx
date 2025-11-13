@@ -38,7 +38,6 @@ import {
   SearchIcon,
   PlusIcon,
   MinusIcon,
-  PackageIcon,
   HashtagIcon
 } from "@shopify/polaris-icons";
 
@@ -90,6 +89,7 @@ interface Product {
         price: string;
         compareAtPrice?: string;
         sku?: string;
+        barcode?: string;
         taxable?: boolean;
         inventoryItem?: {
           id: string;
@@ -216,6 +216,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   const [applyUnitPriceChanges, setApplyUnitPriceChanges] = useState(false);
   const [unitPriceValue, setUnitPriceValue] = useState('');
   
+  // Inventory bulk update state (for pricing tab)
+  const [applySkuChanges, setApplySkuChanges] = useState(false);
+  const [bulkSkuValue, setBulkSkuValue] = useState('');
+  const [applyBarcodeChanges, setApplyBarcodeChanges] = useState(false);
+  const [barcodeValue, setBarcodeValue] = useState('');
+  const [continueSellingWhenOutOfStock, setContinueSellingWhenOutOfStock] = useState(false);
+  
   // Collection Management State
   const [collectionOperation, setCollectionOperation] = useState<'add' | 'remove'>('add');
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
@@ -279,14 +286,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   // Enhanced Inventory Management State
   const [stockUpdateMethod, setStockUpdateMethod] = useState<'set' | 'add' | 'subtract'>('set');
   const [stockQuantity, setStockQuantity] = useState('');
-  
-  // SKU & Metadata Management State
-  const [metadataOperation, setMetadataOperation] = useState<'sku' | 'cost' | 'weight'>('sku');
-  const [skuUpdateMethod, setSkuUpdateMethod] = useState<'set' | 'prefix' | 'suffix'>('set');
-  const [skuValue, setSkuValue] = useState('');
-  const [costValue, setCostValue] = useState('');
-  const [weightValue, setWeightValue] = useState('');
-  const [weightUnit, setWeightUnit] = useState<'GRAMS' | 'KILOGRAMS' | 'POUNDS' | 'OUNCES'>('POUNDS');
   
   // SEO & Metadata State
 
@@ -2474,7 +2473,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                 { id: 2, label: 'Tags', icon: HashtagIcon },
                 { id: 3, label: 'Content', icon: EditIcon },
                 { id: 4, label: 'Inventory', icon: InventoryIcon },
-                { id: 5, label: 'SKU & Metadata', icon: PackageIcon },
               ].map(({ id, label, icon }) => (
                 <Button
                   key={id}
@@ -4125,6 +4123,67 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                         />
                       </div>
 
+                      {/* SKU and Barcode - Side by Side */}
+                      <InlineStack gap="400" blockAlign="start">
+                        <div style={{ flex: 1 }}>
+                          <BlockStack gap="200">
+                            <Checkbox
+                              label="Update SKU"
+                              checked={applySkuChanges}
+                              onChange={setApplySkuChanges}
+                            />
+
+                            {applySkuChanges && (
+                              <TextField
+                                label="SKU (Stock Keeping Unit)"
+                                type="text"
+                                value={bulkSkuValue}
+                                onChange={setBulkSkuValue}
+                                placeholder="SKU-123"
+                                autoComplete="off"
+                                helpText="Unique identifier for inventory tracking"
+                              />
+                            )}
+                          </BlockStack>
+                        </div>
+
+                        <div style={{ flex: 1 }}>
+                          <BlockStack gap="200">
+                            <Checkbox
+                              label="Update Barcode"
+                              checked={applyBarcodeChanges}
+                              onChange={setApplyBarcodeChanges}
+                            />
+
+                            {applyBarcodeChanges && (
+                              <TextField
+                                label="Barcode (ISBN, UPC, GTIN, etc.)"
+                                type="text"
+                                value={barcodeValue}
+                                onChange={setBarcodeValue}
+                                placeholder="1234567890123"
+                                autoComplete="off"
+                                helpText="Scannable barcode identifier"
+                              />
+                            )}
+                          </BlockStack>
+                        </div>
+                      </InlineStack>
+
+                      {/* Continue Selling When Out of Stock */}
+                      <InlineStack gap="300" blockAlign="center">
+                        <Text as="p" variant="bodyMd">
+                          Continue selling when out of stock
+                        </Text>
+                        <Button
+                          onClick={() => setContinueSellingWhenOutOfStock(!continueSellingWhenOutOfStock)}
+                          pressed={continueSellingWhenOutOfStock}
+                          size="slim"
+                        >
+                          {continueSellingWhenOutOfStock ? 'Yes' : 'No'}
+                        </Button>
+                      </InlineStack>
+
                       <Button
                         variant="primary"
                         onClick={handleBulkInventoryUpdate}
@@ -4139,194 +4198,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                   );
                 })()}
 
-                {/* SKU & Metadata Tab */}
-                {activeBulkTab === 5 && (
-                  <BlockStack gap="400">
-                    <div>
-                      <Text as="h3" variant="headingSm">SKU & Product Metadata</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Manage SKU, cost, and weight for {selectedVariants.length} selected variant{selectedVariants.length !== 1 ? 's' : ''}
-                      </Text>
-                    </div>
-
-                    {/* Operation Tabs */}
-                    <div>
-                      <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
-                        Metadata Type
-                      </Text>
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
-                        gap: '8px', 
-                        marginTop: '8px' 
-                      }}>
-                        <Button
-                          variant={metadataOperation === 'sku' ? 'primary' : 'secondary'}
-                          onClick={() => setMetadataOperation('sku')}
-                          size="large"
-                        >
-                          SKU Management
-                        </Button>
-                        <Button
-                          variant={metadataOperation === 'cost' ? 'primary' : 'secondary'}
-                          onClick={() => setMetadataOperation('cost')}
-                          size="large"
-                        >
-                          Cost/Price
-                        </Button>
-                        <Button
-                          variant={metadataOperation === 'weight' ? 'primary' : 'secondary'}
-                          onClick={() => setMetadataOperation('weight')}
-                          size="large"
-                        >
-                          Weight
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* SKU Management */}
-                    {metadataOperation === 'sku' && (
-                      <BlockStack gap="400">
-                        <div>
-                          <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
-                            SKU Update Method
-                          </Text>
-                          <div style={{ 
-                            display: 'grid', 
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
-                            gap: '8px', 
-                            marginTop: '8px' 
-                          }}>
-                            <Button
-                              variant={skuUpdateMethod === 'set' ? 'primary' : 'secondary'}
-                              onClick={() => setSkuUpdateMethod('set')}
-                              size="large"
-                            >
-                              Set SKU
-                            </Button>
-                            <Button
-                              variant={skuUpdateMethod === 'prefix' ? 'primary' : 'secondary'}
-                              onClick={() => setSkuUpdateMethod('prefix')}
-                              size="large"
-                            >
-                              Add Prefix
-                            </Button>
-                            <Button
-                              variant={skuUpdateMethod === 'suffix' ? 'primary' : 'secondary'}
-                              onClick={() => setSkuUpdateMethod('suffix')}
-                              size="large"
-                            >
-                              Add Suffix
-                            </Button>
-                          </div>
-                        </div>
-
-                        <TextField
-                          label={skuUpdateMethod === 'set' ? 'New SKU Value' : skuUpdateMethod === 'prefix' ? 'SKU Prefix' : 'SKU Suffix'}
-                          value={skuValue}
-                          onChange={setSkuValue}
-                          placeholder={
-                            skuUpdateMethod === 'set' ? 'e.g., PROD-001' : 
-                            skuUpdateMethod === 'prefix' ? 'e.g., NEW-' : 
-                            'e.g., -V2'
-                          }
-                          autoComplete="off"
-                          helpText={
-                            skuUpdateMethod === 'set' ? 'All selected variants will have this SKU' :
-                            skuUpdateMethod === 'prefix' ? 'This will be added before existing SKUs' :
-                            'This will be added after existing SKUs'
-                          }
-                        />
-
-                        <Button
-                          variant="primary"
-                          onClick={() => {
-                            // TODO: Implement SKU update
-                            setError('SKU update coming soon!');
-                          }}
-                          loading={isLoading}
-                          disabled={!skuValue}
-                          size="large"
-                        >
-                          Update SKU for {String(selectedVariants.length)} Variant{selectedVariants.length !== 1 ? 's' : ''}
-                        </Button>
-                      </BlockStack>
-                    )}
-
-                    {/* Cost Management */}
-                    {metadataOperation === 'cost' && (
-                      <BlockStack gap="400">
-                        <TextField
-                          label="Cost per Item"
-                          type="number"
-                          value={costValue}
-                          onChange={setCostValue}
-                          placeholder="0.00"
-                          autoComplete="off"
-                          prefix="$"
-                          helpText="Cost to produce or purchase this item"
-                          min="0"
-                        />
-
-                        <Button
-                          variant="primary"
-                          onClick={() => {
-                            // TODO: Implement cost update
-                            setError('Cost update coming soon!');
-                          }}
-                          loading={isLoading}
-                          disabled={!costValue}
-                          size="large"
-                        >
-                          Update Cost for {String(selectedVariants.length)} Variant{selectedVariants.length !== 1 ? 's' : ''}
-                        </Button>
-                      </BlockStack>
-                    )}
-
-                    {/* Weight Management */}
-                    {metadataOperation === 'weight' && (
-                      <BlockStack gap="400">
-                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
-                          <TextField
-                            label="Weight Value"
-                            type="number"
-                            value={weightValue}
-                            onChange={setWeightValue}
-                            placeholder="0.0"
-                            autoComplete="off"
-                            helpText="Product weight for shipping"
-                            min="0"
-                          />
-                          <Select
-                            label="Unit"
-                            options={[
-                              { label: 'Pounds (lb)', value: 'POUNDS' },
-                              { label: 'Ounces (oz)', value: 'OUNCES' },
-                              { label: 'Kilograms (kg)', value: 'KILOGRAMS' },
-                              { label: 'Grams (g)', value: 'GRAMS' },
-                            ]}
-                            value={weightUnit}
-                            onChange={(value) => setWeightUnit(value as any)}
-                          />
-                        </div>
-
-                        <Button
-                          variant="primary"
-                          onClick={() => {
-                            // TODO: Implement weight update
-                            setError('Weight update coming soon!');
-                          }}
-                          loading={isLoading}
-                          disabled={!weightValue}
-                          size="large"
-                        >
-                          Update Weight for {String(selectedVariants.length)} Variant{selectedVariants.length !== 1 ? 's' : ''}
-                        </Button>
-                      </BlockStack>
-                    )}
-                  </BlockStack>
-                )}
-
               </BlockStack>
             </Card>
           )}
@@ -4334,7 +4205,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       )}
 
       {notification.show && (
-        <div style={{ 
+        <div style={{
           position: 'fixed', 
           bottom: '24px', 
           right: '24px',
