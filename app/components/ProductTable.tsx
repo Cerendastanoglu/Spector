@@ -521,7 +521,7 @@ export function ProductTable({
                           gap: '24px',
                           padding: '8px 0'
                         }}>
-                          {/* Handle Section */}
+                          {/* Handle Section - ALWAYS SHOW */}
                           <div style={{ minWidth: '120px' }}>
                             <BlockStack gap="150">
                               <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
@@ -534,13 +534,13 @@ export function ProductTable({
                                 border: '1px solid #e5e7eb'
                               }}>
                                 <Text as="span" variant="bodyXs" fontWeight="medium" tone="base">
-                                  {product.handle}
+                                  {product.handle || 'No handle'}
                                 </Text>
                               </div>
                             </BlockStack>
                           </div>
                           
-                          {/* Tags Section */}
+                          {/* Tags Section - ALWAYS SHOW */}
                           <div style={{ minWidth: '120px' }}>
                             <BlockStack gap="150">
                               <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
@@ -579,7 +579,7 @@ export function ProductTable({
                             </BlockStack>
                           </div>
                           
-                          {/* Collections Section */}
+                          {/* Collections Section - ALWAYS SHOW */}
                           <div style={{ minWidth: '120px' }}>
                             <BlockStack gap="150">
                               <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
@@ -617,7 +617,7 @@ export function ProductTable({
                           </div>
                         </div>
                         
-                        {/* Description Section */}
+                        {/* Description Section - ALWAYS SHOW */}
                         <div>
                           <BlockStack gap="150">
                             <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">

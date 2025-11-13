@@ -90,9 +90,13 @@ interface Product {
         price: string;
         compareAtPrice?: string;
         sku?: string;
+        taxable?: boolean;
         inventoryItem?: {
           id: string;
           tracked: boolean;
+          unitCost?: {
+            amount: string;
+          };
         };
       };
     }>;
@@ -199,6 +203,18 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   // Pricing Category State  
   const [comparePercentage, setComparePercentage] = useState('0');
   const [applyCompareChanges, setApplyCompareChanges] = useState(false);
+  
+  // Cost per item state (for pricing tab)
+  const [applyCostChanges, setApplyCostChanges] = useState(false);
+  const [priceCostValue, setPriceCostValue] = useState('');
+  
+  // Charge tax state
+  const [applyTaxChanges, setApplyTaxChanges] = useState(false);
+  const [taxable, setTaxable] = useState(true);
+  
+  // Unit price state
+  const [applyUnitPriceChanges, setApplyUnitPriceChanges] = useState(false);
+  const [unitPriceValue, setUnitPriceValue] = useState('');
   
   // Collection Management State
   const [collectionOperation, setCollectionOperation] = useState<'add' | 'remove'>('add');
@@ -790,30 +806,55 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
 
   // Enhanced Pricing Operations with Advanced Error Handling
   const handleBulkPricing = async () => {
+    console.log('🎯 handleBulkPricing called!', {
+      selectedVariants: selectedVariants.length,
+      priceOperation,
+      applyCostChanges,
+      applyTaxChanges,
+      applyUnitPriceChanges
+    });
+    
     if (selectedVariants.length === 0) {
+      console.log('❌ No variants selected');
       setError("Please select at least one variant to update pricing.");
       return;
     }
     
-    // Validation based on operation type
-    if (priceOperation === 'set' && (!priceValue || parseFloat(priceValue) <= 0)) {
-      setError("Please enter a valid price greater than $0.");
-      return;
-    }
+    console.log('✅ Passed variant selection check');
     
-    if ((priceOperation === 'increase' || priceOperation === 'decrease') && (!pricePercentage || pricePercentage.trim() === '' || isNaN(parseFloat(pricePercentage)))) {
-      setError("Please enter a valid percentage.");
-      return;
-    }
+    // Check if user is updating ONLY cost/tax/unit price without price changes
+    const isOnlyUpdatingMetadata = !applyCompareChanges && 
+      (applyCostChanges || applyTaxChanges || applyUnitPriceChanges);
     
-    if ((priceOperation === 'increase' || priceOperation === 'decrease') && parseFloat(pricePercentage) < 0) {
-      setError("Percentage cannot be negative.");
-      return;
-    }
-    
-    if (priceOperation === 'decrease' && parseFloat(pricePercentage) >= 100) {
-      setError("Decrease percentage must be less than 100%.");
-      return;
+    // Validation based on operation type (skip if only updating metadata)
+    if (!isOnlyUpdatingMetadata) {
+      if (priceOperation === 'set' && (!priceValue || parseFloat(priceValue) <= 0)) {
+        console.log('❌ Invalid price value:', priceValue);
+        setError("Please enter a valid price greater than $0, or only update cost/tax/unit price.");
+        return;
+      }
+      
+      if ((priceOperation === 'increase' || priceOperation === 'decrease') && (!pricePercentage || pricePercentage.trim() === '' || isNaN(parseFloat(pricePercentage)))) {
+        console.log('❌ Invalid percentage:', pricePercentage);
+        setError("Please enter a valid percentage.");
+        return;
+      }
+      
+      if ((priceOperation === 'increase' || priceOperation === 'decrease') && parseFloat(pricePercentage) < 0) {
+        console.log('❌ Negative percentage:', pricePercentage);
+        setError("Percentage cannot be negative.");
+        return;
+      }
+      
+      if (priceOperation === 'decrease' && parseFloat(pricePercentage) >= 100) {
+        console.log('❌ Decrease percentage too high:', pricePercentage);
+        setError("Decrease percentage must be less than 100%.");
+        return;
+      }
+      
+      console.log('✅ Passed price validation checks');
+    } else {
+      console.log('✅ Skipping price validation (only updating metadata)');
     }
 
 
@@ -823,26 +864,34 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     
     // Validate compare price operations if enabled
     if (applyCompareChanges) {
+      console.log('🔍 Validating compare price changes...');
       if (compareOperation === 'set' && (!compareValue || parseFloat(compareValue) <= 0)) {
+        console.log('❌ Invalid compare price value:', compareValue);
         setError("Please enter a valid compare price greater than $0.");
         return;
       }
       
       if ((compareOperation === 'increase' || compareOperation === 'decrease') && (!comparePercentage || comparePercentage.trim() === '' || isNaN(parseFloat(comparePercentage)))) {
+        console.log('❌ Invalid compare percentage:', comparePercentage);
         setError("Please enter a valid compare price percentage.");
         return;
       }
       
       if ((compareOperation === 'increase' || compareOperation === 'decrease') && parseFloat(comparePercentage) < 0) {
+        console.log('❌ Negative compare percentage:', comparePercentage);
         setError("Compare price percentage cannot be negative.");
         return;
       }
       
       if (compareOperation === 'decrease' && parseFloat(comparePercentage) >= 100) {
+        console.log('❌ Compare decrease percentage too high:', comparePercentage);
         setError("Compare price decrease percentage must be less than 100%.");
         return;
       }
+      console.log('✅ Passed compare price validation');
     }
+    
+    console.log('🚀 Creating operation data and calling applyPriceChanges...');
     
     // Instead of applying changes right away, set up the pending operation and show the modal
     const operationData = {
@@ -853,6 +902,12 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       compareOperation,
       compareValue,
       comparePercentage,
+      applyCostChanges,
+      priceCostValue,
+      applyTaxChanges,
+      taxable,
+      applyUnitPriceChanges,
+      unitPriceValue,
       selectedVariants: [...selectedVariants]
     };
     
@@ -879,6 +934,12 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       compareOperation,
       compareValue,
       comparePercentage,
+      applyCostChanges,
+      priceCostValue,
+      applyTaxChanges,
+      taxable,
+      applyUnitPriceChanges,
+      unitPriceValue,
       selectedVariants 
     } = data;
     
@@ -926,36 +987,45 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           const currentPrice = parseFloat(targetVariant.price || '0');
           const currentComparePrice = targetVariant.compareAtPrice ? parseFloat(targetVariant.compareAtPrice) : null;
           
-          if (currentPrice === 0 && priceOperation !== 'set') {
+          // Check if we're updating price at all
+          const isOnlyUpdatingMetadata = !applyCompareChanges && 
+            (applyCostChanges || applyTaxChanges || applyUnitPriceChanges);
+          
+          // Only validate current price if we're actually changing the price
+          if (!isOnlyUpdatingMetadata && currentPrice === 0 && priceOperation !== 'set') {
             failed.push(`${targetProduct.title} (${targetVariant.title}): No current price found. Please set a fixed price first.`);
             continue;
           }
           
-          // Calculate new regular price
-          switch (priceOperation) {
-            case 'set':
-              newPrice = parseFloat(priceValue) || 0;
-              break;
-            case 'increase': {
-              const increasePercent = parseFloat(pricePercentage) || 0;
-              newPrice = currentPrice * (1 + increasePercent / 100);
-              logger.info(`Increase: ${currentPrice} * (1 + ${increasePercent}/100) = ${newPrice}`);
-              break;
+          // Calculate new regular price (or keep current if only updating metadata)
+          if (isOnlyUpdatingMetadata) {
+            newPrice = currentPrice; // Keep existing price
+          } else {
+            switch (priceOperation) {
+              case 'set':
+                newPrice = parseFloat(priceValue) || 0;
+                break;
+              case 'increase': {
+                const increasePercent = parseFloat(pricePercentage) || 0;
+                newPrice = currentPrice * (1 + increasePercent / 100);
+                logger.info(`Increase: ${currentPrice} * (1 + ${increasePercent}/100) = ${newPrice}`);
+                break;
+              }
+              case 'decrease': {
+                const decreasePercent = parseFloat(pricePercentage) || 0;
+                newPrice = currentPrice * (1 - decreasePercent / 100);
+                logger.info(`Decrease: ${currentPrice} * (1 - ${decreasePercent}/100) = ${newPrice}`);
+                break;
+              }
+              case 'round':
+                newPrice = currentPrice;
+                if (roundingRule === 'up') newPrice = Math.ceil(currentPrice);
+                else if (roundingRule === 'down') newPrice = Math.floor(currentPrice);
+                else newPrice = Math.round(currentPrice);
+                break;
+              default:
+                newPrice = currentPrice;
             }
-            case 'decrease': {
-              const decreasePercent = parseFloat(pricePercentage) || 0;
-              newPrice = currentPrice * (1 - decreasePercent / 100);
-              logger.info(`Decrease: ${currentPrice} * (1 - ${decreasePercent}/100) = ${newPrice}`);
-              break;
-            }
-            case 'round':
-              newPrice = currentPrice;
-              if (roundingRule === 'up') newPrice = Math.ceil(currentPrice);
-              else if (roundingRule === 'down') newPrice = Math.floor(currentPrice);
-              else newPrice = Math.round(currentPrice);
-              break;
-            default:
-              newPrice = currentPrice;
           }
 
           // Ensure minimum price
@@ -999,7 +1069,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
             variantId: targetVariant.id,
             productTitle: targetProduct.title,
             price: newPrice.toFixed(2),
-            compareAtPrice: newComparePrice
+            compareAtPrice: newComparePrice,
+            // New fields
+            cost: applyCostChanges ? (priceCostValue || null) : undefined,
+            taxable: applyTaxChanges ? taxable : undefined,
+            unitPrice: applyUnitPriceChanges ? (unitPriceValue || null) : undefined
           });
           
           successful.push(`${targetProduct.title} (${targetVariant.title})`);
@@ -1766,9 +1840,23 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
 
       const result = await response.json();
       
+      logger.info('📥 Raw response:', { 
+        ok: response.ok, 
+        status: response.status,
+        result: JSON.stringify(result).substring(0, 500)
+      });
+      
       if (!response.ok) {
         throw new Error(result.error || 'Failed to update inventory');
       }
+
+      // Debug logging
+      logger.info('📥 Inventory update response:', { 
+        success: result.success, 
+        updatedVariantsCount: result.updatedVariants?.length || 0,
+        resultsCount: result.results?.length || 0,
+        skippedCount: result.skipped || 0
+      });
 
       // Process results like other handlers
       const successful: string[] = [];
@@ -1834,6 +1922,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       const actionText = stockUpdateMethod === 'set' ? 'set stock to' : 
                         stockUpdateMethod === 'add' ? 'added' : 'subtracted';
       
+      const skippedCount = result.skipped || 0;
+      const skippedVariants = result.skippedVariants || [];
+      
+      // Show success notification if any succeeded
       if (successful.length > 0) {
         logger.info(`✅ Successfully ${actionText} ${stockQuantity} for ${successful.length} variants!`);
         setNotification({
@@ -1841,6 +1933,33 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           message: `✅ Successfully ${actionText} ${stockQuantity} for ${successful.length} variant${successful.length === 1 ? '' : 's'}!`,
           error: false
         });
+      }
+      
+      // Show warning/error notification for skipped variants
+      if (skippedCount > 0) {
+        const skippedMessage = skippedVariants.length > 0 && skippedVariants[0].reason
+          ? `⚠️ ${skippedCount} variant${skippedCount === 1 ? '' : 's'} skipped: ${skippedVariants[0].reason}`
+          : `⚠️ ${skippedCount} variant${skippedCount === 1 ? '' : 's'} skipped`;
+        
+        logger.warn(skippedMessage);
+        
+        // If ONLY skipped variants (none succeeded), show error
+        if (successful.length === 0) {
+          setNotification({
+            show: true,
+            message: `❌ ${skippedMessage}. No inventory was updated.`,
+            error: true
+          });
+        } else {
+          // If some succeeded and some skipped, show warning after success
+          setTimeout(() => {
+            setNotification({
+              show: true,
+              message: skippedMessage,
+              error: true
+            });
+          }, 2500); // Show after success notification
+        }
       }
       
       if (failed.length > 0) {
@@ -1853,8 +1972,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         });
       }
       
-      // Clear form only if completely successful
-      if (failed.length === 0) {
+      // Clear form only if completely successful (no failures or skips)
+      if (failed.length === 0 && skippedCount === 0) {
         setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
         setStockQuantity('');
       }
@@ -2833,38 +2952,40 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                       </Button>
                     </InlineStack>
                     
-                    {/* Right side: Product Status Statistics */}
-                    <InlineStack gap="150" wrap>
-                      <Text as="span" variant="bodySm" fontWeight="medium">{filteredProducts.length}</Text>
-                      <Text as="span" variant="bodySm" tone="subdued">Products Found:</Text>
-                      <Text as="span" variant="bodySm" fontWeight="medium">
-                        {filteredProducts.filter(p => p.status === 'ACTIVE').length}
-                      </Text>
-                      <Text as="span" variant="bodySm" tone="subdued">Active,</Text>
-                      <Text as="span" variant="bodySm" fontWeight="medium">
-                        {filteredProducts.filter(p => p.totalInventory === 0).length}
-                      </Text>
-                      <Text as="span" variant="bodySm" tone="subdued">Out of Stock</Text>
+                    {/* Right side: Product Status Statistics & Selection */}
+                    <InlineStack gap="300" wrap={false}>
+                      {/* Product Status */}
+                      <InlineStack gap="150" wrap={false}>
+                        <Text as="span" variant="bodySm" fontWeight="medium">{filteredProducts.length}</Text>
+                        <Text as="span" variant="bodySm" tone="subdued">Products Found:</Text>
+                        <Text as="span" variant="bodySm" fontWeight="medium">
+                          {filteredProducts.filter(p => p.status === 'ACTIVE').length}
+                        </Text>
+                        <Text as="span" variant="bodySm" tone="subdued">Active,</Text>
+                        <Text as="span" variant="bodySm" fontWeight="medium">
+                          {filteredProducts.filter(p => p.totalInventory === 0).length}
+                        </Text>
+                        <Text as="span" variant="bodySm" tone="subdued">Out of Stock</Text>
+                      </InlineStack>
+                      
+                      {/* Selection Summary */}
+                      {(selectedProducts.length > 0 || selectedVariants.length > 0) && (
+                        <div style={{ 
+                          padding: '6px 12px', 
+                          backgroundColor: '#F0F9FF', 
+                          borderRadius: '6px',
+                          border: '1px solid #BFDBFE'
+                        }}>
+                          <InlineStack gap="100" wrap={false}>
+                            <Text as="span" variant="bodySm" fontWeight="semibold">{selectedProducts.length}</Text>
+                            <Text as="span" variant="bodySm" tone="subdued">Products,</Text>
+                            <Text as="span" variant="bodySm" fontWeight="semibold">{selectedVariants.length}</Text>
+                            <Text as="span" variant="bodySm" tone="subdued">Variants</Text>
+                          </InlineStack>
+                        </div>
+                      )}
                     </InlineStack>
                   </InlineStack>
-                  
-                  {/* Selection Summary - Below filtering */}
-                  {(selectedProducts.length > 0 || selectedVariants.length > 0) && (
-                    <div style={{ 
-                      padding: '12px 16px', 
-                      backgroundColor: '#F0F9FF', 
-                      borderRadius: '8px',
-                      border: '1px solid #BFDBFE',
-                      marginTop: '12px'
-                    }}>
-                      <InlineStack gap="150" wrap>
-                        <Text as="span" variant="bodyMd" fontWeight="semibold">{selectedProducts.length}</Text>
-                        <Text as="span" variant="bodyMd" tone="subdued">Products &</Text>
-                        <Text as="span" variant="bodyMd" fontWeight="semibold">{selectedVariants.length}</Text>
-                        <Text as="span" variant="bodyMd" tone="subdued">Variants Selected</Text>
-                      </InlineStack>
-                    </div>
-                  )}
                 </div>
                     </BlockStack>
                   </div>
@@ -3001,6 +3122,18 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                       setCompareValue={setCompareValue}
                       comparePercentage={comparePercentage}
                       setComparePercentage={setComparePercentage}
+                      applyCostChanges={applyCostChanges}
+                      setApplyCostChanges={setApplyCostChanges}
+                      costValue={priceCostValue}
+                      setCostValue={setPriceCostValue}
+                      applyTaxChanges={applyTaxChanges}
+                      setApplyTaxChanges={setApplyTaxChanges}
+                      taxable={taxable}
+                      setTaxable={setTaxable}
+                      applyUnitPriceChanges={applyUnitPriceChanges}
+                      setApplyUnitPriceChanges={setApplyUnitPriceChanges}
+                      unitPriceValue={unitPriceValue}
+                      setUnitPriceValue={setUnitPriceValue}
                       currencySymbol={currencySymbol}
                       selectedCount={selectedVariants.length}
                       onApply={handleBulkPricing}

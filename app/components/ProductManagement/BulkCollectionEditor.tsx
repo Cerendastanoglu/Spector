@@ -223,7 +223,8 @@ export function BulkCollectionEditor({
                     <Icon source={isExpanded ? ChevronUpIcon : ChevronDownIcon} tone="subdued" />
                   </div>
 
-                  {isExpanded && productCollections.length > 0 && (
+                  {/* Expandable Collections - ALWAYS SHOW */}
+                  {isExpanded && (
                     <div style={{
                       padding: '8px',
                       borderTop: '1px solid #e5e7eb',
@@ -239,11 +240,17 @@ export function BulkCollectionEditor({
                         flexWrap: 'wrap',
                         gap: '4px'
                       }}>
-                        {productCollections.map((collection) => (
-                          <Badge key={collection.node.id} tone="info" size="small">
-                            {collection.node.title}
-                          </Badge>
-                        ))}
+                        {productCollections.length > 0 ? (
+                          productCollections.map((collection) => (
+                            <Badge key={collection.node.id} tone="info" size="small">
+                              {collection.node.title}
+                            </Badge>
+                          ))
+                        ) : (
+                          <Text as="span" variant="bodyXs" tone="subdued">
+                            No collections
+                          </Text>
+                        )}
                       </div>
                     </div>
                   )}

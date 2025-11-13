@@ -25,6 +25,13 @@ interface Product {
         compareAtPrice?: string;
         inventoryQuantity?: number;
         sku?: string;
+        taxable?: boolean;
+        inventoryItem?: {
+          id: string;
+          unitCost?: {
+            amount: string;
+          };
+        };
       };
     }>;
   };
@@ -56,6 +63,24 @@ interface BulkPriceEditorProps {
   comparePercentage: string;
   setComparePercentage: (value: string) => void;
   
+  // Cost per item state
+  applyCostChanges: boolean;
+  setApplyCostChanges: (value: boolean) => void;
+  costValue: string;
+  setCostValue: (value: string) => void;
+  
+  // Charge tax state
+  applyTaxChanges: boolean;
+  setApplyTaxChanges: (value: boolean) => void;
+  taxable: boolean;
+  setTaxable: (value: boolean) => void;
+  
+  // Unit price state (price per unit)
+  applyUnitPriceChanges: boolean;
+  setApplyUnitPriceChanges: (value: boolean) => void;
+  unitPriceValue: string;
+  setUnitPriceValue: (value: string) => void;
+  
   // Actions
   onApply: () => void;
   isLoading: boolean;
@@ -85,6 +110,18 @@ export function BulkPriceEditor({
   setCompareValue,
   comparePercentage,
   setComparePercentage,
+  applyCostChanges,
+  setApplyCostChanges,
+  costValue,
+  setCostValue,
+  applyTaxChanges,
+  setApplyTaxChanges,
+  taxable,
+  setTaxable,
+  applyUnitPriceChanges,
+  setApplyUnitPriceChanges,
+  unitPriceValue,
+  setUnitPriceValue,
   onApply,
   isLoading,
   selectedCount,
@@ -377,6 +414,81 @@ export function BulkPriceEditor({
                                       )}
                                     </div>
                                   )}
+                                  
+                                  {/* Cost per Item */}
+                                  <div>
+                                    <Text as="p" variant="bodyXs" tone="subdued">
+                                      Cost:
+                                    </Text>
+                                    {applyCostChanges && costValue ? (
+                                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                        {variant.node.inventoryItem?.unitCost?.amount && (
+                                          <Text as="span" variant="bodyXs" tone="subdued">
+                                            <span style={{ textDecoration: 'line-through' }}>{currencySymbol}{variant.node.inventoryItem.unitCost.amount}</span>
+                                          </Text>
+                                        )}
+                                        <Text as="span" variant="bodyXs" fontWeight="semibold" tone="success">
+                                          {currencySymbol}{costValue}
+                                        </Text>
+                                      </div>
+                                    ) : (
+                                      <Text as="span" variant="bodyXs" fontWeight="medium">
+                                        {variant.node.inventoryItem?.unitCost?.amount 
+                                          ? `${currencySymbol}${variant.node.inventoryItem.unitCost.amount}` 
+                                          : '—'}
+                                      </Text>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Tax Status */}
+                                  <div>
+                                    <Text as="p" variant="bodyXs" tone="subdued">
+                                      Taxable:
+                                    </Text>
+                                    {applyTaxChanges ? (
+                                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                        {variant.node.taxable !== undefined && variant.node.taxable !== taxable && (
+                                          <Text as="span" variant="bodyXs" tone="subdued">
+                                            <span style={{ textDecoration: 'line-through' }}>{variant.node.taxable ? 'Yes' : 'No'}</span>
+                                          </Text>
+                                        )}
+                                        <Text as="span" variant="bodyXs" fontWeight="semibold" tone="success">
+                                          {taxable ? 'Yes' : 'No'}
+                                        </Text>
+                                      </div>
+                                    ) : (
+                                      <Text as="span" variant="bodyXs" fontWeight="medium">
+                                        {variant.node.taxable !== undefined ? (variant.node.taxable ? 'Yes' : 'No') : '—'}
+                                      </Text>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Unit Price */}
+                                  {(variant.node.inventoryItem?.unitCost?.amount || applyUnitPriceChanges) && (
+                                    <div>
+                                      <Text as="p" variant="bodyXs" tone="subdued">
+                                        Unit price:
+                                      </Text>
+                                      {applyUnitPriceChanges && unitPriceValue ? (
+                                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                          {variant.node.inventoryItem?.unitCost?.amount && (
+                                            <Text as="span" variant="bodyXs" tone="subdued">
+                                              <span style={{ textDecoration: 'line-through' }}>{currencySymbol}{variant.node.inventoryItem.unitCost.amount}</span>
+                                            </Text>
+                                          )}
+                                          <Text as="span" variant="bodyXs" fontWeight="semibold" tone="success">
+                                            {currencySymbol}{unitPriceValue}
+                                          </Text>
+                                        </div>
+                                      ) : (
+                                        <Text as="span" variant="bodyXs" fontWeight="medium">
+                                          {variant.node.inventoryItem?.unitCost?.amount 
+                                            ? `${currencySymbol}${variant.node.inventoryItem.unitCost.amount}` 
+                                            : '—'}
+                                        </Text>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             );
@@ -392,61 +504,82 @@ export function BulkPriceEditor({
         </Collapsible>
       </div>
 
-        {/* Compact Price Operation Row */}
-        <InlineStack gap="300" blockAlign="start" wrap={false}>
-          <div style={{ flex: 1 }}>
-            <Select
-              label="Price operation"
-              options={priceOperationOptions}
-              value={priceOperation}
-              onChange={(value) => setPriceOperation(value as any)}
-            />
-          </div>
+      {/* Main Pricing Section */}
+      <div style={{
+        padding: '16px',
+        backgroundColor: '#f9fafb',
+        borderRadius: '8px',
+        border: '1px solid #e5e7eb'
+      }}>
+        <BlockStack gap="400">
+          <Text variant="headingSm" as="h4">Price Settings</Text>
           
-          {priceOperation === 'set' && (
+          <InlineStack gap="300" blockAlign="start" wrap={false}>
             <div style={{ flex: 1 }}>
-              <TextField
-                label="New price"
-                type="number"
-                value={priceValue}
-                onChange={setPriceValue}
-                prefix={currencySymbol}
-                placeholder="0.00"
-                autoComplete="off"
+              <Select
+                label="Price operation"
+                options={priceOperationOptions}
+                value={priceOperation}
+                onChange={(value) => setPriceOperation(value as any)}
               />
             </div>
-          )}
+            
+            {priceOperation === 'set' && (
+              <div style={{ flex: 1 }}>
+                <TextField
+                  label="New price"
+                  type="number"
+                  value={priceValue}
+                  onChange={setPriceValue}
+                  prefix={currencySymbol}
+                  placeholder="0.00"
+                  autoComplete="off"
+                />
+              </div>
+            )}
 
-          {(priceOperation === 'increase' || priceOperation === 'decrease') && (
-            <div style={{ flex: 1 }}>
-              <TextField
-                label={`${priceOperation === 'increase' ? 'Increase' : 'Decrease'} by`}
-                type="number"
-                value={pricePercentage}
-                onChange={setPricePercentage}
-                suffix="%"
-                placeholder="0"
-                autoComplete="off"
-              />
-            </div>
-          )}
+            {(priceOperation === 'increase' || priceOperation === 'decrease') && (
+              <div style={{ flex: 1 }}>
+                <TextField
+                  label={`${priceOperation === 'increase' ? 'Increase' : 'Decrease'} by`}
+                  type="number"
+                  value={pricePercentage}
+                  onChange={setPricePercentage}
+                  suffix="%"
+                  placeholder="0"
+                  autoComplete="off"
+                />
+              </div>
+            )}
 
-          {priceOperation === 'round' && (
-            <div style={{ flex: 1, paddingTop: '20px' }}>
-              <Text variant="bodyMd" as="p" tone="subdued">
-                Will round all prices to the nearest dollar
-              </Text>
-            </div>
-          )}
-        </InlineStack>
+            {priceOperation === 'round' && (
+              <div style={{ flex: 1, paddingTop: '20px' }}>
+                <Text variant="bodyMd" as="p" tone="subdued">
+                  Will round all prices to the nearest dollar
+                </Text>
+              </div>
+            )}
+          </InlineStack>
+        </BlockStack>
+      </div>
 
-        {/* Compare Price Section */}
-        <BlockStack gap="200">
-          <Checkbox
-            label="Also update compare at price (strikethrough price)"
-            checked={applyCompareChanges}
-            onChange={setApplyCompareChanges}
-          />
+      {/* Advanced Pricing Options */}
+      <div style={{
+        padding: '16px',
+        backgroundColor: '#ffffff',
+        borderRadius: '8px',
+        border: '1px solid #e5e7eb'
+      }}>
+        <BlockStack gap="400">
+          <Text variant="headingSm" as="h4">Advanced Options</Text>
+          
+          {/* Compare Price Section */}
+          <BlockStack gap="200">
+            <Checkbox
+              label="Update compare at price (strikethrough price)"
+              checked={applyCompareChanges}
+              onChange={setApplyCompareChanges}
+            />
 
           {applyCompareChanges && (
             <InlineStack gap="300" blockAlign="start">
@@ -498,14 +631,84 @@ export function BulkPriceEditor({
           )}
         </BlockStack>
 
-        <Button
-          variant="primary"
-          onClick={onApply}
-          loading={isLoading}
-          disabled={selectedCount === 0}
-        >
-          Apply Price Changes
-        </Button>
+        {/* Cost per Item and Unit Price Section - Side by Side */}
+        <InlineStack gap="400" blockAlign="start">
+          <div style={{ flex: 1 }}>
+            <BlockStack gap="200">
+              <Checkbox
+                label="Update cost per item"
+                checked={applyCostChanges}
+                onChange={setApplyCostChanges}
+              />
+
+              {applyCostChanges && (
+                <TextField
+                  label="Cost per item"
+                  type="number"
+                  value={costValue}
+                  onChange={setCostValue}
+                  prefix={currencySymbol}
+                  placeholder="0.00"
+                  autoComplete="off"
+                  helpText="The cost you pay to your supplier for this variant"
+                />
+              )}
+            </BlockStack>
+          </div>
+
+          <div style={{ flex: 1 }}>
+            <BlockStack gap="200">
+              <Checkbox
+                label="Update unit price (price per unit measurement)"
+                checked={applyUnitPriceChanges}
+                onChange={setApplyUnitPriceChanges}
+              />
+
+              {applyUnitPriceChanges && (
+                <TextField
+                  label="Unit price"
+                  type="number"
+                  value={unitPriceValue}
+                  onChange={setUnitPriceValue}
+                  prefix={currencySymbol}
+                  placeholder="0.00"
+                  autoComplete="off"
+                  helpText="Price per unit of measurement (e.g., per kg, per lb)"
+                />
+              )}
+            </BlockStack>
+          </div>
+        </InlineStack>
+
+        {/* Charge Tax Section */}
+        <InlineStack gap="300" blockAlign="center">
+          <Text as="p" variant="bodyMd">
+            Charge tax on this variant
+          </Text>
+          <Button
+            onClick={() => {
+              setApplyTaxChanges(true);
+              setTaxable(!taxable);
+            }}
+            pressed={taxable}
+            size="slim"
+          >
+            {taxable ? 'Yes' : 'No'}
+          </Button>
+        </InlineStack>
+        </BlockStack>
+      </div>
+
+      {/* Apply Button */}
+      <Button
+        variant="primary"
+        onClick={onApply}
+        loading={isLoading}
+        disabled={selectedCount === 0}
+        size="large"
+      >
+        Apply All Price Changes
+      </Button>
     </BlockStack>
   );
 }
