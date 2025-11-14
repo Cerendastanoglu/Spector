@@ -73,8 +73,8 @@ interface BulkPriceEditorProps {
   // Charge tax state
   applyTaxChanges: boolean;
   setApplyTaxChanges: (value: boolean) => void;
-  taxable: boolean;
-  setTaxable: (value: boolean) => void;
+  taxable: boolean | null;
+  setTaxable: (value: boolean | null) => void;
   
   // Unit price state (price per unit)
   applyUnitPriceChanges: boolean;
@@ -446,11 +446,13 @@ export function BulkPriceEditor({
                                     <Text as="p" variant="bodyXs" tone="subdued">
                                       Taxable:
                                     </Text>
-                                    {applyTaxChanges ? (
+                                    {applyTaxChanges && taxable !== null ? (
                                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                         {variant.node.taxable !== undefined && variant.node.taxable !== taxable && (
                                           <Text as="span" variant="bodyXs" tone="subdued">
-                                            <span style={{ textDecoration: 'line-through' }}>{variant.node.taxable ? 'Yes' : 'No'}</span>
+                                            <span style={{ textDecoration: 'line-through' }}>
+                                              {variant.node.taxable ? 'Yes' : 'No'}
+                                            </span>
                                           </Text>
                                         )}
                                         <Text as="span" variant="bodyXs" fontWeight="semibold" tone="success">
@@ -682,21 +684,48 @@ export function BulkPriceEditor({
         </InlineStack>
 
         {/* Charge Tax Section */}
-        <InlineStack gap="300" blockAlign="center">
-          <Text as="p" variant="bodyMd">
+        <div>
+          <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
             Charge tax on this variant
           </Text>
-          <Button
-            onClick={() => {
-              setApplyTaxChanges(true);
-              setTaxable(!taxable);
-            }}
-            pressed={taxable}
-            size="slim"
-          >
-            {taxable ? 'Yes' : 'No'}
-          </Button>
-        </InlineStack>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(3, 1fr)', 
+            gap: '8px', 
+            marginTop: '8px' 
+          }}>
+            <Button
+              variant={taxable === true ? 'primary' : 'secondary'}
+              onClick={() => {
+                setApplyTaxChanges(true);
+                setTaxable(true);
+              }}
+              size="large"
+            >
+              Yes
+            </Button>
+            <Button
+              variant={taxable === false ? 'primary' : 'secondary'}
+              onClick={() => {
+                setApplyTaxChanges(true);
+                setTaxable(false);
+              }}
+              size="large"
+            >
+              No
+            </Button>
+            <Button
+              variant={taxable === null ? 'primary' : 'secondary'}
+              onClick={() => {
+                setApplyTaxChanges(false);
+                setTaxable(null);
+              }}
+              size="large"
+            >
+              Leave Empty
+            </Button>
+          </div>
+        </div>
         </BlockStack>
       </div>
 
