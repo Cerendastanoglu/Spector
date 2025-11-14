@@ -1,46 +1,584 @@
-/* Professional Welcome Modal Styles */
+/* Glassy Welcome Modal with Smooth Animations */
 
-.iconWrapper {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
+/* Logo Wrapper - Transparent with Glow */
+.logoWrapper {
+  width: 100px;
+  height: 100px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f7f7f8;
-  border: 2px solid #e3e3e5;
   margin: 0 auto;
+  padding: 0;
+  animation: float 3s ease-in-out infinite;
+  position: relative;
+  filter: drop-shadow(0 8px 24px rgba(48, 48, 48, 0.15)) drop-shadow(0 0 40px rgba(48, 48, 48, 0.08));
 }
 
-.iconWrapperSlide2 {
-  background: #f7f7f8;
-  border-color: #e3e3e5;
+.logoWrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
+/* Icon Wrapper - Static for Slides 2 & 3 */
+.iconWrapperStatic {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  margin: 0 auto;
+  position: relative;
+  transition: transform 0.3s ease;
+}
+
+.iconWrapperStatic:hover {
+  transform: scale(1.05);
+}
+
+/* Keep original iconWrapper for backward compatibility */
+.iconWrapper {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  margin: 0 auto;
+  animation: float 3s ease-in-out infinite;
+  position: relative;
+}
+
+.iconWrapper::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.iconWrapper:hover::before {
+  opacity: 1;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Slide-specific icon styles - static, no animations */
+.iconWrapperSlide2,
 .iconWrapperSlide3 {
-  background: #f7f7f8;
-  border-color: #e3e3e5;
+  opacity: 1; /* Just to have a valid rule */
 }
 
-.icon {
-  width: 28px;
-  height: 28px;
-  color: #202223;
+/* Glassy Banner */
+.glassyBanner {
+  position: relative;
+  background: rgba(247, 247, 248, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(227, 227, 229, 0.5);
+  border-radius: 12px;
+  padding: 16px 20px;
+  overflow: hidden;
+  animation: slideInDown 0.5s ease-out;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bannerGlow {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(48, 48, 48, 0.03) 0%, transparent 70%);
+  animation: rotate 10s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.bannerContent {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 1;
+}
+
+.bannerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.bannerIcon svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Intro Text */
+.introText {
+  text-align: center;
+  padding: 8px 16px;
+  animation: fadeIn 0.6s ease-out 0.2s backwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Feature Grid */
+.featureGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .featureCard {
-  background: #fafbfb;
-  border-radius: 8px;
-  padding: 14px 16px;
-  border: 1px solid #e3e3e5;
-  transition: all 0.2s ease;
+  background: rgba(250, 251, 251, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(227, 227, 229, 0.6);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  text-align: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
 }
 
 .featureCard:hover {
-  background: #f7f7f8;
-  border-color: #c9cccf;
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(48, 48, 48, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
 }
 
+.animateIn1 {
+  animation: slideInUp 0.5s ease-out 0.1s backwards;
+}
+
+.animateIn2 {
+  animation: slideInUp 0.5s ease-out 0.2s backwards;
+}
+
+.animateIn3 {
+  animation: slideInUp 0.5s ease-out 0.3s backwards;
+}
+
+.animateIn4 {
+  animation: slideInUp 0.5s ease-out 0.4s backwards;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.featureIconGlass {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 10px;
+  border: 1px solid rgba(227, 227, 229, 0.8);
+  transition: all 0.3s ease;
+}
+
+.featureIconGlass svg {
+  width: 20px;
+  height: 20px;
+}
+
+.featureCard:hover .featureIconGlass {
+  transform: scale(1.1);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+/* Glassy Stats Card (Slide 2) */
+.glassyCard {
+  position: relative;
+  background: rgba(247, 247, 248, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(227, 227, 229, 0.5);
+  border-radius: 12px;
+  padding: 20px;
+  overflow: hidden;
+  animation: scaleIn 0.5s ease-out;
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.cardGlow {
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(48, 48, 48, 0.02) 0%, transparent 70%);
+  animation: rotate 15s linear infinite;
+  pointer-events: none;
+}
+
+.cardContent {
+  position: relative;
+  z-index: 1;
+}
+
+.statsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 16px;
+}
+
+.statItem {
+  flex: 1;
+  text-align: center;
+}
+
+.statNumber {
+  font-size: 28px;
+  font-weight: 700;
+  color: #303030;
+  margin-bottom: 4px;
+  animation: countUp 0.8s ease-out;
+}
+
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.statDivider {
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(to bottom, transparent, rgba(227, 227, 229, 0.6), transparent);
+}
+
+/* Capability Items (Slide 2) */
+.capabilityItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  background: rgba(250, 251, 251, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(227, 227, 229, 0.5);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.capabilityItem:hover {
+  transform: translateX(4px);
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(48, 48, 48, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.slideIn1 {
+  animation: slideInRight 0.5s ease-out 0.1s backwards;
+}
+
+.slideIn2 {
+  animation: slideInRight 0.5s ease-out 0.2s backwards;
+}
+
+.slideIn3 {
+  animation: slideInRight 0.5s ease-out 0.3s backwards;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.capabilityIcon {
+  font-size: 24px;
+  flex-shrink: 0;
+  animation: bounce 2s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* Insight Card (Slide 3) */
+.insightCard {
+  position: relative;
+  background: rgba(247, 247, 248, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(227, 227, 229, 0.5);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  overflow: hidden;
+  animation: fadeIn 0.6s ease-out;
+}
+
+.insightGlow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 150%;
+  height: 150%;
+  background: radial-gradient(circle, rgba(48, 48, 48, 0.03) 0%, transparent 70%);
+  animation: pulse 3s ease-in-out infinite;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.insightContent {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.insightIcon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: float 3s ease-in-out infinite;
+}
+
+.insightIcon svg {
+  width: 32px;
+  height: 32px;
+}
+
+/* Benefit Cards (Slide 3) */
+.benefitCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(250, 251, 251, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(227, 227, 229, 0.5);
+  border-radius: 10px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.benefitCard:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.float1 {
+  animation: fadeInFloat 0.6s ease-out 0.1s backwards;
+}
+
+.float2 {
+  animation: fadeInFloat 0.6s ease-out 0.2s backwards;
+}
+
+.float3 {
+  animation: fadeInFloat 0.6s ease-out 0.3s backwards;
+}
+
+@keyframes fadeInFloat {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.benefitBadge {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 8px;
+  border: 1px solid rgba(227, 227, 229, 0.8);
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.benefitBadge svg {
+  width: 18px;
+  height: 18px;
+}
+
+.benefitCard:hover .benefitBadge {
+  transform: rotate(10deg) scale(1.1);
+}
+
+.benefitText {
+  flex: 1;
+}
+
+/* CTA Card (Slide 3) */
+.ctaCard {
+  margin-top: 8px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(247, 247, 248, 0.6), rgba(250, 251, 251, 0.4));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(227, 227, 229, 0.6);
+  border-radius: 12px;
+  text-align: center;
+  animation: slideInUp 0.6s ease-out 0.4s backwards;
+}
+
+.ctaIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.ctaIcon svg {
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+}
+
+/* Legacy support */
+.ctaEmoji {
+  font-size: 20px;
+  display: inline-block;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Slide Indicators */
+.slideIndicator {
+  width: 32px;
+  height: 4px;
+  border-radius: 2px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  background: rgba(227, 227, 229, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.slideIndicatorActive {
+  background: #303030;
+  width: 48px;
+  box-shadow: 0 2px 8px rgba(48, 48, 48, 0.2);
+}
+
+.slideIndicatorInactive:hover {
+  background: rgba(201, 204, 207, 0.8);
+  transform: scaleY(1.5);
+}
+
+/* Legacy styles for backward compatibility */
 .featureItem {
   display: flex;
   align-items: center;
@@ -113,43 +651,4 @@
 
 .learnButtonSlide3:hover {
   background: #1a1a1a;
-}
-
-.slideIndicator {
-  width: 32px;
-  height: 3px;
-  border-radius: 2px;
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
-
-.slideIndicatorActive {
-  background: #303030;
-}
-
-.slideIndicatorInactive {
-  background: #e3e3e5;
-}
-
-.slideIndicatorInactive:hover {
-  background: #c9cccf;
-}
-
-.bannerCompact {
-  background: #f7f7f8;
-  border: 1px solid #e3e3e5;
-  border-radius: 8px;
-  padding: 12px 16px;
-}
-
-.bannerText {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: #4c1d95;
-}
-
-.bannerIcon {
-  font-size: 18px;
 }

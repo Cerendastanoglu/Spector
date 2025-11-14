@@ -87,6 +87,7 @@ interface BulkPriceEditorProps {
   isLoading: boolean;
   selectedCount: number;
   currencySymbol: string;
+  _storeCurrency: string; // Prepared for future currency warning feature
   
   // Selected products
   selectedProducts: Product[];
@@ -127,6 +128,7 @@ export function BulkPriceEditor({
   isLoading,
   selectedCount,
   currencySymbol,
+  _storeCurrency, // Prefixed with _ to indicate "prepared for future use"
   selectedProducts,
   selectedVariants,
   showSelectedProducts,

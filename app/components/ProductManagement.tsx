@@ -25,6 +25,7 @@ import {
   EmptyState,
   Icon,
   Collapsible,
+  ProgressBar,
 } from '@shopify/polaris';
 // Import only the icons we actually use
 import { 
@@ -36,8 +37,6 @@ import {
   CollectionIcon,
   InventoryIcon,
   SearchIcon,
-  PlusIcon,
-  MinusIcon,
   HashtagIcon
 } from "@shopify/polaris-icons";
 
@@ -172,6 +171,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   const fetcher = useFetcher<{ products: Product[]; hasNextPage: boolean; endCursor?: string; error?: string }>();
   const [products, setProducts] = useState<Product[]>(initialProducts || []);
   const [isLoading, setIsLoading] = useState(!initialProducts); // Don't show loading if we have initial data
+  const [bulkProgress, setBulkProgress] = useState<{current: number; total: number} | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<string[]>([]);
   const [currentCategory, setCurrentCategory] = useState<InventoryCategory>(initialCategory);
@@ -243,12 +243,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   const [descriptionReplaceFrom, setDescriptionReplaceFrom] = useState('');
   const [descriptionReplaceTo, setDescriptionReplaceTo] = useState('');
   
-  // Image Management State
-  const [imageOperation, setImageOperation] = useState<'add' | 'remove' | 'replace'>('add');
-  const [imageUrls, setImageUrls] = useState<string[]>(['']);
-  const [imagePosition, setImagePosition] = useState<'start' | 'end'>('end');
-
-  
   // Collection Filter State
   const [filterByCollection, setFilterByCollection] = useState<string>('');
   
@@ -257,13 +251,12 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   const [priceRange, setPriceRange] = useState<{ min: string; max: string }>({ min: '', max: '' });
   const [inventoryRange, setInventoryRange] = useState<{ min: string; max: string }>({ min: '', max: '' });
   const [filterByStatus, setFilterByStatus] = useState<string>('all');
-  const [hasImages, setHasImages] = useState<string>('all'); // 'all', 'with', 'without'
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [tagSearchQuery, setTagSearchQuery] = useState<string>('');
   const [collections, setCollections] = useState<{id: string, title: string}[]>([]);
   
   // Currency State
-  const [, setStoreCurrency] = useState<string>('USD');
+  const [storeCurrency, setStoreCurrency] = useState<string>('USD');
   const [currencySymbol, setCurrencySymbol] = useState<string>('$');
   const [, setShopDomain] = useState<string>('');
   
@@ -288,7 +281,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   const [tagRemoveValue, setTagRemoveValue] = useState('');
   
   // Content operation state
-  const [contentOperation, setContentOperation] = useState<'title' | 'description' | 'images'>('title');
+  const [contentOperation, setContentOperation] = useState<'title' | 'description'>('title');
   
   // Enhanced Inventory Management State
   const [stockUpdateMethod, setStockUpdateMethod] = useState<'set' | 'add' | 'subtract'>('set');
@@ -380,19 +373,33 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
               ? prevProducts 
               : [...prevProducts, productId];
           });
+        } else {
+          // If at least one variant is selected, ensure product is in list
+          setSelectedProducts(prevProducts => {
+            return prevProducts.includes(productId) 
+              ? prevProducts 
+              : [...prevProducts, productId];
+          });
         }
         
         return newSelectedVariants;
       });
     } else {
-      // Deselecting a variant always deselects the parent product
+      // Deselecting a variant - only remove product if NO variants are selected
       setSelectedVariants(prevVariants => {
         const newSelectedVariants = prevVariants.filter(id => id !== variantId);
         
-        // Always remove product when any variant is deselected
-        setSelectedProducts(prevProducts => 
-          prevProducts.filter(id => id !== productId)
+        // Check if this product still has any selected variants
+        const productStillHasSelectedVariants = variantIds.some(id => 
+          id !== variantId && newSelectedVariants.includes(id)
         );
+        
+        // Only remove product if no variants remain selected
+        if (!productStillHasSelectedVariants) {
+          setSelectedProducts(prevProducts => 
+            prevProducts.filter(id => id !== productId)
+          );
+        }
         
         return newSelectedVariants;
       });
@@ -610,8 +617,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     tagSearchQuery,
     priceRange,
     inventoryRange,
-    filterByStatus,
-    hasImages
+    filterByStatus
   ]);
 
   // Filter and sort products
@@ -677,17 +683,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     // Status filter
     if (filterByStatus !== 'all' && product.status !== filterByStatus.toUpperCase()) {
       return false;
-    }
-
-    // Images filter
-    if (hasImages !== 'all') {
-      const productHasImages = product.featuredMedia?.preview?.image || (product.media?.edges && product.media.edges.length > 0);
-      if (hasImages === 'with' && !productHasImages) {
-        return false;
-      }
-      if (hasImages === 'without' && productHasImages) {
-        return false;
-      }
     }
 
     // Price range filter
@@ -952,6 +947,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     setIsLoading(true);
     clearBulkMessages();
     
+    // Initialize progress
+    setBulkProgress({ current: 0, total: selectedVariants.length });
+    
     // Show loading notification
     setNotification({
       show: true,
@@ -974,128 +972,154 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         type: 'pricing'
       };
       
-      for (let i = 0; i < selectedVariants.length; i++) {
-        const variantId = selectedVariants[i];
+      // Process variants in batches of 20 to respect rate limits
+      const BATCH_SIZE = 20;
+      const batches = [];
+      
+      for (let i = 0; i < selectedVariants.length; i += BATCH_SIZE) {
+        batches.push(selectedVariants.slice(i, i + BATCH_SIZE));
+      }
+      
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
         
-        // Find the product and variant
-        let targetProduct = null;
-        let targetVariant = null;
-        
-        for (const product of products) {
-          const variant = product.variants.edges.find(edge => edge.node.id === variantId);
-          if (variant) {
-            targetProduct = product;
-            targetVariant = variant.node;
-            break;
-          }
-        }
-        
-        if (!targetProduct || !targetVariant) {
-          failed.push(`Variant ID ${variantId}: Variant not found`);
-          continue;
-        }
-
-        try {
-          let newPrice: number;
-          let newComparePrice: string | null = null;
-          const currentPrice = parseFloat(targetVariant.price || '0');
-          const currentComparePrice = targetVariant.compareAtPrice ? parseFloat(targetVariant.compareAtPrice) : null;
+        // Update progress
+        setBulkProgress({ 
+          current: batchIndex * BATCH_SIZE, 
+          total: selectedVariants.length 
+        });
+      
+        for (let i = 0; i < batch.length; i++) {
+          const variantId = batch[i];
           
-          // Check if we're updating price at all
-          const isOnlyUpdatingMetadata = !applyCompareChanges && 
-            (applyCostChanges || applyTaxChanges || applyUnitPriceChanges);
+          // Find the product and variant
+          let targetProduct = null;
+          let targetVariant = null;
           
-          // Only validate current price if we're actually changing the price
-          if (!isOnlyUpdatingMetadata && currentPrice === 0 && priceOperation !== 'set') {
-            failed.push(`${targetProduct.title} (${targetVariant.title}): No current price found. Please set a fixed price first.`);
-            continue;
-          }
-          
-          // Calculate new regular price (or keep current if only updating metadata)
-          if (isOnlyUpdatingMetadata) {
-            newPrice = currentPrice; // Keep existing price
-          } else {
-            switch (priceOperation) {
-              case 'set':
-                newPrice = parseFloat(priceValue) || 0;
-                break;
-              case 'increase': {
-                const increasePercent = parseFloat(pricePercentage) || 0;
-                newPrice = currentPrice * (1 + increasePercent / 100);
-                logger.info(`Increase: ${currentPrice} * (1 + ${increasePercent}/100) = ${newPrice}`);
-                break;
-              }
-              case 'decrease': {
-                const decreasePercent = parseFloat(pricePercentage) || 0;
-                newPrice = currentPrice * (1 - decreasePercent / 100);
-                logger.info(`Decrease: ${currentPrice} * (1 - ${decreasePercent}/100) = ${newPrice}`);
-                break;
-              }
-              case 'round':
-                newPrice = currentPrice;
-                if (roundingRule === 'up') newPrice = Math.ceil(currentPrice);
-                else if (roundingRule === 'down') newPrice = Math.floor(currentPrice);
-                else newPrice = Math.round(currentPrice);
-                break;
-              default:
-                newPrice = currentPrice;
+          for (const product of products) {
+            const variant = product.variants.edges.find(edge => edge.node.id === variantId);
+            if (variant) {
+              targetProduct = product;
+              targetVariant = variant.node;
+              break;
             }
           }
-
-          // Ensure minimum price
-          if (newPrice < 0.01) {
-            failed.push(`${targetProduct.title} (${targetVariant.title}): Calculated price ($${newPrice.toFixed(2)}) is below minimum ($0.01)`);
+          
+          if (!targetProduct || !targetVariant) {
+            failed.push(`Variant ID ${variantId}: Variant not found`);
             continue;
           }
 
-          // Calculate new compare price if enabled
-          if (applyCompareChanges) {
-            switch (compareOperation) {
-              case 'set':
-                newComparePrice = parseFloat(compareValue) > 0 ? parseFloat(compareValue).toFixed(2) : null;
-                break;
-              case 'increase':
-                if (currentComparePrice !== null) {
-                  const compareIncreasePercent = parseFloat(comparePercentage) || 0;
-                  newComparePrice = (currentComparePrice * (1 + compareIncreasePercent / 100)).toFixed(2);
-                } else {
-                  // Skip if no existing compare price
-                  logger.info(`${targetProduct.title} (${targetVariant.title}): No existing compare price to increase`);
-                }
-                break;
-              case 'decrease':
-                if (currentComparePrice !== null) {
-                  const compareDecreasePercent = parseFloat(comparePercentage) || 0;
-                  newComparePrice = (currentComparePrice * (1 - compareDecreasePercent / 100)).toFixed(2);
-                } else {
-                  // Skip if no existing compare price
-                  logger.info(`${targetProduct.title} (${targetVariant.title}): No existing compare price to decrease`);
-                }
-                break;
-              case 'remove':
-                newComparePrice = null;
-                break;
+          try {
+            let newPrice: number;
+            let newComparePrice: string | null = null;
+            const currentPrice = parseFloat(targetVariant.price || '0');
+            const currentComparePrice = targetVariant.compareAtPrice ? parseFloat(targetVariant.compareAtPrice) : null;
+            
+            // Check if we're updating price at all
+            const isOnlyUpdatingMetadata = !applyCompareChanges && 
+              (applyCostChanges || applyTaxChanges || applyUnitPriceChanges);
+            
+            // Only validate current price if we're actually changing the price
+            if (!isOnlyUpdatingMetadata && currentPrice === 0 && priceOperation !== 'set') {
+              failed.push(`${targetProduct.title} (${targetVariant.title}): No current price found. Please set a fixed price first.`);
+              continue;
             }
-          }
+            
+            // Calculate new regular price (or keep current if only updating metadata)
+            if (isOnlyUpdatingMetadata) {
+              newPrice = currentPrice; // Keep existing price
+            } else {
+              switch (priceOperation) {
+                case 'set':
+                  newPrice = parseFloat(priceValue) || 0;
+                  break;
+                case 'increase': {
+                  const increasePercent = parseFloat(pricePercentage) || 0;
+                  newPrice = currentPrice * (1 + increasePercent / 100);
+                  logger.info(`Increase: ${currentPrice} * (1 + ${increasePercent}/100) = ${newPrice}`);
+                  break;
+                }
+                case 'decrease': {
+                  const decreasePercent = parseFloat(pricePercentage) || 0;
+                  newPrice = currentPrice * (1 - decreasePercent / 100);
+                  logger.info(`Decrease: ${currentPrice} * (1 - ${decreasePercent}/100) = ${newPrice}`);
+                  break;
+                }
+                case 'round':
+                  newPrice = currentPrice;
+                  if (roundingRule === 'up') newPrice = Math.ceil(currentPrice);
+                  else if (roundingRule === 'down') newPrice = Math.floor(currentPrice);
+                  else newPrice = Math.round(currentPrice);
+                  break;
+                default:
+                  newPrice = currentPrice;
+              }
+            }
 
-          variantUpdates.push({
-            productId: targetProduct.id,
-            variantId: targetVariant.id,
-            productTitle: targetProduct.title,
-            price: newPrice.toFixed(2),
-            compareAtPrice: newComparePrice,
-            // New fields
-            cost: applyCostChanges ? (priceCostValue || null) : undefined,
-            taxable: applyTaxChanges ? taxable : undefined,
-            unitPrice: applyUnitPriceChanges ? (unitPriceValue || null) : undefined
-          });
-          
-          successful.push(`${targetProduct.title} (${targetVariant.title})`);
-          
-        } catch (error) {
-          failed.push(`${targetProduct?.title || targetVariant.id} (${targetVariant.title}): ${error instanceof Error ? error.message : 'Unknown error'}`);
+            // Ensure minimum price
+            if (newPrice < 0.01) {
+              failed.push(`${targetProduct.title} (${targetVariant.title}): Calculated price ($${newPrice.toFixed(2)}) is below minimum ($0.01)`);
+              continue;
+            }
+
+            // Calculate new compare price if enabled
+            if (applyCompareChanges) {
+              switch (compareOperation) {
+                case 'set':
+                  newComparePrice = parseFloat(compareValue) > 0 ? parseFloat(compareValue).toFixed(2) : null;
+                  break;
+                case 'increase':
+                  if (currentComparePrice !== null) {
+                    const compareIncreasePercent = parseFloat(comparePercentage) || 0;
+                    newComparePrice = (currentComparePrice * (1 + compareIncreasePercent / 100)).toFixed(2);
+                  } else {
+                    // Skip if no existing compare price
+                    logger.info(`${targetProduct.title} (${targetVariant.title}): No existing compare price to increase`);
+                  }
+                  break;
+                case 'decrease':
+                  if (currentComparePrice !== null) {
+                    const compareDecreasePercent = parseFloat(comparePercentage) || 0;
+                    newComparePrice = (currentComparePrice * (1 - compareDecreasePercent / 100)).toFixed(2);
+                  } else {
+                    // Skip if no existing compare price
+                    logger.info(`${targetProduct.title} (${targetVariant.title}): No existing compare price to decrease`);
+                  }
+                  break;
+                case 'remove':
+                  newComparePrice = null;
+                  break;
+              }
+            }
+
+            variantUpdates.push({
+              productId: targetProduct.id,
+              variantId: targetVariant.id,
+              productTitle: targetProduct.title,
+              price: newPrice.toFixed(2),
+              compareAtPrice: newComparePrice,
+              // New fields
+              cost: applyCostChanges ? (priceCostValue || null) : undefined,
+              taxable: applyTaxChanges ? taxable : undefined,
+              unitPrice: applyUnitPriceChanges ? (unitPriceValue || null) : undefined
+            });
+            
+            successful.push(`${targetProduct.title} (${targetVariant.title})`);
+            
+          } catch (error) {
+            failed.push(`${targetProduct?.title || targetVariant.id} (${targetVariant.title}): ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
+        
+        // Add delay between batches to respect Shopify API rate limits (2 req/sec)
+        if (batchIndex < batches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
+      
+      // Final progress update
+      setBulkProgress({ current: selectedVariants.length, total: selectedVariants.length });
 
       if (variantUpdates.length === 0) {
         throw new Error('No variants could be updated. Please check the errors above.');
@@ -1253,6 +1277,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       });
     } finally {
       setIsLoading(false);
+      setBulkProgress(null); // Reset progress when done
     }
   };
 
@@ -1755,122 +1780,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     }
   };
 
-  const handleBulkImageUpdate = async () => {
-    if (selectedProducts.length === 0) {
-      setError("Please select at least one product to update images.");
-      return;
-    }
-    
-    if (imageOperation !== 'remove' && imageUrls.every(url => !url.trim())) {
-      setError("Please provide at least one valid image URL.");
-      return;
-    }
-    
-    setIsLoading(true);
-    setError("");
-    
-    try {
-      const productIds = selectedProducts;
-      const validImageUrls = imageUrls.filter(url => url.trim());
-      
-      const response = await fetch('/app/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'update-images',
-          productIds,
-          imageOperation,
-          imageUrls: validImageUrls,
-          imagePosition: imageOperation === 'add' ? imagePosition : undefined,
-        }),
-      });
-
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update images');
-      }
-
-      // Process results
-      const successful: string[] = [];
-      const failed: string[] = [];
-      
-      if (result.results) {
-        result.results.forEach((resultItem: any) => {
-          if (resultItem.success) {
-            const product = products.find(p => p.id === resultItem.productId);
-            successful.push(product?.title || resultItem.productId);
-          } else {
-            failed.push(`${resultItem.productId}: ${resultItem.error}`);
-          }
-        });
-      }
-
-      // Update local state to reflect changes
-      if (result.success && result.results) {
-        setProducts(prevProducts => {
-          const updatedProducts = [...prevProducts];
-          result.results.forEach((resultItem: any) => {
-            if (resultItem.success && resultItem.product) {
-              const index = updatedProducts.findIndex(p => p.id === resultItem.productId);
-              if (index !== -1) {
-                updatedProducts[index] = {
-                  ...updatedProducts[index],
-                  media: resultItem.product.media || updatedProducts[index].media,
-                  featuredMedia: resultItem.product.featuredMedia || updatedProducts[index].featuredMedia
-                };
-              }
-            }
-          });
-          return updatedProducts;
-        });
-      }
-      
-      let operationText = '';
-      if (imageOperation === 'add') {
-        operationText = `added ${validImageUrls.length} image${validImageUrls.length > 1 ? 's' : ''} to`;
-      } else if (imageOperation === 'remove') {
-        operationText = `removed images from`;
-      } else {
-        operationText = `replaced images in`;
-      }
-      
-      if (successful.length > 0) {
-        logger.info(`✅ Successfully ${operationText} ${successful.length} products!`);
-        setNotification({
-          show: true,
-          message: `✅ Successfully ${operationText} ${successful.length} product${successful.length === 1 ? '' : 's'}!`,
-          error: false
-        });
-      }
-      
-      if (failed.length > 0) {
-        logger.info(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
-        logger.info("Failed operations:", failed);
-        setNotification({
-          show: true,
-          message: `⚠️ ${successful.length} updated, ${failed.length} failed. Check console for details.`,
-          error: true
-        });
-      }
-      
-      // Clear form only if completely successful
-      if (failed.length === 0) {
-        setHasBulkOperationsCompleted(true);
-        setImageUrls(['']);
-      }
-      
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update images';
-      logger.error('Failed to update images:', error);
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleBulkInventoryUpdate = async () => {
     if (selectedVariants.length === 0) {
       setError("Please select at least one variant to update inventory.");
@@ -2277,6 +2186,15 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
 
       {/* Product Management Header */}
       <BlockStack gap="400">
+        {/* Disclaimer about Undo Feature */}
+        <Card>
+          <BlockStack gap="200">
+            <Text as="p" variant="bodyXs" tone="subdued">
+              <strong>Note:</strong> At this time, we are not able to undo bulk operations. However, we are working on implementing this feature. Please double-check your selections before applying changes.
+            </Text>
+          </BlockStack>
+        </Card>
+
         {/* Modern Step Navigation - Individual Boxes */}
         <div className={styles.stepsContainer}>
             {/* Step 1: Select Products */}
@@ -2378,7 +2296,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                   {selectedVariants.length > 0 && (
                     <div className={styles.stepSuccess}>
                       <Text as="p" variant="bodySm" tone="base" fontWeight="medium">
-                        {selectedVariants.length} variant{selectedVariants.length !== 1 ? 's' : ''} ready for editing
+                        {selectedVariants.length} variant{selectedVariants.length !== 1 ? 's' : ''} from {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} ready for editing
                       </Text>
                     </div>
                   )}
@@ -2749,18 +2667,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                         />
                       </div>
                     </InlineStack>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <Select
-                      label="Has Images"
-                      options={[
-                        { label: 'All Products', value: 'all' },
-                        { label: 'With Images', value: 'with' },
-                        { label: 'Without Images', value: 'without' }
-                      ]}
-                      value={hasImages}
-                      onChange={setHasImages}
-                    />
                   </div>
                   <div style={{ flex: 1, paddingTop: '22px' }}>
                     <Checkbox
@@ -3174,6 +3080,21 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           ) : (
             <Card>
               <BlockStack gap="400">
+                {/* Progress Bar */}
+                {bulkProgress && (
+                  <Box paddingBlockEnd="200">
+                    <BlockStack gap="200">
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Processing {bulkProgress.current} of {bulkProgress.total} variants...
+                      </Text>
+                      <ProgressBar 
+                        progress={(bulkProgress.current / bulkProgress.total) * 100} 
+                        size="small" 
+                      />
+                    </BlockStack>
+                  </Box>
+                )}
+                
                 {/* Pricing Tab */}
                 {activeBulkTab === 0 && (() => {
                   // Convert selectedProducts IDs to actual Product objects
@@ -3208,6 +3129,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                       unitPriceValue={unitPriceValue}
                       setUnitPriceValue={setUnitPriceValue}
                       currencySymbol={currencySymbol}
+                      _storeCurrency={storeCurrency}
                       selectedCount={selectedVariants.length}
                       onApply={handleBulkPricing}
                       isLoading={isLoading}
@@ -3715,196 +3637,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                           size="large"
                         >
                           Update Product Descriptions
-                        </Button>
-                      </BlockStack>
-                    )}
-
-                    {/* Images Management */}
-                    {contentOperation === 'images' && (
-                      <BlockStack gap="400">
-                        <div>
-                          <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
-                            Image Operation Type
-                          </Text>
-                          <div style={{ 
-                            display: 'grid', 
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
-                            gap: '8px', 
-                            marginTop: '8px' 
-                          }}>
-                            <Button
-                              variant={imageOperation === 'add' ? 'primary' : 'secondary'}
-                              onClick={() => setImageOperation('add')}
-                              size="large"
-                              icon={PlusIcon}
-                            >
-                              Add Images
-                            </Button>
-                            <Button
-                              variant={imageOperation === 'remove' ? 'primary' : 'secondary'}
-                              onClick={() => setImageOperation('remove')}
-                              size="large"
-                              icon={MinusIcon}
-                            >
-                              Remove Images
-                            </Button>
-                            <Button
-                              variant={imageOperation === 'replace' ? 'primary' : 'secondary'}
-                              onClick={() => setImageOperation('replace')}
-                              size="large"
-                            >
-                              Replace Images
-                            </Button>
-                          </div>
-                        </div>
-
-                        {imageOperation === 'add' && (
-                          <BlockStack gap="400">
-                            <div>
-                              <Text as="p" variant="bodyMd" fontWeight="medium">Image Position</Text>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
-                                <Button
-                                  variant={imagePosition === 'start' ? 'primary' : 'secondary'}
-                                  onClick={() => setImagePosition('start')}
-                                  size="medium"
-                                >
-                                  Add to Beginning
-                                </Button>
-                                <Button
-                                  variant={imagePosition === 'end' ? 'primary' : 'secondary'}
-                                  onClick={() => setImagePosition('end')}
-                                  size="medium"
-                                >
-                                  Add to End
-                                </Button>
-                              </div>
-                            </div>
-
-                            <div>
-                              <Text as="p" variant="bodyMd" fontWeight="medium">Image URLs</Text>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                Add image URLs to be added to all selected products
-                              </Text>
-                              {imageUrls.map((url, index) => (
-                                <div key={index} style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                                  <div style={{ flex: 1 }}>
-                                    <TextField
-                                      label={`Image URL ${index + 1}`}
-                                      value={url}
-                                      onChange={(value) => {
-                                        const newUrls = [...imageUrls];
-                                        newUrls[index] = value;
-                                        setImageUrls(newUrls);
-                                      }}
-                                      placeholder="https://example.com/image.jpg"
-                                      autoComplete="off"
-                                    />
-                                  </div>
-                                  {imageUrls.length > 1 && (
-                                    <div style={{ paddingTop: '24px' }}>
-                                      <Button
-                                        variant="plain"
-                                        icon={MinusIcon}
-                                        onClick={() => {
-                                          const newUrls = imageUrls.filter((_, i) => i !== index);
-                                          setImageUrls(newUrls);
-                                        }}
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                              
-                              <div style={{ marginTop: '12px' }}>
-                                <Button
-                                  variant="plain"
-                                  icon={PlusIcon}
-                                  onClick={() => setImageUrls([...imageUrls, ''])}
-                                >
-                                  Add Another Image URL
-                                </Button>
-                              </div>
-                            </div>
-                          </BlockStack>
-                        )}
-
-                        {imageOperation === 'remove' && (
-                          <BlockStack gap="300">
-                            <Text as="p" variant="bodyMd" tone="subdued">
-                              Choose how to remove images from selected products:
-                            </Text>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
-                              <Button variant="secondary" size="medium">
-                                Remove First Image
-                              </Button>
-                              <Button variant="secondary" size="medium">
-                                Remove Last Image
-                              </Button>
-                              <Button variant="secondary" size="medium">
-                                Remove All Images
-                              </Button>
-                            </div>
-                          </BlockStack>
-                        )}
-
-                        {imageOperation === 'replace' && (
-                          <BlockStack gap="300">
-                            <Text as="p" variant="bodyMd" tone="subdued">
-                              Replace all existing images with new ones:
-                            </Text>
-                            {imageUrls.map((url, index) => (
-                              <div key={index} style={{ display: 'flex', gap: '8px' }}>
-                                <div style={{ flex: 1 }}>
-                                  <TextField
-                                    label={`Replacement Image URL ${index + 1}`}
-                                    value={url}
-                                    onChange={(value) => {
-                                      const newUrls = [...imageUrls];
-                                      newUrls[index] = value;
-                                      setImageUrls(newUrls);
-                                    }}
-                                    placeholder="https://example.com/new-image.jpg"
-                                    autoComplete="off"
-                                  />
-                                </div>
-                                {imageUrls.length > 1 && (
-                                  <div style={{ paddingTop: '24px' }}>
-                                    <Button
-                                      variant="plain"
-                                      icon={MinusIcon}
-                                      onClick={() => {
-                                        const newUrls = imageUrls.filter((_, i) => i !== index);
-                                        setImageUrls(newUrls);
-                                      }}
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                            
-                            <Button
-                              variant="plain"
-                              icon={PlusIcon}
-                              onClick={() => setImageUrls([...imageUrls, ''])}
-                            >
-                              Add Another Replacement Image
-                            </Button>
-                          </BlockStack>
-                        )}
-
-                        <Button
-                          variant="primary"
-                          onClick={handleBulkImageUpdate}
-                          disabled={
-                            selectedProducts.length === 0 || 
-                            (imageOperation !== 'remove' && imageUrls.every(url => !url.trim()))
-                          }
-                          loading={isLoading}
-                          size="large"
-                        >
-                          {imageOperation === 'add' ? 'Add Images to Products' :
-                           imageOperation === 'remove' ? 'Remove Images from Products' :
-                           'Replace Product Images'}
                         </Button>
                       </BlockStack>
                     )}

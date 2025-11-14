@@ -171,39 +171,8 @@ export function ProductTable({
   };
 
   const handleBulkSelect = (productId: string, checked: boolean) => {
-    if (!showVariantSelection) {
-      onProductSelect(productId, checked);
-      return;
-    }
-    
-    const product = products.find(p => p.id === productId);
-    if (!product) return;
-    
-    const variantIds = product.variants.edges.map(v => v.node.id);
-    
-    if (checked) {
-      // Select all variants of this product
-      variantIds.forEach(variantId => {
-        if (!selectedVariants.includes(variantId)) {
-          onVariantSelect(variantId, true);
-        }
-      });
-      // Also select the product
-      if (!selectedProducts.includes(productId)) {
-        onProductSelect(productId, true);
-      }
-    } else {
-      // Deselect all variants of this product
-      variantIds.forEach(variantId => {
-        if (selectedVariants.includes(variantId)) {
-          onVariantSelect(variantId, false);
-        }
-      });
-      // Also deselect the product
-      if (selectedProducts.includes(productId)) {
-        onProductSelect(productId, false);
-      }
-    }
+    // Always just call onProductSelect - it will handle variants atomically
+    onProductSelect(productId, checked);
   };
 
   // Status legend component

@@ -5,12 +5,18 @@ import {
   BlockStack,
   InlineStack,
   Icon,
-  Card,
 } from "@shopify/polaris";
 import {
   ChartVerticalIcon,
   PackageIcon,
   StarIcon,
+  ChartLineIcon,
+  CashDollarIcon,
+  ProductIcon,
+  EditIcon,
+  ChartPopularIcon,
+  LightbulbIcon,
+  StarFilledIcon,
 } from "@shopify/polaris-icons";
 import styles from "./WelcomeModal.module.css";
 
@@ -49,56 +55,96 @@ export function WelcomeModal({
   const slides = [
     // Slide 1: Welcome + Subscription + Basics
     {
-      icon: StarIcon,
-      iconClass: styles.iconWrapper,
+      icon: StarIcon, // Keep for type compatibility
+      iconClass: styles.logoWrapper,
       title: "Welcome to Spector",
-      subtitle: "Your Product Management Suite",
+      subtitle: "Your intelligent product management companion",
+      isLogoSlide: true,
       content: (
         <BlockStack gap="400">
           {/* Subscription Banner - Only show if no subscription */}
           {!hasSubscription && (
-            <div className={styles.bannerCompact}>
-              <div className={styles.bannerText}>
-                <span className={styles.bannerIcon}>🎉</span>
-                <Text as="p" variant="bodyMd">
-                  <strong>3-day free trial</strong> • Only {subscriptionPrice} after • Cancel anytime
-                </Text>
+            <div className={styles.glassyBanner}>
+              <div className={styles.bannerGlow}></div>
+              <div className={styles.bannerContent}>
+                <span className={styles.bannerIcon}>
+                  <Icon source={StarFilledIcon} tone="base" />
+                </span>
+                <div>
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+                    Start Your Free 3-Day Trial
+                  </Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {subscriptionPrice} after • Cancel anytime • No credit card required
+                  </Text>
+                </div>
               </div>
             </div>
           )}
 
-          <Text as="p" variant="bodyMd" tone="subdued">
-            Spector helps you monitor inventory, track performance, and make data-driven decisions.
-          </Text>
+          <div className={styles.introText}>
+            <Text as="p" variant="bodyLg" tone="subdued" alignment="center">
+              Transform how you manage your Shopify catalog with powerful tools designed for efficiency
+            </Text>
+          </div>
           
-          <Card>
-            <BlockStack gap="200">
-              <div className={styles.featureItem}>
-                <div className={styles.checkmark}>✓</div>
-                <Text as="p" variant="bodyMd">
-                  Real-time inventory monitoring
+          <div className={styles.featureGrid}>
+            <div className={`${styles.featureCard} ${styles.animateIn1}`}>
+              <div className={styles.featureIconGlass}>
+                <Icon source={ChartLineIcon} />
+              </div>
+              <div>
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  Real-time Analytics
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Track performance instantly
                 </Text>
               </div>
-              <div className={styles.featureItem}>
-                <div className={styles.checkmark}>✓</div>
-                <Text as="p" variant="bodyMd">
-                  Product analytics dashboard
+            </div>
+            
+            <div className={`${styles.featureCard} ${styles.animateIn2}`}>
+              <div className={styles.featureIconGlass}>
+                <Icon source={PackageIcon} />
+              </div>
+              <div>
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  Bulk Operations
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Edit hundreds at once
                 </Text>
               </div>
-              <div className={styles.featureItem}>
-                <div className={styles.checkmark}>✓</div>
-                <Text as="p" variant="bodyMd">
-                  Bulk product management
+            </div>
+            
+            <div className={`${styles.featureCard} ${styles.animateIn3}`}>
+              <div className={styles.featureIconGlass}>
+                <Icon source={ChartPopularIcon} />
+              </div>
+              <div>
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  Smart Forecasting
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Predict demand ahead
                 </Text>
               </div>
-              <div className={styles.featureItem}>
-                <div className={styles.checkmark}>✓</div>
-                <Text as="p" variant="bodyMd">
-                  Revenue tracking & forecasting
+            </div>
+            
+            <div className={`${styles.featureCard} ${styles.animateIn4}`}>
+              <div className={styles.featureIconGlass}>
+                <Icon source={CashDollarIcon} />
+              </div>
+              <div>
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  Revenue Tracking
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Monitor growth daily
                 </Text>
               </div>
-            </BlockStack>
-          </Card>
+            </div>
+          </div>
         </BlockStack>
       )
     },
@@ -106,46 +152,76 @@ export function WelcomeModal({
     // Slide 2: Bulk Edit + How-to's
     {
       icon: PackageIcon,
-      iconClass: `${styles.iconWrapper} ${styles.iconWrapperSlide2}`,
+      iconClass: `${styles.iconWrapperStatic} ${styles.iconWrapperSlide2}`,
       title: "Bulk Product Management",
-      subtitle: "Edit multiple products at once",
+      subtitle: "Edit hundreds of products in seconds, not hours",
       content: (
         <BlockStack gap="400">
-          <Text as="p" variant="bodyMd" tone="subdued">
-            Save time by updating prices, inventory, and product details for multiple items simultaneously.
-          </Text>
+          <div className={styles.glassyCard}>
+            <div className={styles.cardGlow}></div>
+            <div className={styles.cardContent}>
+              <div className={styles.statsRow}>
+                <div className={styles.statItem}>
+                  <div className={styles.statNumber}>10x</div>
+                  <Text as="p" variant="bodySm" tone="subdued">Faster Editing</Text>
+                </div>
+                <div className={styles.statDivider}></div>
+                <div className={styles.statItem}>
+                  <div className={styles.statNumber}>100+</div>
+                  <Text as="p" variant="bodySm" tone="subdued">Products at Once</Text>
+                </div>
+                <div className={styles.statDivider}></div>
+                <div className={styles.statItem}>
+                  <div className={styles.statNumber}>5min</div>
+                  <Text as="p" variant="bodySm" tone="subdued">Average Save</Text>
+                </div>
+              </div>
+            </div>
+          </div>
           
-          <Card>
-            <BlockStack gap="200">
-              <div className={styles.featureItem}>
-                <div className={`${styles.bullet} ${styles.bulletSlide2}`}></div>
-                <Text as="p" variant="bodyMd">
-                  Bulk price updates across categories
+          <BlockStack gap="300">
+            <div className={`${styles.benefitCard} ${styles.float1}`}>
+              <div className={styles.benefitBadge}>
+                <Icon source={CashDollarIcon} />
+              </div>
+              <div className={styles.benefitText}>
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  Smart Pricing
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Update prices with percentage changes, fixed amounts, or replace patterns
                 </Text>
               </div>
-              <div className={styles.featureItem}>
-                <div className={`${styles.bullet} ${styles.bulletSlide2}`}></div>
-                <Text as="p" variant="bodyMd">
-                  Quick inventory adjustments
-                </Text>
-              </div>
-              <div className={styles.featureItem}>
-                <div className={`${styles.bullet} ${styles.bulletSlide2}`}></div>
-                <Text as="p" variant="bodyMd">
-                  CSV export/import functionality
-                </Text>
-              </div>
-            </BlockStack>
-          </Card>
+            </div>
 
-          <a 
-            href="https://docs.spector-app.com/bulk-edit" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className={`${styles.learnButton} ${styles.learnButtonSlide2}`}
-          >
-            📚 Learn How It Works
-          </a>
+            <div className={`${styles.benefitCard} ${styles.float2}`}>
+              <div className={styles.benefitBadge}>
+                <Icon source={ProductIcon} />
+              </div>
+              <div className={styles.benefitText}>
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  Inventory Control
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Set stock levels, SKUs, and tracking across variants instantly
+                </Text>
+              </div>
+            </div>
+
+            <div className={`${styles.benefitCard} ${styles.float3}`}>
+              <div className={styles.benefitBadge}>
+                <Icon source={EditIcon} />
+              </div>
+              <div className={styles.benefitText}>
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  Content Updates
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Modify titles, descriptions, and tags with prefix/suffix/replace
+                </Text>
+              </div>
+            </div>
+          </BlockStack>
         </BlockStack>
       )
     },
@@ -153,46 +229,61 @@ export function WelcomeModal({
     // Slide 3: Forecasting
     {
       icon: ChartVerticalIcon,
-      iconClass: `${styles.iconWrapper} ${styles.iconWrapperSlide3}`,
-      title: "Inventory Forecasting",
-      subtitle: "Predict demand & prevent stockouts",
+      iconClass: `${styles.iconWrapperStatic} ${styles.iconWrapperSlide3}`,
+      title: "AI-Powered Insights",
+      subtitle: "Stay ahead with intelligent inventory forecasting",
       content: (
         <BlockStack gap="400">
-          <Text as="p" variant="bodyMd" tone="subdued">
-            Use AI-powered forecasting to predict when you'll run out of stock and plan ahead.
-          </Text>
+          <div className={styles.insightCard}>
+            <div className={styles.insightGlow}></div>
+            <div className={styles.insightContent}>
+              <Text as="p" variant="bodyMd" alignment="center">
+                Machine learning analyzes your sales patterns to predict stockouts before they happen
+              </Text>
+            </div>
+          </div>
           
-          <Card>
-            <BlockStack gap="200">
-              <div className={styles.featureItem}>
-                <div className={`${styles.bullet} ${styles.bulletSlide3}`}></div>
-                <Text as="p" variant="bodyMd">
-                  Sales trend analysis with charts
+          <BlockStack gap="300">
+            <div className={`${styles.benefitCard} ${styles.float1}`}>
+              <div className={styles.benefitBadge}>
+                <Icon source={ChartPopularIcon} />
+              </div>
+              <div className={styles.benefitText}>
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  Trend Analysis
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Visual charts showing sales velocity and seasonal patterns
                 </Text>
               </div>
-              <div className={styles.featureItem}>
-                <div className={`${styles.bullet} ${styles.bulletSlide3}`}></div>
-                <Text as="p" variant="bodyMd">
-                  Smart restock recommendations
-                </Text>
-              </div>
-              <div className={styles.featureItem}>
-                <div className={`${styles.bullet} ${styles.bulletSlide3}`}></div>
-                <Text as="p" variant="bodyMd">
-                  Demand predictions by product
-                </Text>
-              </div>
-            </BlockStack>
-          </Card>
+            </div>
 
-          <a 
-            href="https://docs.spector-app.com/forecasting" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className={`${styles.learnButton} ${styles.learnButtonSlide3}`}
-          >
-            📈 Learn How It Works
-          </a>
+            <div className={`${styles.benefitCard} ${styles.float2}`}>
+              <div className={styles.benefitBadge}>
+                <Icon source={LightbulbIcon} />
+              </div>
+              <div className={styles.benefitText}>
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  Actionable Recommendations
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Precise restock quantities calculated from demand predictions
+                </Text>
+              </div>
+            </div>
+          </BlockStack>
+
+          <div className={styles.ctaCard}>
+            <Text as="p" variant="bodyMd" alignment="center">
+              <span className={styles.ctaIcon}>
+                <Icon source={StarFilledIcon} />
+              </span>
+              <strong> Ready to streamline your workflow?</strong>
+            </Text>
+            <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+              Join thousands of merchants saving hours every week
+            </Text>
+          </div>
         </BlockStack>
       )
     }
@@ -236,7 +327,7 @@ export function WelcomeModal({
       title=""
       primaryAction={{
         content: isLastSlide 
-          ? (!hasSubscription ? "🚀 Start Free Trial" : "✨ Get Started")
+          ? (!hasSubscription ? "Start Free Trial" : "Get Started")
           : "Next →",
         onAction: isLastSlide ? handleFinalAction : nextSlide,
       }}
@@ -253,11 +344,21 @@ export function WelcomeModal({
     >
       <Modal.Section>
         <BlockStack gap="500">
-          {/* Icon and Title */}
+          {/* Icon/Logo and Title */}
           <BlockStack gap="300" align="center">
-            <div className={currentSlideData.iconClass}>
-              <Icon source={currentSlideData.icon} />
-            </div>
+            {currentSlideData.isLogoSlide ? (
+              <div className={currentSlideData.iconClass}>
+                <img 
+                  src="/assets/Logo.svg" 
+                  alt="Spector Logo" 
+                  style={{ width: '100%', height: '100%' }}
+                />
+              </div>
+            ) : (
+              <div className={currentSlideData.iconClass}>
+                <Icon source={currentSlideData.icon} />
+              </div>
+            )}
             
             <BlockStack gap="100" align="center">
               <Text as="h2" variant="headingLg" alignment="center">
