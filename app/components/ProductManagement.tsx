@@ -91,6 +91,7 @@ interface Product {
         sku?: string;
         barcode?: string;
         taxable?: boolean;
+        inventoryPolicy?: string;
         inventoryItem?: {
           id: string;
           tracked: boolean;
@@ -133,6 +134,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       @keyframes scaleIn {
         from { opacity: 0; transform: scale(0.98); }
         to { opacity: 1; transform: scale(1); }
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
       }
       .grid-item-hover {
         transition: all 0.2s ease-in-out;
@@ -210,7 +215,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   
   // Charge tax state
   const [applyTaxChanges, setApplyTaxChanges] = useState(false);
-  const [taxable, setTaxable] = useState(true);
+  const [taxable, setTaxable] = useState<boolean | null>(null);
   
   // Unit price state
   const [applyUnitPriceChanges, setApplyUnitPriceChanges] = useState(false);
@@ -221,7 +226,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   const [bulkSkuValue, setBulkSkuValue] = useState('');
   const [applyBarcodeChanges, setApplyBarcodeChanges] = useState(false);
   const [barcodeValue, setBarcodeValue] = useState('');
-  const [continueSellingWhenOutOfStock, setContinueSellingWhenOutOfStock] = useState(false);
+  const [applyContinueSellingChanges, setApplyContinueSellingChanges] = useState(false);
+  const [continueSellingWhenOutOfStock, setContinueSellingWhenOutOfStock] = useState<boolean | null>(null);
   
   // Collection Management State
   const [collectionOperation, setCollectionOperation] = useState<'add' | 'remove'>('add');
@@ -272,6 +278,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     show: boolean;
     message: string;
     error?: boolean;
+    loading?: boolean;
     actionLabel?: string;
     onAction?: () => void;
   }>({ show: false, message: '' });
@@ -465,15 +472,15 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     }
   }, [initialProducts]);
 
-  // Auto-hide notifications after 2 seconds
+  // Auto-hide notifications after 2 seconds (but not loading messages)
   useEffect(() => {
-    if (notification.show) {
+    if (notification.show && !notification.loading) {
       const timer = setTimeout(() => {
         setNotification({ show: false, message: '' });
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [notification.show]);
+  }, [notification.show, notification.loading]);
 
 
   const fetchAllProducts = async () => {
@@ -945,6 +952,14 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     setIsLoading(true);
     clearBulkMessages();
     
+    // Show loading notification
+    setNotification({
+      show: true,
+      loading: true,
+      message: `Updating ${selectedVariants.length} variant${selectedVariants.length !== 1 ? 's' : ''}...`,
+      error: false
+    });
+    
     const failed: string[] = [];
     const successful: string[] = [];
     
@@ -1144,9 +1159,22 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       const apiFailed = result.results.filter((r: any) => !r.success);
       const apiSuccessful = result.results.filter((r: any) => r.success);
       
+      // Categorize failures: gift card errors vs other errors
+      const giftCardErrors: string[] = [];
+      const otherErrors: string[] = [];
+      
       if (apiFailed.length > 0) {
         apiFailed.forEach((failure: any) => {
-          failed.push(`${failure.productId}: ${failure.error}`);
+          const errorMsg = `${failure.productId}: ${failure.error}`;
+          // Check if error is related to gift cards
+          if (failure.error && typeof failure.error === 'string' && 
+              (failure.error.toLowerCase().includes('gift card') || 
+               failure.error.toLowerCase().includes('giftcard'))) {
+            giftCardErrors.push(errorMsg);
+          } else {
+            otherErrors.push(errorMsg);
+            failed.push(errorMsg);
+          }
         });
       }
       
@@ -1154,9 +1182,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         logger.info(`✅ Successfully updated pricing for ${apiSuccessful.length} products!`);
       }
       
-      if (failed.length > 0) {
-        logger.info(`⚠️ ${apiSuccessful.length} products updated successfully. ${failed.length} failed.`);
-        logger.info("Failed operations:", failed);
+      if (giftCardErrors.length > 0) {
+        logger.info(`ℹ️ ${giftCardErrors.length} gift card(s) skipped (tax cannot be applied to gift cards)`);
+      }
+      
+      if (otherErrors.length > 0) {
+        logger.info(`⚠️ ${apiSuccessful.length} products updated successfully. ${otherErrors.length} failed.`);
+        logger.info("Failed operations:", otherErrors);
       }
       
       // Reset form only if completely successful (keep products selected for additional operations)
@@ -1169,11 +1201,18 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         setComparePercentage('0');
         setApplyCompareChanges(false);
         
+        // Build success message
+        let successMessage = `✅ ${apiSuccessful.length} variant${apiSuccessful.length !== 1 ? 's' : ''} updated`;
+        if (giftCardErrors.length > 0) {
+          successMessage += `\nℹ️ ${giftCardErrors.length} gift card${giftCardErrors.length !== 1 ? 's' : ''} skipped (can't be taxed)`;
+        }
+        
         // Show success notification
         setNotification({
           show: true,
-          message: `Successfully updated prices for ${apiSuccessful.length} products`,
-          error: false
+          message: successMessage,
+          error: false,
+          loading: false
         });
         
         // Note: Keeping selectedProducts so users can perform multiple operations on the same selection
@@ -1189,11 +1228,29 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
             logger.info(`ℹ️ Note: ${productsWithoutCompare} product(s) didn't have existing compare prices, so percentage changes were skipped for those.`);
           }
         }
+      } else {
+        // Show error notification with details
+        let errorMessage = `⚠️ ${apiSuccessful.length} updated, ${otherErrors.length} failed`;
+        if (giftCardErrors.length > 0) {
+          errorMessage += `\nℹ️ ${giftCardErrors.length} gift card${giftCardErrors.length !== 1 ? 's' : ''} skipped (can't be taxed)`;
+        }
+        
+        setNotification({
+          show: true,
+          message: errorMessage,
+          error: true,
+          loading: false
+        });
       }
       
     } catch (error) {
       logger.error('Bulk pricing error:', error);
-      setError(`Failed to update prices: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setNotification({
+        show: true,
+        message: `Failed to update: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error: true,
+        loading: false
+      });
     } finally {
       setIsLoading(false);
     }
@@ -1823,6 +1880,17 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     setIsLoading(true);
     setError("");
     
+    // Check if user is updating only metadata (SKU/Barcode/Continue Selling) without stock changes
+    const isOnlyUpdatingMetadata = !stockQuantity && 
+      (applySkuChanges || applyBarcodeChanges || applyContinueSellingChanges);
+    
+    // Validate stock quantity only if we're actually changing stock
+    if (!isOnlyUpdatingMetadata && (!stockQuantity || stockQuantity.trim() === '')) {
+      setError("Please enter a stock quantity, or only update SKU/Barcode/Continue Selling.");
+      setIsLoading(false);
+      return;
+    }
+    
     try {
       const response = await fetch('/app/api/products', {
         method: 'POST',
@@ -1832,8 +1900,15 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         body: JSON.stringify({
           action: 'update-inventory',
           variantIds: selectedVariants,
-          stockQuantity,
-          stockUpdateMethod,
+          stockQuantity: isOnlyUpdatingMetadata ? undefined : stockQuantity,
+          stockUpdateMethod: isOnlyUpdatingMetadata ? undefined : stockUpdateMethod,
+          // Metadata fields
+          applySku: applySkuChanges,
+          sku: applySkuChanges ? bulkSkuValue : undefined,
+          applyBarcode: applyBarcodeChanges,
+          barcode: applyBarcodeChanges ? barcodeValue : undefined,
+          applyContinueSelling: applyContinueSellingChanges,
+          continueSelling: applyContinueSellingChanges ? continueSellingWhenOutOfStock : undefined,
         }),
       });
 
@@ -4014,15 +4089,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                                                   <Text as="span" variant="bodyXs" fontWeight="semibold">
                                                     {variant.node.title}
                                                   </Text>
-                                                  {variant.node.sku && (
-                                                    <Text as="span" variant="bodyXs" tone="subdued">
-                                                      {' • SKU: '}{variant.node.sku}
-                                                    </Text>
-                                                  )}
                                                 </div>
                                                 
                                                 {/* Inventory Details with Live Preview */}
-                                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
                                                   <div>
                                                     <Text as="p" variant="bodyXs" tone="subdued">
                                                       Stock:
@@ -4060,6 +4130,82 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                                                       </Text>
                                                     </div>
                                                   )}
+                                                  
+                                                  {/* SKU with Before/After Preview */}
+                                                  <div>
+                                                    <Text as="p" variant="bodyXs" tone="subdued">
+                                                      SKU:
+                                                    </Text>
+                                                    {applySkuChanges && bulkSkuValue ? (
+                                                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                        {variant.node.sku && variant.node.sku !== bulkSkuValue && (
+                                                          <Text as="span" variant="bodyXs" tone="subdued">
+                                                            <span style={{ textDecoration: 'line-through' }}>
+                                                              {variant.node.sku}
+                                                            </span>
+                                                          </Text>
+                                                        )}
+                                                        <Text as="span" variant="bodyXs" fontWeight="semibold" tone="success">
+                                                          {bulkSkuValue}
+                                                        </Text>
+                                                      </div>
+                                                    ) : (
+                                                      <Text as="span" variant="bodyXs" fontWeight="medium">
+                                                        {variant.node.sku || '—'}
+                                                      </Text>
+                                                    )}
+                                                  </div>
+                                                  
+                                                  {/* Barcode with Before/After Preview */}
+                                                  <div>
+                                                    <Text as="p" variant="bodyXs" tone="subdued">
+                                                      Barcode:
+                                                    </Text>
+                                                    {applyBarcodeChanges && barcodeValue ? (
+                                                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                        {variant.node.barcode && variant.node.barcode !== barcodeValue && (
+                                                          <Text as="span" variant="bodyXs" tone="subdued">
+                                                            <span style={{ textDecoration: 'line-through' }}>
+                                                              {variant.node.barcode}
+                                                            </span>
+                                                          </Text>
+                                                        )}
+                                                        <Text as="span" variant="bodyXs" fontWeight="semibold" tone="success">
+                                                          {barcodeValue}
+                                                        </Text>
+                                                      </div>
+                                                    ) : (
+                                                      <Text as="span" variant="bodyXs" fontWeight="medium">
+                                                        {variant.node.barcode || '—'}
+                                                      </Text>
+                                                    )}
+                                                  </div>
+                                                  
+                                                  {/* Continue Selling with Before/After Preview */}
+                                                  <div>
+                                                    <Text as="p" variant="bodyXs" tone="subdued">
+                                                      Continue Selling:
+                                                    </Text>
+                                                    {applyContinueSellingChanges && continueSellingWhenOutOfStock !== null ? (
+                                                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                        {variant.node.inventoryPolicy !== undefined && 
+                                                         ((variant.node.inventoryPolicy === 'CONTINUE') !== continueSellingWhenOutOfStock) && (
+                                                          <Text as="span" variant="bodyXs" tone="subdued">
+                                                            <span style={{ textDecoration: 'line-through' }}>
+                                                              {variant.node.inventoryPolicy === 'CONTINUE' ? 'Yes' : 'No'}
+                                                            </span>
+                                                          </Text>
+                                                        )}
+                                                        <Text as="span" variant="bodyXs" fontWeight="semibold" tone="success">
+                                                          {continueSellingWhenOutOfStock ? 'Yes' : 'No'}
+                                                        </Text>
+                                                      </div>
+                                                    ) : (
+                                                      <Text as="span" variant="bodyXs" fontWeight="medium">
+                                                        {variant.node.inventoryPolicy === 'CONTINUE' ? 'Yes' : 'No'}
+                                                      </Text>
+                                                    )}
+                                                  </div>
                                                 </div>
                                               </div>
                                             );
@@ -4170,19 +4316,49 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                         </div>
                       </InlineStack>
 
-                      {/* Continue Selling When Out of Stock */}
-                      <InlineStack gap="300" blockAlign="center">
-                        <Text as="p" variant="bodyMd">
+                      {/* Continue Selling When Out of Stock - 3-State Control */}
+                      <div>
+                        <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
                           Continue selling when out of stock
                         </Text>
-                        <Button
-                          onClick={() => setContinueSellingWhenOutOfStock(!continueSellingWhenOutOfStock)}
-                          pressed={continueSellingWhenOutOfStock}
-                          size="slim"
-                        >
-                          {continueSellingWhenOutOfStock ? 'Yes' : 'No'}
-                        </Button>
-                      </InlineStack>
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: 'repeat(3, 1fr)', 
+                          gap: '8px', 
+                          marginTop: '8px' 
+                        }}>
+                          <Button
+                            variant={continueSellingWhenOutOfStock === true ? 'primary' : 'secondary'}
+                            onClick={() => {
+                              setApplyContinueSellingChanges(true);
+                              setContinueSellingWhenOutOfStock(true);
+                            }}
+                            size="large"
+                          >
+                            Yes
+                          </Button>
+                          <Button
+                            variant={continueSellingWhenOutOfStock === false ? 'primary' : 'secondary'}
+                            onClick={() => {
+                              setApplyContinueSellingChanges(true);
+                              setContinueSellingWhenOutOfStock(false);
+                            }}
+                            size="large"
+                          >
+                            No
+                          </Button>
+                          <Button
+                            variant={continueSellingWhenOutOfStock === null ? 'primary' : 'secondary'}
+                            onClick={() => {
+                              setApplyContinueSellingChanges(false);
+                              setContinueSellingWhenOutOfStock(null);
+                            }}
+                            size="large"
+                          >
+                            Leave Empty
+                          </Button>
+                        </div>
+                      </div>
 
                       <Button
                         variant="primary"
@@ -4215,8 +4391,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           animation: 'slideInRight 0.3s ease-out'
         }}>
           <div style={{
-            backgroundColor: notification.error ? '#FEF2F2' : '#F0FDF4',
-            border: `2px solid ${notification.error ? '#FCA5A5' : '#86EFAC'}`,
+            backgroundColor: notification.loading ? '#F0F9FF' : (notification.error ? '#FEF2F2' : '#F0FDF4'),
+            border: `2px solid ${notification.loading ? '#60A5FA' : (notification.error ? '#FCA5A5' : '#86EFAC')}`,
             borderRadius: '12px',
             padding: '16px',
             boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
@@ -4224,48 +4400,61 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
             alignItems: 'flex-start',
             gap: '12px'
           }}>
-            {/* Success/Error Icon */}
+            {/* Icon: Loading spinner, error, or success */}
             <div style={{
               width: '40px',
               height: '40px',
               borderRadius: '50%',
-              backgroundColor: notification.error ? '#FCA5A5' : '#22C55E',
+              backgroundColor: notification.loading ? '#60A5FA' : (notification.error ? '#FCA5A5' : '#22C55E'),
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0
             }}>
-              <span style={{ fontSize: '24px', color: 'white' }}>
-                {notification.error ? '⚠️' : '✓'}
-              </span>
+              {notification.loading ? (
+                <div style={{
+                  width: '20px',
+                  height: '20px',
+                  border: '3px solid rgba(255, 255, 255, 0.3)',
+                  borderTopColor: 'white',
+                  borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite'
+                }} />
+              ) : (
+                <span style={{ fontSize: '24px', color: 'white' }}>
+                  {notification.error ? '⚠️' : '✓'}
+                </span>
+              )}
             </div>
             
             {/* Message */}
             <div style={{ flex: 1, paddingTop: '4px' }}>
-              <Text as="p" variant="bodyMd" fontWeight="semibold" tone={notification.error ? 'critical' : 'success'}>
-                {notification.error ? 'Update Error' : 'Success!'}
+              <Text as="p" variant="bodyMd" fontWeight="semibold" tone={notification.loading ? 'base' : (notification.error ? 'critical' : 'success')}>
+                {notification.loading ? 'Processing...' : (notification.error ? 'Update Error' : 'Success!')}
               </Text>
-              <Text as="p" variant="bodySm">
+              <Text as="p" variant="bodySm" tone={notification.loading ? 'subdued' : undefined}>
                 {notification.message}
               </Text>
             </div>
             
-            {/* Close Button */}
-            <button
-              onClick={() => setNotification({ show: false, message: '' })}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '4px',
-                color: '#6B7280',
-                fontSize: '20px',
-                lineHeight: '1',
-                flexShrink: 0
-              }}
-            >
-              ×
-            </button>
+            {/* Close Button (only show for non-loading states) */}
+            {!notification.loading && (
+              <button
+                onClick={() => setNotification({ show: false, message: '' })}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  color: '#6B7280',
+                  fontSize: '20px',
+                  lineHeight: '1',
+                  flexShrink: 0
+                }}
+              >
+                ×
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -98,6 +98,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         id
                         title
                         inventoryQuantity
+                        inventoryPolicy
                         price
                         sku
                         inventoryItem {
@@ -169,6 +170,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         id
                         title
                         inventoryQuantity
+                        inventoryPolicy
                         price
                       }
                     }
@@ -236,6 +238,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         id
                         title
                         inventoryQuantity
+                        inventoryPolicy
                         price
                       }
                     }
@@ -1457,18 +1460,34 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (actionType === "update-inventory") {
     try {
-      const { variantIds, stockQuantity, stockUpdateMethod } = requestData;
+      const { 
+        variantIds, 
+        stockQuantity, 
+        stockUpdateMethod,
+        applySku,
+        sku,
+        applyBarcode,
+        barcode,
+        applyContinueSelling,
+        continueSelling
+      } = requestData;
 
       console.log('📦 Inventory Update Request:', {
         variantCount: variantIds?.length,
         stockQuantity,
-        stockUpdateMethod
+        stockUpdateMethod,
+        applySku,
+        applyBarcode,
+        applyContinueSelling
       });
 
       if (!variantIds || !Array.isArray(variantIds)) {
         return json({ error: "Variant IDs are required" }, { status: 400 });
       }
 
+      // Check if we're updating only metadata (no stock changes)
+      const isOnlyMetadata = !stockQuantity && (applySku || applyBarcode || applyContinueSelling);
+      
       // Simplified to stock-only operations
       const quantity = parseInt(stockQuantity) || 0;
 
@@ -1657,7 +1676,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         console.log(`⚠️ Skipped ${skippedVariants.length} variants (inventory not tracked)`);
       }
 
-      if (changes.length === 0) {
+      if (changes.length === 0 && !isOnlyMetadata) {
         return json({
           success: skippedVariants.length === 0, // Only success if nothing was skipped
           results: [],
@@ -1672,58 +1691,182 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
       }
 
-      // Execute SINGLE bulk mutation with ALL changes
-      const adjustResponse = await admin.graphql(
-        `#graphql
-          mutation InventoryAdjustQuantities($input: InventoryAdjustQuantitiesInput!) {
-            inventoryAdjustQuantities(input: $input) {
-              inventoryAdjustmentGroup {
-                createdAt
-                reason
-                changes {
-                  name
-                  delta
+      // Execute inventory adjustment ONLY if we have stock changes
+      if (!isOnlyMetadata && changes.length > 0) {
+        const adjustResponse = await admin.graphql(
+          `#graphql
+            mutation InventoryAdjustQuantities($input: InventoryAdjustQuantitiesInput!) {
+              inventoryAdjustQuantities(input: $input) {
+                inventoryAdjustmentGroup {
+                  createdAt
+                  reason
+                  changes {
+                    name
+                    delta
+                  }
+                }
+                userErrors {
+                  field
+                  message
+                  code
                 }
               }
-              userErrors {
-                field
-                message
-                code
+            }`,
+          {
+            variables: {
+              input: {
+                reason: "correction",
+                name: "available",
+                referenceDocumentUri: "gid://spector-app/BulkUpdate/" + Date.now(),
+                changes: changes
               }
-            }
-          }`,
-        {
-          variables: {
-            input: {
-              reason: "correction",
-              name: "available",
-              referenceDocumentUri: "gid://spector-app/BulkUpdate/" + Date.now(),
-              changes: changes
-            }
-          },
-        }
-      );
+            },
+          }
+        );
 
-      const adjustJson: any = await adjustResponse.json();
-      
-      if (adjustJson.errors || adjustJson.data?.inventoryAdjustQuantities?.userErrors?.length > 0) {
-        const errorMessage = adjustJson.errors?.[0]?.message || 
-                           adjustJson.data?.inventoryAdjustQuantities?.userErrors?.[0]?.message || 
-                           'Unknown error';
-        console.error(`❌ Bulk inventory adjust failed:`, errorMessage);
-        return json({ error: errorMessage }, { status: 500 });
+        const adjustJson: any = await adjustResponse.json();
+        
+        if (adjustJson.errors || adjustJson.data?.inventoryAdjustQuantities?.userErrors?.length > 0) {
+          const errorMessage = adjustJson.errors?.[0]?.message || 
+                             adjustJson.data?.inventoryAdjustQuantities?.userErrors?.[0]?.message || 
+                             'Unknown error';
+          console.error(`❌ Bulk inventory adjust failed:`, errorMessage);
+          return json({ error: errorMessage }, { status: 500 });
+        }
+
+        console.log(`✅ Bulk inventory adjustment successful for ${changes.length} variants`);
       }
 
-      console.log(`✅ Bulk inventory adjustment successful for ${changes.length} variants`);
+      // Update SKU, Barcode, and Continue Selling if requested
+      const metadataResults: any[] = [];
+      
+      if (applySku || applyBarcode || applyContinueSelling) {
+        console.log(`🏷️ Updating metadata for ${variantIds.length} variants...`);
+        
+        for (const variantId of variantIds) {
+          try {
+            // Build the variant input object
+            const variantInput: any = { id: variantId };
+            
+            if (applySku) {
+              variantInput.sku = sku || '';
+            }
+            
+            if (applyBarcode) {
+              variantInput.barcode = barcode || '';
+            }
+            
+            if (applyContinueSelling && continueSelling !== null) {
+              variantInput.inventoryPolicy = continueSelling ? 'CONTINUE' : 'DENY';
+            }
+            
+            // Update the variant using productVariantsBulkUpdate
+            // First, get the product ID for this variant
+            const variantDataResponse = await admin.graphql(
+              `#graphql
+                query getVariantProduct($variantId: ID!) {
+                  productVariant(id: $variantId) {
+                    id
+                    product {
+                      id
+                    }
+                  }
+                }`,
+              {
+                variables: { variantId }
+              }
+            );
+            
+            const variantDataJson: any = await variantDataResponse.json();
+            const productId = variantDataJson.data?.productVariant?.product?.id;
+            
+            if (!productId) {
+              throw new Error('Could not find product for variant');
+            }
+            
+            // Now update the variant
+            const variantUpdateResponse = await admin.graphql(
+              `#graphql
+                mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+                  productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+                    productVariants {
+                      id
+                      sku
+                      barcode
+                      inventoryPolicy
+                    }
+                    userErrors {
+                      field
+                      message
+                    }
+                  }
+                }`,
+              {
+                variables: {
+                  productId: productId,
+                  variants: [variantInput]
+                }
+              }
+            );
+            
+            const variantUpdateJson: any = await variantUpdateResponse.json();
+            
+            if (variantUpdateJson.data?.productVariantsBulkUpdate?.userErrors?.length > 0) {
+              const errors = variantUpdateJson.data.productVariantsBulkUpdate.userErrors;
+              console.warn(`⚠️ Metadata update failed for ${variantId}:`, errors);
+              metadataResults.push({
+                variantId,
+                success: false,
+                error: errors.map((e: any) => e.message).join(', ')
+              });
+            } else {
+              console.log(`✅ Updated metadata for ${variantId}`);
+              metadataResults.push({
+                variantId,
+                success: true
+              });
+            }
+          } catch (error) {
+            console.error(`❌ Error updating metadata for ${variantId}:`, error);
+            metadataResults.push({
+              variantId,
+              success: false,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+          }
+        }
+        
+        console.log(`✅ Completed metadata updates: ${metadataResults.filter(r => r.success).length} successful, ${metadataResults.filter(r => !r.success).length} failed`);
+      }
 
-      // Prepare results
-      const results = Array.from(variantMap.entries()).map(([variantId, data]) => ({
-        variantId,
-        success: true,
-        oldQuantity: data.oldQuantity,
-        newQuantity: data.newQuantity,
-        delta: data.delta
-      }));
+      // Prepare results (combine stock and metadata results if both exist)
+      let results;
+      if (isOnlyMetadata) {
+        // Only metadata was updated
+        results = metadataResults;
+      } else if (metadataResults.length > 0) {
+        // Both stock and metadata were updated - merge results
+        results = Array.from(variantMap.entries()).map(([variantId, data]) => {
+          const metaResult = metadataResults.find(r => r.variantId === variantId);
+          return {
+            variantId,
+            success: metaResult ? metaResult.success : true,
+            oldQuantity: data.oldQuantity,
+            newQuantity: data.newQuantity,
+            delta: data.delta,
+            error: metaResult?.error
+          };
+        });
+      } else {
+        // Only stock was updated
+        results = Array.from(variantMap.entries()).map(([variantId, data]) => ({
+          variantId,
+          success: true,
+          oldQuantity: data.oldQuantity,
+          newQuantity: data.newQuantity,
+          delta: data.delta
+        }));
+      }
       
       // Prepare updated variants data for immediate UI update
       const updatedVariants = results.map(r => ({
