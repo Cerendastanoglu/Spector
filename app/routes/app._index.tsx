@@ -57,11 +57,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       const analyticsModule = await import("./app.api.product-analytics");
       // Call the loader function from product-analytics route
       const analyticsResponse = await analyticsModule.loader({ request } as any);
-      const analyticsJson = await analyticsResponse.json();
-      productAnalytics = analyticsJson.success ? analyticsJson.data : null;
-      logger.info("🔵 Main Loader: Product analytics loaded successfully");
+      
+      // Check if response is a redirect (session expired)
+      if (analyticsResponse.status === 302 || analyticsResponse.status === 301) {
+        logger.warn('🟡 Main Loader: Analytics request redirected (likely session expired), skipping...');
+        productAnalytics = null;
+      } else if (!analyticsResponse.ok) {
+        logger.error(`🔴 Main Loader: Analytics request failed with status ${analyticsResponse.status}`);
+        productAnalytics = null;
+      } else {
+        const analyticsJson = await analyticsResponse.json();
+        productAnalytics = analyticsJson.success ? analyticsJson.data : null;
+        logger.info("🔵 Main Loader: Product analytics loaded successfully");
+      }
     } catch (err) {
-      logger.error('🔴 Main Loader: Error loading product analytics:', err);
+      logger.error('🔴 Main Loader: Error loading product analytics:', err instanceof Error ? err.message : 'Unknown error');
+      productAnalytics = null;
     }
     
     // Load products directly in loader
@@ -77,11 +88,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         body: formData,
       });
       const productsResponse = await productsModule.action({ request: productsRequest } as any);
-      const productsJson = await productsResponse.json();
-      initialProducts = productsJson.products || null;
-      logger.info("🔵 Main Loader: Products loaded successfully");
+      
+      // Check if response is a redirect (session expired)
+      if (productsResponse.status === 302 || productsResponse.status === 301) {
+        logger.warn('🟡 Main Loader: Products request redirected (likely session expired), skipping...');
+        initialProducts = null;
+      } else if (!productsResponse.ok) {
+        logger.error(`🔴 Main Loader: Products request failed with status ${productsResponse.status}`);
+        initialProducts = null;
+      } else {
+        const productsJson = await productsResponse.json();
+        initialProducts = productsJson.products || null;
+        logger.info("🔵 Main Loader: Products loaded successfully");
+      }
     } catch (err) {
-      logger.error('🔴 Main Loader: Error loading products:', err);
+      logger.error('🔴 Main Loader: Error loading products:', err instanceof Error ? err.message : 'Unknown error');
+      initialProducts = null;
     }
     
     // Load forecasting data directly in loader
@@ -90,11 +112,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       logger.info("🔵 Main Loader: Fetching forecasting data...");
       const forecastingModule = await import("./app.api.inventory-forecasting");
       const forecastingResponse = await forecastingModule.loader({ request } as any);
-      const forecastingJson = await forecastingResponse.json();
-      forecastingData = (forecastingJson.success && 'data' in forecastingJson) ? forecastingJson.data : null;
-      logger.info("🔵 Main Loader: Forecasting data loaded successfully");
+      
+      // Check if response is a redirect (session expired)
+      if (forecastingResponse.status === 302 || forecastingResponse.status === 301) {
+        logger.warn('🟡 Main Loader: Forecasting request redirected (likely session expired), skipping...');
+        forecastingData = null;
+      } else if (!forecastingResponse.ok) {
+        logger.error(`🔴 Main Loader: Forecasting request failed with status ${forecastingResponse.status}`);
+        forecastingData = null;
+      } else {
+        const forecastingJson = await forecastingResponse.json();
+        forecastingData = (forecastingJson.success && 'data' in forecastingJson) ? forecastingJson.data : null;
+        logger.info("🔵 Main Loader: Forecasting data loaded successfully");
+      }
     } catch (err) {
-      logger.error('🔴 Main Loader: Error loading forecasting data:', err);
+      logger.error('🔴 Main Loader: Error loading forecasting data:', err instanceof Error ? err.message : 'Unknown error');
+      forecastingData = null;
     }
     
     return {

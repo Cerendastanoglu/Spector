@@ -48,6 +48,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const { admin } = await authenticate.admin(request);
     logger.info("🔵 Inventory Forecasting API: Authentication successful");
 
+    // Safety limits for forecasting
+    const MAX_PRODUCTS_TO_ANALYZE = 250;
+    const MAX_ORDERS_TO_ANALYZE = 250;
+
     // Calculate 60 days ago date
     const sixtyDaysAgo = new Date();
     sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
@@ -58,7 +62,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // GraphQL query to get all products with inventory and variants
     const productsResponse = await admin.graphql(`
       query {
-        products(first: 250) {
+        products(first: ${MAX_PRODUCTS_TO_ANALYZE}) {
           edges {
             node {
               id
@@ -92,7 +96,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // GraphQL query to get orders from the last 60 days
     const ordersResponse = await admin.graphql(`
       query {
-        orders(first: 250, sortKey: CREATED_AT, reverse: true, query: "created_at:>='${sixtyDaysAgoISO}'") {
+        orders(first: ${MAX_ORDERS_TO_ANALYZE}, sortKey: CREATED_AT, reverse: true, query: "created_at:>='${sixtyDaysAgoISO}'") {
           edges {
             node {
               id

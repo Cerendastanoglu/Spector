@@ -22,6 +22,7 @@ interface ProductVariant {
   title: string;
   inventoryQuantity: number;
   price: string;
+  compareAtPrice?: string;
   sku?: string;
   inventoryItem?: {
     id: string;
@@ -424,12 +425,22 @@ export function ProductTable({
                     color: '#111827', 
                     verticalAlign: 'middle' 
                   }}>
-                    <Text as="span" variant="bodySm">
-                      {hasMultipleVariants 
-                        ? `${product.variants.edges.length} variants` 
-                        : `${shopCurrency}${product.variants?.edges?.[0]?.node?.price || '0.00'}`
-                      }
-                    </Text>
+                    {hasMultipleVariants ? (
+                      <Text as="span" variant="bodySm">
+                        {`${product.variants.edges.length} variants`}
+                      </Text>
+                    ) : (
+                      <BlockStack gap="050">
+                        <Text as="span" variant="bodySm" fontWeight="medium">
+                          {`${shopCurrency}${product.variants?.edges?.[0]?.node?.price || '0.00'}`}
+                        </Text>
+                        <Text as="span" variant="bodyXs" tone="subdued">
+                          {product.variants?.edges?.[0]?.node?.compareAtPrice 
+                            ? `Compare: ${shopCurrency}${product.variants.edges[0].node.compareAtPrice}`
+                            : 'No compare at'}
+                        </Text>
+                      </BlockStack>
+                    )}
                   </td>
                   
                   {/* Actions column */}
@@ -586,32 +597,66 @@ export function ProductTable({
                           </div>
                         </div>
                         
-                        {/* Description Section - ALWAYS SHOW */}
+                        {/* Description & SKU Section - ALWAYS SHOW */}
                         <div>
-                          <BlockStack gap="150">
-                            <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
-                              Description
-                            </Text>
-                            <div style={{
-                              padding: '8px',
-                              backgroundColor: '#ffffff',
-                              borderRadius: '6px',
-                              border: '1px solid #e5e7eb',
-                              maxHeight: '80px',
-                              overflowY: 'auto',
-                              minHeight: '28px',
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}>
-                              {product.description ? (
-                                <Text as="p" variant="bodyXs" tone="base">
-                                  {product.description}
+                          <BlockStack gap="300">
+                            <div>
+                              <BlockStack gap="150">
+                                <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
+                                  Description
                                 </Text>
-                              ) : (
-                                <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
-                                  No description
+                                <div style={{
+                                  padding: '8px',
+                                  backgroundColor: '#ffffff',
+                                  borderRadius: '6px',
+                                  border: '1px solid #e5e7eb',
+                                  maxHeight: '80px',
+                                  overflowY: 'auto',
+                                  minHeight: '28px',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}>
+                                  {product.description ? (
+                                    <Text as="p" variant="bodyXs" tone="base">
+                                      {product.description}
+                                    </Text>
+                                  ) : (
+                                    <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
+                                      No description
+                                    </Text>
+                                  )}
+                                </div>
+                              </BlockStack>
+                            </div>
+                            
+                            {/* SKU Section */}
+                            <div>
+                              <BlockStack gap="150">
+                                <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
+                                  SKU
                                 </Text>
-                              )}
+                                <div style={{
+                                  padding: '6px 8px',
+                                  backgroundColor: '#ffffff',
+                                  borderRadius: '6px',
+                                  border: '1px solid #e5e7eb',
+                                  minHeight: '28px',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}>
+                                  {product.variants?.edges?.[0]?.node?.sku ? (
+                                    <Text as="span" variant="bodyXs" fontWeight="medium" tone="base">
+                                      {product.variants.edges.length > 1 
+                                        ? `${product.variants.edges.length} variants with SKUs` 
+                                        : product.variants.edges[0].node.sku}
+                                    </Text>
+                                  ) : (
+                                    <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
+                                      No SKU
+                                    </Text>
+                                  )}
+                                </div>
+                              </BlockStack>
                             </div>
                           </BlockStack>
                         </div>
@@ -671,6 +716,14 @@ export function ProductTable({
                                           <Text as="p" variant="bodyXs" tone="subdued">Price</Text>
                                           <Text as="p" variant="bodySm" fontWeight="medium">
                                             {shopCurrency}{variant.node.price}
+                                          </Text>
+                                        </div>
+                                        <div style={{ textAlign: 'center' }}>
+                                          <Text as="p" variant="bodyXs" tone="subdued">Compare At</Text>
+                                          <Text as="p" variant="bodySm" fontWeight="medium" tone={variant.node.compareAtPrice ? "base" : "subdued"}>
+                                            {variant.node.compareAtPrice 
+                                              ? `${shopCurrency}${variant.node.compareAtPrice}`
+                                              : 'No compare at'}
                                           </Text>
                                         </div>
                                       </InlineStack>

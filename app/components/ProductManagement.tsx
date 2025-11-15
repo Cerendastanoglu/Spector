@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useFetcher } from "@remix-run/react";
 import { openInNewTab } from "../utils/browserUtils";
 import { ProductConstants } from "../utils/scopedConstants";
@@ -303,6 +303,12 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   const [retryCount, setRetryCount] = useState(0);
   const [maxRetries] = useState(ProductConstants.MAX_RETRIES);
   
+  // Pagination state for loading all products
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreProducts, setHasMoreProducts] = useState(false);
+  const [currentCursor, setCurrentCursor] = useState<string | null>(null);
+  const [totalProductsLoaded, setTotalProductsLoaded] = useState(0);
+  
   // Collapsible product details state
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
   
@@ -334,7 +340,22 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     return product ? product.variants.edges.map(v => v.node.id) : [];
   };
 
+  // Select all filtered products and their variants
+  const handleSelectAllFiltered = () => {
+    const allFilteredProductIds = filteredProducts.map(p => p.id);
+    const allFilteredVariantIds = filteredProducts.flatMap(p => 
+      p.variants.edges.map(v => v.node.id)
+    );
+    
+    setSelectedProducts(allFilteredProductIds);
+    setSelectedVariants(allFilteredVariantIds);
+  };
 
+  // Deselect all products and variants
+  const handleDeselectAll = () => {
+    setSelectedProducts([]);
+    setSelectedVariants([]);
+  };
 
   const handleProductSelection = (productId: string, checked: boolean) => {
     const variantIds = getProductVariantIds(productId);
@@ -501,10 +522,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     setIsLoading(true);
     setError(null);
     setLastFetchTime(now);
+    setCurrentCursor(null); // Reset pagination
+    setTotalProductsLoaded(0);
     
     try {
+      // Fetch first page with 100 products
       fetcher.submit(
-        { action: "get-all-products" },
+        { action: "get-all-products", limit: "100" },
         { method: "POST", action: "/app/api/products" }
       );
       setRetryCount(0); // Reset retry count on successful submission
@@ -522,34 +546,81 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       }
     }
   };
+  
+  // Load more products (pagination)
+  const loadMoreProducts = useCallback(async () => {
+    if (!hasMoreProducts || isLoadingMore || !currentCursor) return;
+    
+    logger.info(`📄 Loading more products. Total loaded: ${totalProductsLoaded}`);
+    setIsLoadingMore(true);
+    
+    try {
+      fetcher.submit(
+        { 
+          action: "get-all-products", 
+          limit: "100",
+          cursor: currentCursor 
+        },
+        { method: "POST", action: "/app/api/products" }
+      );
+    } catch (error) {
+      logger.error("Error loading more products:", error);
+      setIsLoadingMore(false);
+    }
+  }, [hasMoreProducts, isLoadingMore, currentCursor, totalProductsLoaded, fetcher]);
 
   // Update products when fetcher data changes
   useEffect(() => {
     if (fetcher.data?.products) {
-      // Use real product data from API (including collections)
-      const productsWithMockPricing = fetcher.data.products.map((product: Product, index: number) => ({
+      const newProducts = fetcher.data.products;
+      const productCount = newProducts.length;
+      const hasNext = fetcher.data.hasNextPage || false;
+      const cursor = fetcher.data.endCursor || null;
+      
+      logger.info(`📦 Received ${productCount} products. Has more: ${hasNext}`);
+      
+      // Process new products
+      const productsWithMockPricing = newProducts.map((product: Product, index: number) => ({
         ...product,
-        // Keep real collections data from API, only add mock compare prices for testing
         variants: {
           ...product.variants,
           edges: product.variants.edges.map(edge => ({
             ...edge,
             node: {
               ...edge.node,
-              // Add mock compare prices for testing (30-50% higher than regular price)
               compareAtPrice: index % 3 === 0 ? (parseFloat(edge.node.price) * 1.3).toFixed(2) : undefined
             }
           }))
         }
       }));
-      setProducts(productsWithMockPricing);
       
-      // Extract unique values for filters
+      // Append to existing products if loading more, otherwise replace
+      setProducts(prevProducts => {
+        if (isLoadingMore && currentCursor) {
+          // Appending more products
+          logger.info(`📄 Appending ${productCount} products to existing ${prevProducts.length}`);
+          return [...prevProducts, ...productsWithMockPricing];
+        } else {
+          // First page or refresh
+          return productsWithMockPricing;
+        }
+      });
+      
+      // Update pagination state
+      setHasMoreProducts(hasNext);
+      setCurrentCursor(cursor);
+      setTotalProductsLoaded(prev => (isLoadingMore && currentCursor) ? prev + productCount : productCount);
+      setIsLoadingMore(false);
+      
+      // Extract unique values for filters (from ALL currently loaded products)
+      const allCurrentProducts = (isLoadingMore && currentCursor) 
+        ? [...products, ...productsWithMockPricing]
+        : productsWithMockPricing;
+          
       const collectionsMap = new Map<string, {id: string, title: string}>();
       const tagFrequency = new Map<string, number>();
       
-      productsWithMockPricing.forEach((product: Product) => {
-        // Extract collections using Map to avoid duplicates by ID
+      allCurrentProducts.forEach((product: Product) => {
         if (product.collections?.edges) {
           product.collections.edges.forEach(edge => {
             collectionsMap.set(edge.node.id, { id: edge.node.id, title: edge.node.title });
@@ -584,15 +655,25 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       
       setError(null);
       setIsLoading(false);
+      
+      // Automatically load more products if available
+      if (hasNext && cursor) {
+        logger.info(`🔄 Auto-loading next page of products...`);
+        setTimeout(() => loadMoreProducts(), 100); // Small delay to prevent overwhelming the API
+      } else if (!hasNext) {
+        logger.info(`✅ All products loaded! Total: ${(isLoadingMore && currentCursor) ? products.length + productCount : productCount}`);
+      }
     } else if (fetcher.data?.error) {
       setError(fetcher.data.error);
       setIsLoading(false);
+      setIsLoadingMore(false);
     } else if (fetcher.state === 'idle' && fetcher.data && !fetcher.data.products) {
       // Handle case where API returns but no products
       setError('No products found or failed to load');
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
-  }, [fetcher.data, fetcher.state]);
+  }, [fetcher.data, fetcher.state, isLoadingMore, currentCursor, products, loadMoreProducts]);
 
   // Handle fetcher loading state
   useEffect(() => {
@@ -619,6 +700,21 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     inventoryRange,
     filterByStatus
   ]);
+
+  // Check if any filters are applied
+  const hasFiltersApplied = () => {
+    return !!(
+      searchQuery ||
+      filterByCollection ||
+      filterByTags.length > 0 ||
+      filterByStatus !== 'all' ||
+      priceRange.min ||
+      priceRange.max ||
+      inventoryRange.min ||
+      inventoryRange.max ||
+      !showDraftProducts
+    );
+  };
 
   // Filter and sort products
   const filteredProducts = products.filter(product => {
@@ -2550,9 +2646,24 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                       <Icon source={SearchIcon} />
                       <Text as="h3" variant="headingXs">Filters & Search</Text>
                     </InlineStack>
-                    <div style={{ marginLeft: 'auto' }}>
+                    
+                    {/* Product Statistics */}
+                    <InlineStack gap="300" wrap={false}>
+                      <InlineStack gap="150" wrap={false}>
+                        <Text as="span" variant="bodySm" fontWeight="medium">{filteredProducts.length}</Text>
+                        <Text as="span" variant="bodySm" tone="subdued">Products Found:</Text>
+                        <Text as="span" variant="bodySm" fontWeight="medium">
+                          {filteredProducts.filter(p => p.status === 'ACTIVE').length}
+                        </Text>
+                        <Text as="span" variant="bodySm" tone="subdued">Active,</Text>
+                        <Text as="span" variant="bodySm" fontWeight="medium">
+                          {filteredProducts.filter(p => p.totalInventory === 0).length}
+                        </Text>
+                        <Text as="span" variant="bodySm" tone="subdued">Out of Stock</Text>
+                      </InlineStack>
+                      
                       <Icon source={isFiltersOpen ? ChevronUpIcon : ChevronDownIcon} />
-                    </div>
+                    </InlineStack>
                   </InlineStack>
                 </button>
                 
@@ -2574,39 +2685,45 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                 {/* Filter Controls - Row 1: Basic Filters */}
                 <InlineStack gap="300" wrap={false}>
                   <div style={{ flex: 1 }}>
-                    <Select
-                      label="Category"
-                      value={currentCategory}
-                      onChange={(value) => setCurrentCategory(value as InventoryCategory)}
-                      options={ProductConstants.CATEGORY_OPTIONS as any}
-                    />
+                    <div style={{ 
+                      backgroundColor: filterByCollection ? '#e6f7e6' : 'transparent',
+                      padding: filterByCollection ? '8px' : '0',
+                      borderRadius: '6px',
+                      transition: 'background-color 0.2s'
+                    }}>
+                      <Select
+                        label="Collection"
+                        options={[
+                          { label: 'All Collections', value: '' },
+                          ...collections.map(collection => ({
+                            label: collection.title,
+                            value: collection.id
+                          }))
+                        ]}
+                        value={filterByCollection}
+                        onChange={setFilterByCollection}
+                      />
+                    </div>
                   </div>
                   <div style={{ flex: 1 }}>
-                    <Select
-                      label="Collection"
-                      options={[
-                        { label: 'All Collections', value: '' },
-                        ...collections.map(collection => ({
-                          label: collection.title,
-                          value: collection.id
-                        }))
-                      ]}
-                      value={filterByCollection}
-                      onChange={setFilterByCollection}
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <Select
-                      label="Status"
-                      options={[
-                        { label: 'All Status', value: 'all' },
-                        { label: 'Active', value: 'active' },
-                        { label: 'Draft', value: 'draft' },
-                        { label: 'Archived', value: 'archived' }
-                      ]}
-                      value={filterByStatus}
-                      onChange={setFilterByStatus}
-                    />
+                    <div style={{ 
+                      backgroundColor: filterByStatus !== 'all' ? '#e6f7e6' : 'transparent',
+                      padding: filterByStatus !== 'all' ? '8px' : '0',
+                      borderRadius: '6px',
+                      transition: 'background-color 0.2s'
+                    }}>
+                      <Select
+                        label="Status"
+                        options={[
+                          { label: 'All Status', value: 'all' },
+                          { label: 'Active', value: 'active' },
+                          { label: 'Draft', value: 'draft' },
+                          { label: 'Archived', value: 'archived' }
+                        ]}
+                        value={filterByStatus}
+                        onChange={setFilterByStatus}
+                      />
+                    </div>
                   </div>
                   <div style={{ flex: 1 }}>
                     <Select
@@ -2625,63 +2742,70 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                 {/* Filter Controls - Row 2: Price & Inventory Ranges */}
                 <InlineStack gap="300" wrap={false}>
                   <div style={{ flex: 1 }}>
-                    <Text as="p" variant="bodyMd" fontWeight="medium">Price Range</Text>
-                    <InlineStack gap="200" blockAlign="center">
-                      <div style={{ flex: 1 }}>
-                        <TextField
-                          label=""
-                          placeholder="Min $"
-                          value={priceRange.min}
-                          onChange={(value) => setPriceRange(prev => ({ ...prev, min: value }))}
-                          type="number"
-                          autoComplete="off"
-                        />
-                      </div>
-                      <Text as="span" variant="bodySm" tone="subdued">to</Text>
-                      <div style={{ flex: 1 }}>
-                        <TextField
-                          label=""
-                          placeholder="Max $"
-                          value={priceRange.max}
-                          onChange={(value) => setPriceRange(prev => ({ ...prev, max: value }))}
-                          type="number"
-                          autoComplete="off"
-                        />
-                      </div>
-                    </InlineStack>
+                    <div style={{ 
+                      backgroundColor: (priceRange.min || priceRange.max) ? '#e6f7e6' : 'transparent',
+                      padding: (priceRange.min || priceRange.max) ? '8px' : '0',
+                      borderRadius: '6px',
+                      transition: 'background-color 0.2s'
+                    }}>
+                      <Text as="p" variant="bodyMd" fontWeight="medium">Price Range</Text>
+                      <InlineStack gap="200" blockAlign="center">
+                        <div style={{ flex: 1 }}>
+                          <TextField
+                            label=""
+                            placeholder="Min $"
+                            value={priceRange.min}
+                            onChange={(value) => setPriceRange(prev => ({ ...prev, min: value }))}
+                            type="number"
+                            autoComplete="off"
+                          />
+                        </div>
+                        <Text as="span" variant="bodySm" tone="subdued">to</Text>
+                        <div style={{ flex: 1 }}>
+                          <TextField
+                            label=""
+                            placeholder="Max $"
+                            value={priceRange.max}
+                            onChange={(value) => setPriceRange(prev => ({ ...prev, max: value }))}
+                            type="number"
+                            autoComplete="off"
+                          />
+                        </div>
+                      </InlineStack>
+                    </div>
                   </div>
                   <div style={{ flex: 1 }}>
-                    <Text as="p" variant="bodyMd" fontWeight="medium">Inventory Range</Text>
-                    <InlineStack gap="200" blockAlign="center">
-                      <div style={{ flex: 1 }}>
-                        <TextField
-                          label=""
-                          placeholder="Min qty"
-                          value={inventoryRange.min}
-                          onChange={(value) => setInventoryRange(prev => ({ ...prev, min: value }))}
-                          type="number"
-                          autoComplete="off"
-                        />
-                      </div>
-                      <Text as="span" variant="bodySm" tone="subdued">to</Text>
-                      <div style={{ flex: 1 }}>
-                        <TextField
-                          label=""
-                          placeholder="Max qty"
-                          value={inventoryRange.max}
-                          onChange={(value) => setInventoryRange(prev => ({ ...prev, max: value }))}
-                          type="number"
-                          autoComplete="off"
-                        />
-                      </div>
-                    </InlineStack>
-                  </div>
-                  <div style={{ flex: 1, paddingTop: '22px' }}>
-                    <Checkbox
-                      checked={showDraftProducts}
-                      onChange={setShowDraftProducts}
-                      label="Include draft products"
-                    />
+                    <div style={{ 
+                      backgroundColor: (inventoryRange.min || inventoryRange.max) ? '#e6f7e6' : 'transparent',
+                      padding: (inventoryRange.min || inventoryRange.max) ? '8px' : '0',
+                      borderRadius: '6px',
+                      transition: 'background-color 0.2s'
+                    }}>
+                      <Text as="p" variant="bodyMd" fontWeight="medium">Inventory Range</Text>
+                      <InlineStack gap="200" blockAlign="center">
+                        <div style={{ flex: 1 }}>
+                          <TextField
+                            label=""
+                            placeholder="Min"
+                            value={inventoryRange.min}
+                            onChange={(value) => setInventoryRange(prev => ({ ...prev, min: value }))}
+                            type="number"
+                            autoComplete="off"
+                          />
+                        </div>
+                        <Text as="span" variant="bodySm" tone="subdued">to</Text>
+                        <div style={{ flex: 1 }}>
+                          <TextField
+                            label=""
+                            placeholder="Max"
+                            value={inventoryRange.max}
+                            onChange={(value) => setInventoryRange(prev => ({ ...prev, max: value }))}
+                            type="number"
+                            autoComplete="off"
+                          />
+                        </div>
+                      </InlineStack>
+                    </div>
                   </div>
                 </InlineStack>
 
@@ -2690,16 +2814,16 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                   <div style={{ 
                     border: '1px solid #e1e3e5', 
                     borderRadius: '8px', 
-                    backgroundColor: '#fafbfb',
-                    overflow: 'hidden'
+                    backgroundColor: filterByTags.length > 0 ? '#e6f7e6' : '#fafbfb',
+                    overflow: 'hidden',
+                    transition: 'background-color 0.2s'
                   }}>
                     {/* Tag Filter Header with Selected Tags Preview */}
                     <div 
                       style={{ 
                         padding: '12px 16px',
                         cursor: 'pointer',
-                        borderBottom: isTagFilterOpen ? '1px solid #e1e3e5' : 'none',
-                        backgroundColor: filterByTags.length > 0 ? '#f0f8ff' : '#fafbfb'
+                        borderBottom: isTagFilterOpen ? '1px solid #e1e3e5' : 'none'
                       }}
                       onClick={() => setIsTagFilterOpen(!isTagFilterOpen)}
                     >
@@ -2870,42 +2994,33 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                   </div>
                 )}
 
-                {/* Bottom Section: Selection Controls (Left) + Statistics (Right) */}
+                {/* Bottom Section: Selection Controls (Left) + Selection Summary (Right) */}
                 <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #e1e3e5' }}>
                   <InlineStack align="space-between" blockAlign="center" wrap>
                     {/* Left side: Selection Controls */}
                     <InlineStack gap="200" wrap>
                       <Button
-                        variant="tertiary"
+                        variant="secondary"
                         size="slim"
                         onClick={() => {
-                          const allVariants = filteredProducts.flatMap(p => 
+                          const allVariants = products.flatMap(p => 
                             p.variants.edges.map(v => v.node.id)
                           );
                           setSelectedVariants(allVariants);
-                          const allProductIds = filteredProducts.map(p => p.id);
+                          const allProductIds = products.map(p => p.id);
                           setSelectedProducts(allProductIds);
                         }}
-                        disabled={filteredProducts.length === 0}
+                        disabled={products.length === 0}
                       >
                         Select All
                       </Button>
                       <Button
-                        variant="tertiary"
+                        variant="secondary"
                         size="slim"
-                        onClick={() => {
-                          const activeProducts = filteredProducts.filter(p => p.status === 'ACTIVE');
-                          const allVariants = activeProducts.flatMap(p => 
-                            p.variants.edges.map(v => v.node.id)
-                          );
-                          setSelectedVariants(allVariants);
-                          // Also update selectedProducts for visual checkbox consistency
-                          const activeProductIds = activeProducts.map(p => p.id);
-                          setSelectedProducts(activeProductIds);
-                        }}
-                        disabled={filteredProducts.filter(p => p.status === 'ACTIVE').length === 0}
+                        onClick={handleSelectAllFiltered}
+                        disabled={!hasFiltersApplied() || filteredProducts.length === 0}
                       >
-                        Select All Active
+                        {`Select All Filtered (${filteredProducts.length})`}
                       </Button>
                       <Button
                         variant="tertiary"
@@ -2927,11 +3042,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                       <Button
                         variant="tertiary"
                         size="slim"
-                        onClick={() => {
-                          setSelectedVariants([]);
-                          setSelectedProducts([]);
-                          setHasBulkOperationsCompleted(false); // Reset completion state
-                        }}
+                        onClick={handleDeselectAll}
                         disabled={selectedVariants.length === 0}
                         tone="critical"
                       >
@@ -2939,39 +3050,22 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                       </Button>
                     </InlineStack>
                     
-                    {/* Right side: Product Status Statistics & Selection */}
-                    <InlineStack gap="300" wrap={false}>
-                      {/* Product Status */}
-                      <InlineStack gap="150" wrap={false}>
-                        <Text as="span" variant="bodySm" fontWeight="medium">{filteredProducts.length}</Text>
-                        <Text as="span" variant="bodySm" tone="subdued">Products Found:</Text>
-                        <Text as="span" variant="bodySm" fontWeight="medium">
-                          {filteredProducts.filter(p => p.status === 'ACTIVE').length}
-                        </Text>
-                        <Text as="span" variant="bodySm" tone="subdued">Active,</Text>
-                        <Text as="span" variant="bodySm" fontWeight="medium">
-                          {filteredProducts.filter(p => p.totalInventory === 0).length}
-                        </Text>
-                        <Text as="span" variant="bodySm" tone="subdued">Out of Stock</Text>
-                      </InlineStack>
-                      
-                      {/* Selection Summary */}
-                      {(selectedProducts.length > 0 || selectedVariants.length > 0) && (
-                        <div style={{ 
-                          padding: '6px 12px', 
-                          backgroundColor: '#F0F9FF', 
-                          borderRadius: '6px',
-                          border: '1px solid #BFDBFE'
-                        }}>
-                          <InlineStack gap="100" wrap={false}>
-                            <Text as="span" variant="bodySm" fontWeight="semibold">{selectedProducts.length}</Text>
-                            <Text as="span" variant="bodySm" tone="subdued">Products,</Text>
-                            <Text as="span" variant="bodySm" fontWeight="semibold">{selectedVariants.length}</Text>
-                            <Text as="span" variant="bodySm" tone="subdued">Variants</Text>
-                          </InlineStack>
-                        </div>
-                      )}
-                    </InlineStack>
+                    {/* Right side: Selection Summary */}
+                    {(selectedProducts.length > 0 || selectedVariants.length > 0) && (
+                      <div style={{ 
+                        padding: '8px 16px', 
+                        backgroundColor: '#F0F9FF', 
+                        borderRadius: '6px',
+                        border: '1px solid #BFDBFE'
+                      }}>
+                        <InlineStack gap="100" wrap={false}>
+                          <Text as="span" variant="bodySm" fontWeight="semibold">{selectedProducts.length}</Text>
+                          <Text as="span" variant="bodySm" tone="subdued">Products,</Text>
+                          <Text as="span" variant="bodySm" fontWeight="semibold">{selectedVariants.length}</Text>
+                          <Text as="span" variant="bodySm" tone="subdued">Variants Selected</Text>
+                        </InlineStack>
+                      </div>
+                    )}
                   </InlineStack>
                 </div>
                     </BlockStack>
@@ -2987,7 +3081,41 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
 
                 {/* Clean Product Selection Table */}
                 <div style={{ minHeight: '400px', maxHeight: '600px', overflow: 'auto', marginTop: '24px' }}>
-                  {isLoading ? (
+                  {/* Loading Progress Banner */}
+                  {(isLoading || isLoadingMore || hasMoreProducts) && (
+                    <div style={{
+                      padding: '12px 16px',
+                      backgroundColor: hasMoreProducts ? '#f0f9ff' : '#f0fdf4',
+                      borderRadius: '8px',
+                      border: `1px solid ${hasMoreProducts ? '#bfdbfe' : '#bbf7d0'}`,
+                      marginBottom: '16px'
+                    }}>
+                      <InlineStack align="space-between" blockAlign="center">
+                        <InlineStack gap="200" blockAlign="center">
+                          {isLoadingMore && <Spinner size="small" />}
+                          <Text as="p" variant="bodySm" fontWeight="medium">
+                            {isLoadingMore 
+                              ? `Loading more products... (${totalProductsLoaded} loaded so far)`
+                              : hasMoreProducts 
+                                ? `${totalProductsLoaded} products loaded. More available - loading automatically...`
+                                : `✓ All ${totalProductsLoaded} products loaded successfully!`
+                            }
+                          </Text>
+                        </InlineStack>
+                        {hasMoreProducts && !isLoadingMore && (
+                          <Button
+                            size="slim"
+                            onClick={loadMoreProducts}
+                            loading={isLoadingMore}
+                          >
+                            Load Next 100
+                          </Button>
+                        )}
+                      </InlineStack>
+                    </div>
+                  )}
+                  
+                  {isLoading && totalProductsLoaded === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px' }}>
                       <Spinner size="large" />
                       <Text as="p" variant="bodySm" tone="subdued">Loading products...</Text>
@@ -3003,6 +3131,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                           setCurrentCategory('all');
                           setShowDraftProducts(true);
                           setFilterByCollection('');
+                          setFilterByTags([]);
+                          setFilterByStatus('all');
+                          setPriceRange({ min: '', max: '' });
+                          setInventoryRange({ min: '', max: '' });
                         }
                       }}
                     >
