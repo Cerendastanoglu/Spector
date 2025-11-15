@@ -787,6 +787,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           results.push({
             productId: update.productId,
             variantId: update.variantId,
+            productTitle: update.productTitle,
             success: true,
             newPrice: updatedVariant?.price || update.price,
             newCompareAtPrice: updatedVariant?.compareAtPrice || update.compareAtPrice
