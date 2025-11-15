@@ -10,6 +10,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return json({ message: "Products API endpoint" });
 };
 
+// Safety constants to prevent crashes
+const MEMORY_WARNING_THRESHOLD = 150; // Warn if over this many products per page
+
 export const action = async ({ request }: ActionFunctionArgs) => {
   // Apply rate limiting (100 requests per minute for products API)
   const rateLimitResponse = await applyRateLimit(request, RATE_LIMITS.API_PRODUCTS);
@@ -62,11 +65,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (actionType === "get-all-products") {
     try {
+      logger.info("🔵 Fetching all products...");
+      
+      // Support pagination with cursor
+      const cursor = requestData instanceof FormData 
+        ? requestData.get("cursor")?.toString() 
+        : requestData.cursor;
+      
+      const limit = requestData instanceof FormData
+        ? parseInt(requestData.get("limit")?.toString() || "100")
+        : (requestData.limit || 100);
+      
+      logger.info(`🔵 Fetching ${limit} products${cursor ? ` after cursor ${cursor.substring(0, 20)}...` : ' (first page)'}`);
+      
       const response = await admin.graphql(
         `#graphql
-          query getAllProducts($first: Int!) {
-            products(first: $first) {
+          query getAllProducts($first: Int!, $after: String) {
+            products(first: $first, after: $after) {
               edges {
+                cursor
                 node {
                   id
                   title
@@ -118,7 +135,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           }`,
         {
           variables: {
-            first: 250,
+            first: Math.min(limit, 250), // Shopify max is 250
+            after: cursor || null,
           },
         }
       );
@@ -126,20 +144,36 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const responseJson: any = await response.json();
       
       if (responseJson.errors) {
-        console.error("GraphQL Errors:", responseJson.errors);
+        logger.error("🔴 GraphQL Errors:", responseJson.errors);
         return json({ error: "Failed to fetch products" }, { status: 500 });
       }
 
-      const products = responseJson.data?.products?.edges?.map((edge: any) => edge.node) || [];
-      const hasNextPage = responseJson.data?.products?.pageInfo?.hasNextPage || false;
+      const edges = responseJson.data?.products?.edges || [];
+      const products = edges.map((edge: any) => edge.node);
+      const pageInfo = responseJson.data?.products?.pageInfo || {};
+      const hasNextPage = pageInfo.hasNextPage || false;
+      const endCursor = edges.length > 0 ? edges[edges.length - 1].cursor : null;
+      
+      const productCount = products.length;
+      logger.info(`🔵 Fetched ${productCount} products. Has next page: ${hasNextPage}`);
+      
+      if (productCount > MEMORY_WARNING_THRESHOLD) {
+        logger.warn(`⚠️  Fetching ${productCount} products in single request. Consider using smaller page size.`);
+      }
 
       return json({
         products,
         hasNextPage,
+        endCursor,
+        productCount,
+        totalFetched: productCount,
       });
     } catch (error) {
-      console.error("Error fetching all products:", error);
-      return json({ error: "Internal server error" }, { status: 500 });
+      logger.error("🔴 Error fetching all products:", error);
+      return json({ 
+        error: "Internal server error", 
+        message: error instanceof Error ? error.message : "Unknown error" 
+      }, { status: 500 });
     }
   }
 
