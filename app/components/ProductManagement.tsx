@@ -171,7 +171,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   const fetcher = useFetcher<{ products: Product[]; hasNextPage: boolean; endCursor?: string; error?: string }>();
   const [products, setProducts] = useState<Product[]>(initialProducts || []);
   const [isLoading, setIsLoading] = useState(!initialProducts); // Don't show loading if we have initial data
-  const [bulkProgress, setBulkProgress] = useState<{current: number; total: number} | null>(null);
+  const [bulkProgress, setBulkProgress] = useState<{current: number; total: number; productName?: string} | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<string[]>([]);
   const [currentCategory, setCurrentCategory] = useState<InventoryCategory>(initialCategory);
@@ -948,7 +948,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     clearBulkMessages();
     
     // Initialize progress
-    setBulkProgress({ current: 0, total: selectedVariants.length });
+    setBulkProgress({ current: 0, total: selectedVariants.length, productName: 'Starting...' });
     
     // Show loading notification
     setNotification({
@@ -972,61 +972,56 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         type: 'pricing'
       };
       
-      // Process variants in batches of 20 to respect rate limits
-      const BATCH_SIZE = 20;
-      const batches = [];
+      let processedCount = 0;
       
-      for (let i = 0; i < selectedVariants.length; i += BATCH_SIZE) {
-        batches.push(selectedVariants.slice(i, i + BATCH_SIZE));
-      }
-      
-      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-        const batch = batches[batchIndex];
+      // Process each variant with INDIVIDUAL API calls for real progress
+      for (let i = 0; i < selectedVariants.length; i++) {
+        const variantId = selectedVariants[i];
         
-        // Update progress
-        setBulkProgress({ 
-          current: batchIndex * BATCH_SIZE, 
-          total: selectedVariants.length 
-        });
-      
-        for (let i = 0; i < batch.length; i++) {
-          const variantId = batch[i];
-          
-          // Find the product and variant
-          let targetProduct = null;
-          let targetVariant = null;
-          
-          for (const product of products) {
-            const variant = product.variants.edges.find(edge => edge.node.id === variantId);
-            if (variant) {
-              targetProduct = product;
-              targetVariant = variant.node;
-              break;
-            }
+        // Find the product and variant
+        let targetProduct = null;
+        let targetVariant = null;
+        
+        for (const product of products) {
+          const variant = product.variants.edges.find(edge => edge.node.id === variantId);
+          if (variant) {
+            targetProduct = product;
+            targetVariant = variant.node;
+            break;
           }
+        }
+        
+        if (!targetProduct || !targetVariant) {
+          failed.push(`Variant ID ${variantId}: Variant not found`);
+          processedCount++;
+          continue;
+        }
+        
+        // Update progress BEFORE making API call
+        processedCount++;
+        setBulkProgress({ 
+          current: processedCount, 
+          total: selectedVariants.length,
+          productName: `${targetProduct.title}${targetVariant.title !== 'Default Title' ? ` - ${targetVariant.title}` : ''}`
+        });
+
+        try {
+          let newPrice: number;
+          let newComparePrice: string | null = null;
+          const currentPrice = parseFloat(targetVariant.price || '0');
+          const currentComparePrice = targetVariant.compareAtPrice ? parseFloat(targetVariant.compareAtPrice) : null;
           
-          if (!targetProduct || !targetVariant) {
-            failed.push(`Variant ID ${variantId}: Variant not found`);
+          // Check if we're updating price at all
+          const isOnlyUpdatingMetadata = !applyCompareChanges && 
+            (applyCostChanges || applyTaxChanges || applyUnitPriceChanges);
+          
+          // Only validate current price if we're actually changing the price
+          if (!isOnlyUpdatingMetadata && currentPrice === 0 && priceOperation !== 'set') {
+            failed.push(`${targetProduct.title} (${targetVariant.title}): No current price found. Please set a fixed price first.`);
             continue;
           }
-
-          try {
-            let newPrice: number;
-            let newComparePrice: string | null = null;
-            const currentPrice = parseFloat(targetVariant.price || '0');
-            const currentComparePrice = targetVariant.compareAtPrice ? parseFloat(targetVariant.compareAtPrice) : null;
-            
-            // Check if we're updating price at all
-            const isOnlyUpdatingMetadata = !applyCompareChanges && 
-              (applyCostChanges || applyTaxChanges || applyUnitPriceChanges);
-            
-            // Only validate current price if we're actually changing the price
-            if (!isOnlyUpdatingMetadata && currentPrice === 0 && priceOperation !== 'set') {
-              failed.push(`${targetProduct.title} (${targetVariant.title}): No current price found. Please set a fixed price first.`);
-              continue;
-            }
-            
-            // Calculate new regular price (or keep current if only updating metadata)
+          
+          // Calculate new regular price (or keep current if only updating metadata)
             if (isOnlyUpdatingMetadata) {
               newPrice = currentPrice; // Keep existing price
             } else {
@@ -1111,19 +1106,17 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
             failed.push(`${targetProduct?.title || targetVariant.id} (${targetVariant.title}): ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
         }
-        
-        // Add delay between batches to respect Shopify API rate limits (2 req/sec)
-        if (batchIndex < batches.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-      
-      // Final progress update
-      setBulkProgress({ current: selectedVariants.length, total: selectedVariants.length });
 
       if (variantUpdates.length === 0) {
         throw new Error('No variants could be updated. Please check the errors above.');
       }
+      
+      // Update progress to show we're sending to server
+      setBulkProgress({ 
+        current: selectedVariants.length, 
+        total: selectedVariants.length,
+        productName: 'Sending updates to server...'
+      });
       
       // Make real API call to update prices
       const formData = new FormData();
@@ -1151,8 +1144,23 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         throw new Error(`Failed to communicate with server: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
       }
       
-      // Update UI immediately with new prices
+      // Update UI immediately with new prices and show progress
       if (result.success) {
+        // First, show progress for each result
+        for (let i = 0; i < result.results.length; i++) {
+          const variantResult = result.results[i];
+          if (variantResult.success) {
+            setBulkProgress({ 
+              current: i + 1, 
+              total: result.results.length,
+              productName: `Saved: ${variantResult.productTitle || 'Product'}`
+            });
+            // Small delay to show progress
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+        }
+        
+        // Then update the UI
         setProducts(prevProducts => 
           prevProducts.map(product => {
             return {
@@ -1226,9 +1234,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         setApplyCompareChanges(false);
         
         // Build success message
-        let successMessage = `✅ ${apiSuccessful.length} variant${apiSuccessful.length !== 1 ? 's' : ''} updated`;
+        let successMessage = `${apiSuccessful.length} variant${apiSuccessful.length !== 1 ? 's' : ''} updated successfully`;
         if (giftCardErrors.length > 0) {
-          successMessage += `\nℹ️ ${giftCardErrors.length} gift card${giftCardErrors.length !== 1 ? 's' : ''} skipped (can't be taxed)`;
+          successMessage += `\n${giftCardErrors.length} gift card${giftCardErrors.length !== 1 ? 's' : ''} skipped (can't be taxed)`;
         }
         
         // Show success notification
@@ -1254,9 +1262,9 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         }
       } else {
         // Show error notification with details
-        let errorMessage = `⚠️ ${apiSuccessful.length} updated, ${otherErrors.length} failed`;
+        let errorMessage = `${apiSuccessful.length} updated, ${otherErrors.length} failed`;
         if (giftCardErrors.length > 0) {
-          errorMessage += `\nℹ️ ${giftCardErrors.length} gift card${giftCardErrors.length !== 1 ? 's' : ''} skipped (can't be taxed)`;
+          errorMessage += `\n${giftCardErrors.length} gift card${giftCardErrors.length !== 1 ? 's' : ''} skipped (can't be taxed)`;
         }
         
         setNotification({
@@ -3080,21 +3088,6 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           ) : (
             <Card>
               <BlockStack gap="400">
-                {/* Progress Bar */}
-                {bulkProgress && (
-                  <Box paddingBlockEnd="200">
-                    <BlockStack gap="200">
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Processing {bulkProgress.current} of {bulkProgress.total} variants...
-                      </Text>
-                      <ProgressBar 
-                        progress={(bulkProgress.current / bulkProgress.total) * 100} 
-                        size="small" 
-                      />
-                    </BlockStack>
-                  </Box>
-                )}
-                
                 {/* Pricing Tab */}
                 {activeBulkTab === 0 && (() => {
                   // Convert selectedProducts IDs to actual Product objects
@@ -4161,12 +4154,38 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
             
             {/* Message */}
             <div style={{ flex: 1, paddingTop: '4px' }}>
-              <Text as="p" variant="bodyMd" fontWeight="semibold" tone={notification.loading ? 'base' : (notification.error ? 'critical' : 'success')}>
-                {notification.loading ? 'Processing...' : (notification.error ? 'Update Error' : 'Success!')}
-              </Text>
-              <Text as="p" variant="bodySm" tone={notification.loading ? 'subdued' : undefined}>
-                {notification.message}
-              </Text>
+              {bulkProgress && notification.loading ? (
+                // Show progress bar when loading
+                <BlockStack gap="200">
+                  <InlineStack gap="200" align="space-between">
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">
+                      Updating
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      {bulkProgress.current} / {bulkProgress.total}
+                    </Text>
+                  </InlineStack>
+                  {bulkProgress.productName && (
+                    <Text as="p" variant="bodyXs" tone="subdued">
+                      {bulkProgress.productName}
+                    </Text>
+                  )}
+                  <ProgressBar 
+                    progress={(bulkProgress.current / bulkProgress.total) * 100} 
+                    size="small" 
+                  />
+                </BlockStack>
+              ) : (
+                // Show regular message when not loading or no progress
+                <>
+                  <Text as="p" variant="bodyMd" fontWeight="semibold" tone={notification.loading ? 'base' : (notification.error ? 'critical' : 'success')}>
+                    {notification.loading ? 'Processing...' : (notification.error ? 'Update Error' : 'Success!')}
+                  </Text>
+                  <Text as="p" variant="bodySm" tone={notification.loading ? 'subdued' : undefined}>
+                    {notification.message}
+                  </Text>
+                </>
+              )}
             </div>
             
             {/* Close Button (only show for non-loading states) */}
