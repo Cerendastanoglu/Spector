@@ -588,89 +588,55 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return json({ error: "No updates provided" }, { status: 400 });
       }
 
-      const results = [];
+      const results: any[] = [];
       
-      // First, get the current prices for all variants being updated
-      const variantIds = updates.map(update => update.variantId);
-      const variantPrices = new Map();
-      
-      // Get current prices in batches
-      for (let i = 0; i < variantIds.length; i += 10) {
-        const batch = variantIds.slice(i, i + 10);
-        const variantsQuery = batch.map((id, idx) => `
-          v${idx}: productVariant(id: "${id}") {
-            id
-            price
-            compareAtPrice
-          }
-        `).join('\n');
-        
-        try {
-          const priceResponse = await admin.graphql(`
-            query getVariantPrices {
-              ${variantsQuery}
-            }
-          `);
-          
-          const priceData = await priceResponse.json();
-          
-          // Extract prices from response
-          batch.forEach((id, idx) => {
-            const variant = priceData.data[`v${idx}`];
-            if (variant) {
-              variantPrices.set(id, {
-                price: variant.price,
-                compareAtPrice: variant.compareAtPrice
-              });
-            }
-          });
-        } catch (error) {
-          console.error("Error fetching variant prices:", error);
-          // Continue with updates even if we can't get current prices
+      // Group updates by product to batch variants together
+      const updatesByProduct = new Map<string, any[]>();
+      updates.forEach(update => {
+        if (!updatesByProduct.has(update.productId)) {
+          updatesByProduct.set(update.productId, []);
         }
-      }
+        const productUpdates = updatesByProduct.get(update.productId);
+        if (productUpdates) {
+          productUpdates.push(update);
+        }
+      });
       
-      // Now process all updates with original price data
-      for (const update of updates) {
+      // Process each product's variants in a single bulk update
+      for (const [productId, productUpdates] of updatesByProduct.entries()) {
         try {
-          // Store the original price
-          const originalPriceData = variantPrices.get(update.variantId) || { price: "0.00", compareAtPrice: null };
-          update.oldPrice = originalPriceData.price;
-          update.oldCompareAtPrice = originalPriceData.compareAtPrice;
-          
-          // Build variant input object - only price, compareAtPrice, and taxable are supported
-          const variantInput: any = {
-            id: update.variantId,
-            price: update.price,
-            compareAtPrice: update.compareAtPrice || null
-          };
-          
-          // Add taxable if defined
-          if (update.taxable !== undefined) {
-            variantInput.taxable = update.taxable;
-          }
-          
-          console.log('📦 Updating variant:', {
-            variantId: update.variantId,
-            input: variantInput,
-            hasCost: update.cost !== undefined,
-            hasUnitPrice: update.unitPrice !== undefined
+          // Build variant inputs for this product
+          const variantInputs = productUpdates.map(update => {
+            const variantInput: any = {
+              id: update.variantId,
+              price: update.price,
+              compareAtPrice: update.compareAtPrice || null
+            };
+            
+            if (update.taxable !== undefined) {
+              variantInput.taxable = update.taxable;
+            }
+            
+            return variantInput;
           });
           
-          // Update product variant (price, compare price, taxable)
+          // Single bulk update for all variants of this product
           const response = await admin.graphql(
             `#graphql
               mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
                 productVariantsBulkUpdate(productId: $productId, variants: $variants) {
                   product {
                     id
-                    variants(first: 10) {
+                    variants(first: 100) {
                       edges {
                         node {
                           id
                           price
                           compareAtPrice
                           taxable
+                          inventoryItem {
+                            id
+                          }
                         }
                       }
                     }
@@ -684,8 +650,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             `,
             {
               variables: {
-                productId: update.productId,
-                variants: [variantInput]
+                productId,
+                variants: variantInputs
               }
             }
           );
@@ -693,145 +659,83 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           const data = await response.json();
           
           if (data.data?.productVariantsBulkUpdate?.userErrors?.length > 0) {
+            // If bulk update fails, mark all variants as failed
+            productUpdates.forEach(update => {
+              results.push({
+                productId: update.productId,
+                variantId: update.variantId,
+                success: false,
+                error: data.data.productVariantsBulkUpdate.userErrors[0].message
+              });
+            });
+            continue;
+          }
+          
+          const updatedVariants = data.data?.productVariantsBulkUpdate?.product?.variants?.edges || [];
+          
+          // Handle cost and unit price updates if needed (these require separate calls)
+          const costUpdates = productUpdates.filter(u => u.cost !== undefined && u.cost !== null);
+          if (costUpdates.length > 0) {
+            // Batch cost updates
+            for (const update of costUpdates) {
+              try {
+                const variant = updatedVariants.find((v: any) => v.node.id === update.variantId);
+                const inventoryItemId = variant?.node?.inventoryItem?.id;
+                
+                if (inventoryItemId) {
+                  await admin.graphql(
+                    `#graphql
+                      mutation inventoryItemUpdate($id: ID!, $input: InventoryItemInput!) {
+                        inventoryItemUpdate(id: $id, input: $input) {
+                          inventoryItem {
+                            id
+                          }
+                          userErrors {
+                            field
+                            message
+                          }
+                        }
+                      }
+                    `,
+                    {
+                      variables: {
+                        id: inventoryItemId,
+                        input: {
+                          cost: parseFloat(update.cost),
+                          tracked: true
+                        }
+                      }
+                    }
+                  );
+                }
+              } catch (costError) {
+                console.error('Error updating cost:', costError);
+              }
+            }
+          }
+          
+          // Add successful results for all variants
+          productUpdates.forEach(update => {
+            const variant = updatedVariants.find((v: any) => v.node.id === update.variantId);
+            results.push({
+              productId: update.productId,
+              variantId: update.variantId,
+              productTitle: update.productTitle,
+              success: true,
+              newPrice: variant?.node?.price || update.price,
+              newCompareAtPrice: variant?.node?.compareAtPrice || update.compareAtPrice
+            });
+          });
+          
+        } catch (error) {
+          // Mark all variants as failed if an error occurs
+          productUpdates.forEach(update => {
             results.push({
               productId: update.productId,
               variantId: update.variantId,
               success: false,
-              error: data.data.productVariantsBulkUpdate.userErrors[0].message
+              error: error instanceof Error ? error.message : 'Unknown error'
             });
-            continue; // Skip cost/unit price updates if variant update failed
-          }
-          
-          const updatedVariant = data.data?.productVariantsBulkUpdate?.product?.variants?.edges?.[0]?.node;
-          
-          // Update cost per item if provided (requires separate mutation)
-          if (update.cost !== undefined && update.cost !== null) {
-            console.log('💰 Updating cost for variant:', update.variantId, 'to', update.cost);
-            try {
-              // First get the inventory item ID
-              const variantResponse = await admin.graphql(
-                `#graphql
-                  query getInventoryItem($id: ID!) {
-                    productVariant(id: $id) {
-                      id
-                      inventoryItem {
-                        id
-                      }
-                    }
-                  }
-                `,
-                { variables: { id: update.variantId } }
-              );
-              
-              const variantData = await variantResponse.json();
-              const inventoryItemId = variantData.data?.productVariant?.inventoryItem?.id;
-              
-              if (inventoryItemId) {
-                await admin.graphql(
-                  `#graphql
-                    mutation inventoryItemUpdate($id: ID!, $input: InventoryItemInput!) {
-                      inventoryItemUpdate(id: $id, input: $input) {
-                        inventoryItem {
-                          id
-                        }
-                        userErrors {
-                          field
-                          message
-                        }
-                      }
-                    }
-                  `,
-                  {
-                    variables: {
-                      id: inventoryItemId,
-                      input: {
-                        cost: parseFloat(update.cost),
-                        tracked: true
-                      }
-                    }
-                  }
-                );
-              }
-            } catch (costError) {
-              console.error('Error updating cost:', costError);
-            }
-          }
-          
-          // Update unit price if provided
-          if (update.unitPrice !== undefined && update.unitPrice !== null) {
-            console.log('📏 Updating unit price for variant:', update.variantId, 'to', update.unitPrice);
-            try {
-              const variantResponse = await admin.graphql(
-                `#graphql
-                  query getInventoryItem($id: ID!) {
-                    productVariant(id: $id) {
-                      id
-                      inventoryItem {
-                        id
-                        measurement {
-                          weight {
-                            unit
-                          }
-                        }
-                      }
-                    }
-                  }
-                `,
-                { variables: { id: update.variantId } }
-              );
-              
-              const variantData = await variantResponse.json();
-              const inventoryItemId = variantData.data?.productVariant?.inventoryItem?.id;
-              
-              if (inventoryItemId) {
-                await admin.graphql(
-                  `#graphql
-                    mutation inventoryItemUpdate($id: ID!, $input: InventoryItemInput!) {
-                      inventoryItemUpdate(id: $id, input: $input) {
-                        inventoryItem {
-                          id
-                          unitCost {
-                            amount
-                          }
-                        }
-                        userErrors {
-                          field
-                          message
-                        }
-                      }
-                    }
-                  `,
-                  {
-                    variables: {
-                      id: inventoryItemId,
-                      input: {
-                        unitCost: {
-                          amount: parseFloat(update.unitPrice)
-                        }
-                      }
-                    }
-                  }
-                );
-              }
-            } catch (unitPriceError) {
-              console.error('Error updating unit price:', unitPriceError);
-            }
-          }
-          
-          results.push({
-            productId: update.productId,
-            variantId: update.variantId,
-            productTitle: update.productTitle,
-            success: true,
-            newPrice: updatedVariant?.price || update.price,
-            newCompareAtPrice: updatedVariant?.compareAtPrice || update.compareAtPrice
-          });
-        } catch (error) {
-          results.push({
-            productId: update.productId,
-            variantId: update.variantId,
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error'
           });
         }
       }
@@ -1395,29 +1299,62 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           // Calculate new description based on operation
           let newDescription = currentProduct.descriptionHtml || '';
           
+          console.log('📝 Description Update Debug:', {
+            productId,
+            operation: descriptionOperation,
+            currentDescription: newDescription,
+            valueToApply: descriptionValue,
+            replaceFrom: descriptionReplaceFrom,
+            replaceTo: descriptionReplaceTo
+          });
+          
           if (descriptionOperation === 'set') {
-            // Set/replace entire description
+            // Set/replace entire description - always use the new value
             newDescription = descriptionValue || '';
+            console.log('✏️ SET operation - New description:', newDescription);
           } else if (descriptionOperation === 'prefix' || descriptionOperation === 'prepend') {
             // Add to beginning - handle empty descriptions
-            newDescription = newDescription 
-              ? `${descriptionValue}\n${newDescription}` 
-              : descriptionValue;
+            if (descriptionValue) {
+              if (!newDescription) {
+                // If product has no description, just use the prefix
+                newDescription = descriptionValue;
+              } else {
+                // Add prefix with proper HTML line break
+                newDescription = `${descriptionValue}<br/>${newDescription}`;
+              }
+              console.log('➕ PREFIX operation - New description:', newDescription);
+            }
           } else if (descriptionOperation === 'suffix' || descriptionOperation === 'append') {
             // Add to end - handle empty descriptions
-            newDescription = newDescription 
-              ? `${newDescription}\n${descriptionValue}` 
-              : descriptionValue;
+            if (descriptionValue) {
+              if (!newDescription) {
+                // If product has no description, just use the suffix
+                newDescription = descriptionValue;
+              } else {
+                // Add suffix with proper HTML line break
+                newDescription = `${newDescription}<br/>${descriptionValue}`;
+              }
+              console.log('➕ SUFFIX operation - New description:', newDescription);
+            }
           } else if (descriptionOperation === 'replace') {
             // Replace text - if no existing description, nothing to replace
             // Allow empty descriptionReplaceTo to delete the found text
             if (newDescription && descriptionReplaceFrom) {
+              const oldDescription = newDescription;
               newDescription = newDescription.replace(
                 new RegExp(descriptionReplaceFrom, 'g'), 
                 descriptionReplaceTo !== undefined ? descriptionReplaceTo : ''
               );
+              console.log('🔄 REPLACE operation:', {
+                oldDescription,
+                newDescription,
+                findText: descriptionReplaceFrom,
+                replaceText: descriptionReplaceTo
+              });
             }
           }
+
+          console.log('📤 Sending update to Shopify:', { productId, newDescription });
 
           // Update the product description
           const updateResponse = await admin.graphql(

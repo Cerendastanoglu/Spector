@@ -37,7 +37,8 @@ import {
   CollectionIcon,
   InventoryIcon,
   SearchIcon,
-  HashtagIcon
+  HashtagIcon,
+  AlertCircleIcon
 } from "@shopify/polaris-icons";
 
 interface Product {
@@ -599,9 +600,79 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         if (isLoadingMore && currentCursor) {
           // Appending more products
           logger.info(`📄 Appending ${productCount} products to existing ${prevProducts.length}`);
-          return [...prevProducts, ...productsWithMockPricing];
+          const combined = [...prevProducts, ...productsWithMockPricing];
+          
+          // Extract unique values for filters from ALL products
+          const collectionsMap = new Map<string, {id: string, title: string}>();
+          const tagFrequency = new Map<string, number>();
+          
+          combined.forEach((product: Product) => {
+            if (product.collections?.edges) {
+              product.collections.edges.forEach(edge => {
+                collectionsMap.set(edge.node.id, { id: edge.node.id, title: edge.node.title });
+              });
+            }
+            
+            if (product.tags) {
+              product.tags.forEach(tag => {
+                const trimmedTag = tag.trim();
+                if (trimmedTag) {
+                  tagFrequency.set(trimmedTag, (tagFrequency.get(trimmedTag) || 0) + 1);
+                }
+              });
+            }
+          });
+          
+          // Update collections and tags
+          const uniqueCollections = Array.from(collectionsMap.values()).sort((a, b) => a.title.localeCompare(b.title));
+          setCollections(uniqueCollections);
+          setAvailableCollections(uniqueCollections);
+          
+          const sortedTags = Array.from(tagFrequency.entries())
+            .sort((a, b) => {
+              if (b[1] !== a[1]) return b[1] - a[1];
+              return a[0].localeCompare(b[0]);
+            })
+            .map(([tag]) => tag);
+          
+          setAvailableTags(sortedTags);
+          
+          return combined;
         } else {
-          // First page or refresh
+          // First page or refresh - extract filters
+          const collectionsMap = new Map<string, {id: string, title: string}>();
+          const tagFrequency = new Map<string, number>();
+          
+          productsWithMockPricing.forEach((product: Product) => {
+            if (product.collections?.edges) {
+              product.collections.edges.forEach(edge => {
+                collectionsMap.set(edge.node.id, { id: edge.node.id, title: edge.node.title });
+              });
+            }
+            
+            if (product.tags) {
+              product.tags.forEach(tag => {
+                const trimmedTag = tag.trim();
+                if (trimmedTag) {
+                  tagFrequency.set(trimmedTag, (tagFrequency.get(trimmedTag) || 0) + 1);
+                }
+              });
+            }
+          });
+          
+          const uniqueCollections = Array.from(collectionsMap.values()).sort((a, b) => a.title.localeCompare(b.title));
+          setCollections(uniqueCollections);
+          setAvailableCollections(uniqueCollections);
+          
+          const sortedTags = Array.from(tagFrequency.entries())
+            .sort((a, b) => {
+              if (b[1] !== a[1]) return b[1] - a[1];
+              return a[0].localeCompare(b[0]);
+            })
+            .map(([tag]) => tag);
+          
+          setAvailableTags(sortedTags);
+          
           return productsWithMockPricing;
         }
       });
@@ -611,69 +682,26 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       setCurrentCursor(cursor);
       setTotalProductsLoaded(prev => (isLoadingMore && currentCursor) ? prev + productCount : productCount);
       setIsLoadingMore(false);
-      
-      // Extract unique values for filters (from ALL currently loaded products)
-      const allCurrentProducts = (isLoadingMore && currentCursor) 
-        ? [...products, ...productsWithMockPricing]
-        : productsWithMockPricing;
-          
-      const collectionsMap = new Map<string, {id: string, title: string}>();
-      const tagFrequency = new Map<string, number>();
-      
-      allCurrentProducts.forEach((product: Product) => {
-        if (product.collections?.edges) {
-          product.collections.edges.forEach(edge => {
-            collectionsMap.set(edge.node.id, { id: edge.node.id, title: edge.node.title });
-          });
-        }
-        
-        // Extract tags and count frequency
-        if (product.tags) {
-          product.tags.forEach(tag => {
-            const trimmedTag = tag.trim();
-            if (trimmedTag) {
-              tagFrequency.set(trimmedTag, (tagFrequency.get(trimmedTag) || 0) + 1);
-            }
-          });
-        }
-      });
-      
-      // Update collections and tags state
-      const uniqueCollections = Array.from(collectionsMap.values()).sort((a, b) => a.title.localeCompare(b.title));
-      setCollections(uniqueCollections);
-      setAvailableCollections(uniqueCollections);
-      
-      // Sort tags by frequency (most popular first), then alphabetically
-      const sortedTags = Array.from(tagFrequency.entries())
-        .sort((a, b) => {
-          if (b[1] !== a[1]) return b[1] - a[1]; // Sort by frequency descending
-          return a[0].localeCompare(b[0]); // Then alphabetically
-        })
-        .map(([tag]) => tag);
-      
-      setAvailableTags(sortedTags);
-      
       setError(null);
       setIsLoading(false);
       
       // Automatically load more products if available
       if (hasNext && cursor) {
         logger.info(`🔄 Auto-loading next page of products...`);
-        setTimeout(() => loadMoreProducts(), 100); // Small delay to prevent overwhelming the API
+        setTimeout(() => loadMoreProducts(), 100);
       } else if (!hasNext) {
-        logger.info(`✅ All products loaded! Total: ${(isLoadingMore && currentCursor) ? products.length + productCount : productCount}`);
+        logger.info(`✅ All products loaded! Total: ${productCount}`);
       }
     } else if (fetcher.data?.error) {
       setError(fetcher.data.error);
       setIsLoading(false);
       setIsLoadingMore(false);
     } else if (fetcher.state === 'idle' && fetcher.data && !fetcher.data.products) {
-      // Handle case where API returns but no products
       setError('No products found or failed to load');
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [fetcher.data, fetcher.state, isLoadingMore, currentCursor, products, loadMoreProducts]);
+  }, [fetcher.data, fetcher.state, isLoadingMore, currentCursor, loadMoreProducts]);
 
   // Handle fetcher loading state
   useEffect(() => {
@@ -836,6 +864,15 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     const comparison = String(aVal).localeCompare(String(bVal));
     return sortDirection === 'asc' ? comparison : -comparison;
   });
+
+  // Merge filtered products with selected products (so selected products remain visible even when filters change)
+  const displayProducts = React.useMemo(() => {
+    const filteredIds = new Set(filteredProducts.map(p => p.id));
+    const selectedProductObjects = products.filter(p => selectedProducts.includes(p.id) && !filteredIds.has(p.id));
+    
+    // Combine: selected products first (that aren't in filtered), then filtered products
+    return [...selectedProductObjects, ...filteredProducts];
+  }, [filteredProducts, selectedProducts, products]);
 
   // Enhanced error handling helpers
   const clearBulkMessages = () => {
@@ -2224,6 +2261,81 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         }
         
         @media (max-width: 768px) {
+          /* More graceful important warning on mobile */
+          .important-warning .Polaris-Box {
+            padding: var(--p-space-200) !important;
+          }
+          .important-warning .Polaris-InlineStack {
+            gap: var(--p-space-150) !important;
+          }
+          .important-warning .Polaris-Text--bodyMd {
+            font-size: 13px !important;
+          }
+          .important-warning .Polaris-Text--bodySm {
+            font-size: 11px !important;
+            line-height: 1.4 !important;
+          }
+          
+          /* Stack filters vertically on mobile */
+          .filters-row .Polaris-InlineStack {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: var(--p-space-300) !important;
+          }
+          .filters-row .Polaris-InlineStack > * {
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+          
+          /* Product table mobile optimization */
+          .product-table-mobile {
+            width: 100% !important;
+            margin: 0 !important;
+          }
+          .product-table-mobile table {
+            font-size: 12px !important;
+            width: 100% !important;
+            table-layout: fixed !important;
+          }
+          .product-table-mobile th:first-child,
+          .product-table-mobile tr:not([style*="background-color: rgb(249, 250, 251)"]) td:first-child {
+            width: calc(100% - 80px) !important;
+          }
+          .product-table-mobile th:last-child,
+          .product-table-mobile tr:not([style*="background-color: rgb(249, 250, 251)"]) td:last-child {
+            width: 80px !important;
+          }
+          .product-table-mobile th:not(:first-child):not(:last-child),
+          .product-table-mobile td:not(:first-child):not(:last-child) {
+            display: none !important;
+            width: 0 !important;
+          }
+          .product-table-mobile .product-details-mobile {
+            display: block !important;
+            font-size: 11px !important;
+            color: #6B7280 !important;
+            margin-top: 4px !important;
+          }
+          
+          /* Fix expanded row on mobile */
+          .product-table-mobile td[colspan] {
+            display: table-cell !important;
+            padding: 12px !important;
+            overflow-x: auto !important;
+            width: 100% !important;
+          }
+          .product-table-mobile td[colspan] .Polaris-BlockStack {
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+          .product-table-mobile td[colspan] > div > div:first-child {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+          }
+          .product-table-mobile td[colspan] > div > div:first-child > div {
+            min-width: auto !important;
+          }
+          
           .product-management-layout {
             flex-direction: column !important;
             height: auto !important;
@@ -2292,11 +2404,33 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       <BlockStack gap="400">
         {/* Disclaimer about Undo Feature */}
         <Card>
-          <BlockStack gap="200">
-            <Text as="p" variant="bodyXs" tone="subdued">
-              <strong>Note:</strong> At this time, we are not able to undo bulk operations. However, we are working on implementing this feature. Please double-check your selections before applying changes.
-            </Text>
-          </BlockStack>
+          <div className="important-warning">
+          <Box 
+            padding="300" 
+            background="bg-surface-secondary" 
+            borderRadius="200"
+            borderWidth="025"
+            borderColor="border"
+          >
+            <InlineStack gap="200" blockAlign="start">
+              <div style={{ 
+                flexShrink: 0, 
+                paddingTop: '2px',
+                color: '#0070C9' 
+              }}>
+                <Icon source={AlertCircleIcon} />
+              </div>
+              <BlockStack gap="100">
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  Important
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Bulk operations cannot be undone. We're working on this feature. Please verify your selections before applying changes.
+                </Text>
+              </BlockStack>
+            </InlineStack>
+          </Box>
+          </div>
         </Card>
 
         {/* Modern Step Navigation - Individual Boxes */}
@@ -2450,15 +2584,15 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                   // Get unique products from selected variants (performance optimized)
                   const selectedProductIds = new Set(
                     selectedVariants.map(variantId => {
-                      // Find product that contains this variant
-                      return filteredProducts.find(p => 
+                      // Find product that contains this variant (search in all products, not just filtered)
+                      return products.find(p => 
                         p.variants.edges.some(v => v.node.id === variantId)
                       )?.id;
                     }).filter(Boolean)
                   );
                   
                   const selectedProductsList = Array.from(selectedProductIds)
-                    .map(productId => filteredProducts.find(p => p.id === productId))
+                    .map(productId => products.find(p => p.id === productId))
                     .filter((product): product is Product => product !== undefined);
                   
                   return (
@@ -2683,6 +2817,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                 />
 
                 {/* Filter Controls - Row 1: Basic Filters */}
+                <div className="filters-row">
                 <InlineStack gap="300" wrap={false}>
                   <div style={{ flex: 1 }}>
                     <div style={{ 
@@ -2738,8 +2873,10 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                     />
                   </div>
                 </InlineStack>
+                </div>
 
                 {/* Filter Controls - Row 2: Price & Inventory Ranges */}
+                <div className="filters-row">
                 <InlineStack gap="300" wrap={false}>
                   <div style={{ flex: 1 }}>
                     <div style={{ 
@@ -2808,6 +2945,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                     </div>
                   </div>
                 </InlineStack>
+                </div>
 
                 {/* Filter Controls - Row 3: Tags Filter (Collapsible) */}
                 {availableTags.length > 0 && (
@@ -3143,13 +3281,13 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                   ) : (
                     <>
                       <ProductTable
-                        products={filteredProducts.slice((currentPage - 1) * productsPerPage, currentPage * productsPerPage)}
+                        products={displayProducts.slice((currentPage - 1) * productsPerPage, currentPage * productsPerPage)}
                         selectedProducts={selectedProducts}
                         selectedVariants={selectedVariants}
                         expandedProducts={expandedProducts}
                         onProductSelect={handleProductSelection}
                         onVariantSelect={(variantId, checked) => {
-                          const product = filteredProducts.find(p => 
+                          const product = displayProducts.find(p => 
                             p.variants.edges.some(v => v.node.id === variantId)
                           );
                           if (product) {
@@ -3162,11 +3300,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                         onContinueToBulkEdit={() => setActiveMainTab(1)}
                       shopCurrency={currencySymbol}
                       showVariantSelection={true}
-                      totalCount={filteredProducts.length}
+                      totalCount={displayProducts.length}
                     />
                     
                     {/* Pagination Controls */}
-                    {filteredProducts.length > productsPerPage && (
+                    {displayProducts.length > productsPerPage && (
                       <Box padding="400">
                         <InlineStack align="center" gap="400">
                           <Button
@@ -3176,11 +3314,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                             Previous
                           </Button>
                           <Text as="p" variant="bodyMd">
-                            Page {currentPage} of {Math.ceil(filteredProducts.length / productsPerPage)} 
-                            {' '}({filteredProducts.length} products total)
+                            Page {currentPage} of {Math.ceil(displayProducts.length / productsPerPage)} 
+                            {' '}({displayProducts.length} products total)
                           </Text>
                           <Button
-                            disabled={currentPage >= Math.ceil(filteredProducts.length / productsPerPage)}
+                            disabled={currentPage >= Math.ceil(displayProducts.length / productsPerPage)}
                             onClick={() => setCurrentPage(currentPage + 1)}
                           >
                             Next
@@ -3554,15 +3692,14 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                     {/* Content Sub-tabs */}
                     <div style={{ 
                       display: 'grid', 
-                      gridTemplateColumns: 'repeat(3, 1fr)', 
+                      gridTemplateColumns: 'repeat(2, 1fr)', 
                       gap: '8px', 
                       borderBottom: '1px solid #e1e3e5',
                       marginBottom: '20px'
                     }}>
                       {[
                         { id: 'title', label: 'Titles' },
-                        { id: 'description', label: 'Descriptions' },
-                        { id: 'images', label: 'Images' }
+                        { id: 'description', label: 'Descriptions' }
                       ].map(({ id, label }) => (
                         <Button
                           key={id}

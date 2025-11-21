@@ -24,27 +24,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   logger.info(`[Billing Webhook] Received ${topic} for shop: ${shop}`);
 
-  if (!admin) {
-    logger.error("[Billing Webhook] Admin API not available");
-    return new Response("Admin API not available", { status: 500 });
+  // 🚀 CRITICAL: Respond with 200 OK immediately (Shopify requirement)
+  // Process webhook asynchronously to avoid timeout
+  if (admin && topic === "APP_SUBSCRIPTIONS_UPDATE") {
+    processSubscriptionUpdateAsync(shop, payload);
   }
 
-  try {
-    switch (topic) {
-      case "APP_SUBSCRIPTIONS_UPDATE":
-        await handleSubscriptionUpdate(shop, payload);
-        break;
-
-      default:
-        logger.warn(`[Billing Webhook] Unhandled webhook topic: ${topic}`);
-    }
-
-    return new Response("Webhook processed", { status: 200 });
-  } catch (error) {
-    logger.error(`[Billing Webhook] Error processing ${topic}:`, error);
-    return new Response("Error processing webhook", { status: 500 });
-  }
+  return new Response();
 };
+
+/**
+ * Process subscription update asynchronously after responding to Shopify
+ */
+async function processSubscriptionUpdateAsync(shop: string, payload: any) {
+  try {
+    await handleSubscriptionUpdate(shop, payload);
+  } catch (error) {
+    logger.error(`[Billing Webhook] Error processing subscription update:`, error);
+  }
+}
 
 /**
  * Handle subscription update webhook

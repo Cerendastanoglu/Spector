@@ -548,95 +548,99 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
         renderMetricsSkeleton()
       ) : (
         <Card>
-          <InlineStack gap="600" align="space-between" wrap={false}>
-            <InlineStack gap="300" blockAlign="center">
-              <Box 
-                background="bg-surface-info" 
-                padding="200" 
-                borderRadius="100"
-              >
-                <Icon source={ChartVerticalIcon} tone="info" />
-              </Box>
-              <BlockStack gap="050">
-                <Text as="p" variant="bodySm" tone="subdued">Total Products</Text>
-                <Text as="span" variant="headingLg" fontWeight="bold">
-                  {productAnalyticsData?.totalProducts || 0}
-                </Text>
-                <Text as="p" variant="bodyXs" tone="subdued">
-                  {productAnalyticsData?.activeProducts || 0} active in catalog
-                </Text>
-                {isLoading && (
-                  <InlineStack gap="100" blockAlign="center">
-                    <Spinner size="small" />
-                    <Text as="p" variant="bodyXs" tone="subdued">Updating...</Text>
-                  </InlineStack>
-                )}
-              </BlockStack>
-            </InlineStack>
+          <div className="metrics-grid">
+            <InlineStack gap="300" wrap={true} blockAlign="start">
+            <div className="metric-card-wrapper">
+              <InlineStack gap="200" blockAlign="center">
+                <Box 
+                  background="bg-surface-info" 
+                  padding="200" 
+                  borderRadius="100"
+                >
+                  <Icon source={ChartVerticalIcon} tone="info" />
+                </Box>
+                <BlockStack gap="050">
+                  <Text as="p" variant="bodySm" tone="subdued">Total Products</Text>
+                  <Text as="span" variant="headingLg" fontWeight="bold">
+                    {productAnalyticsData?.totalProducts || 0}
+                  </Text>
+                  <Text as="p" variant="bodyXs" tone="subdued">
+                    {productAnalyticsData?.activeProducts || 0} active
+                  </Text>
+                  {isLoading && (
+                    <InlineStack gap="100" blockAlign="center">
+                      <Spinner size="small" />
+                      <Text as="p" variant="bodyXs" tone="subdued">Updating...</Text>
+                    </InlineStack>
+                  )}
+                </BlockStack>
+              </InlineStack>
+            </div>
 
-            <Box background="bg-surface" width="1px" minHeight="60px" />
+            <div className="metric-card-wrapper">
+              <InlineStack gap="200" blockAlign="center">
+                <Box 
+                  background="bg-surface-success" 
+                  padding="200" 
+                  borderRadius="100"
+                >
+                  <Icon source={CashDollarIcon} tone="success" />
+                </Box>
+                <BlockStack gap="050">
+                  <Text as="p" variant="bodySm" tone="subdued">Catalog Value</Text>
+                  <Text as="span" variant="headingLg" fontWeight="bold">
+                    {formatCompactCurrency(productAnalyticsData?.totalCatalogValue || 0)}
+                  </Text>
+                  <Text as="p" variant="bodyXs" tone="subdued">
+                    Total inventory
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+            </div>
 
-            <InlineStack gap="300" blockAlign="center">
-              <Box 
-                background="bg-surface-success" 
-                padding="200" 
-                borderRadius="100"
-              >
-                <Icon source={CashDollarIcon} tone="success" />
-              </Box>
-              <BlockStack gap="050">
-                <Text as="p" variant="bodySm" tone="subdued">Catalog Value</Text>
-                <Text as="span" variant="headingLg" fontWeight="bold">
-                  {formatCompactCurrency(productAnalyticsData?.totalCatalogValue || 0)}
-                </Text>
-                <Text as="p" variant="bodyXs" tone="subdued">
-                  Total inventory value
-                </Text>
-              </BlockStack>
-            </InlineStack>
+            <div className="metric-card-wrapper">
+              <InlineStack gap="200" blockAlign="center">
+                <Box 
+                  background="bg-surface-warning" 
+                  padding="200" 
+                  borderRadius="100"
+                >
+                  <Icon source={ChartVerticalIcon} tone="warning" />
+                </Box>
+                <BlockStack gap="050">
+                  <Text as="p" variant="bodySm" tone="subdued">Average Price</Text>
+                  <Text as="span" variant="headingLg" fontWeight="bold">
+                    {formatCompactCurrency(productAnalyticsData?.avgProductPrice || 0)}
+                  </Text>
+                  <Text as="p" variant="bodyXs" tone="subdued">
+                    Per product
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+            </div>
 
-            <Box background="bg-surface" width="1px" minHeight="60px" />
-
-            <InlineStack gap="300" blockAlign="center">
-              <Box 
-                background="bg-surface-warning" 
-                padding="200" 
-                borderRadius="100"
-              >
-                <Icon source={ChartVerticalIcon} tone="warning" />
-              </Box>
-              <BlockStack gap="050">
-                <Text as="p" variant="bodySm" tone="subdued">Average Price</Text>
-                <Text as="span" variant="headingLg" fontWeight="bold">
-                  {formatCompactCurrency(productAnalyticsData?.avgProductPrice || 0)}
-                </Text>
-                <Text as="p" variant="bodyXs" tone="subdued">
-                  Per product pricing
-                </Text>
-              </BlockStack>
-            </InlineStack>
-
-            <Box background="bg-surface" width="1px" minHeight="60px" />
-
-            <InlineStack gap="300" blockAlign="center">
-              <Box 
-                background="bg-surface-critical" 
-                padding="200" 
-                borderRadius="100"
-              >
-                <Icon source={ChartVerticalIcon} tone="critical" />
-              </Box>
-              <BlockStack gap="050">
-                <Text as="p" variant="bodySm" tone="subdued">Catalog Health</Text>
-                <Text as="span" variant="headingLg" fontWeight="bold">
-                  {(productAnalyticsData?.catalogHealth || 0).toFixed(1)}%
-                </Text>
-                <Text as="p" variant="bodyXs" tone="subdued">
-                  Stock adequacy score
-                </Text>
-              </BlockStack>
-            </InlineStack>
+            <div className="metric-card-wrapper">
+              <InlineStack gap="200" blockAlign="center">
+                <Box 
+                  background="bg-surface-critical" 
+                  padding="200" 
+                  borderRadius="100"
+                >
+                  <Icon source={ChartVerticalIcon} tone="critical" />
+                </Box>
+                <BlockStack gap="050">
+                  <Text as="p" variant="bodySm" tone="subdued">Catalog Health</Text>
+                  <Text as="span" variant="headingLg" fontWeight="bold">
+                    {(productAnalyticsData?.catalogHealth || 0).toFixed(1)}%
+                  </Text>
+                  <Text as="p" variant="bodyXs" tone="subdued">
+                    Stock score
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+            </div>
           </InlineStack>
+          </div>
         </Card>
       )}
 
@@ -650,91 +654,96 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
             </Text>
             
             {productAnalyticsData?.inventoryDistribution ? (
-              <InlineStack gap="400" align="space-between" wrap={true}>
-                <Box 
-                  padding="400" 
-                  background="bg-surface" 
-                  borderRadius="200" 
-                  borderWidth="025" 
-                  borderColor="border-success"
-                  minWidth="280px"
-                >
-                  <InlineStack align="space-between" blockAlign="center">
-                    <InlineStack gap="300" blockAlign="center">
-                      <Box 
-                        background="bg-surface-success" 
-                        padding="200" 
-                        borderRadius="100"
-                      >
-                        <Icon source={CheckIcon} tone="success" />
-                      </Box>
-                      <BlockStack gap="100">
-                        <Text as="p" variant="bodyMd" fontWeight="semibold">Well Stocked</Text>
-                        <Text as="p" variant="bodyXs" tone="subdued">Products in good supply</Text>
-                      </BlockStack>
+              <div className="stock-cards-grid">
+                <InlineStack gap="300" wrap={true} blockAlign="start">
+                <div className="stock-card-wrapper">
+                  <Box 
+                    padding="300" 
+                    background="bg-surface" 
+                    borderRadius="200" 
+                    borderWidth="025" 
+                    borderColor="border-success"
+                  >
+                    <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Box 
+                          background="bg-surface-success" 
+                          padding="200" 
+                          borderRadius="100"
+                        >
+                          <Icon source={CheckIcon} tone="success" />
+                        </Box>
+                        <BlockStack gap="050">
+                          <Text as="p" variant="bodyMd" fontWeight="semibold">Well Stocked</Text>
+                          <Text as="p" variant="bodyXs" tone="subdued">Good supply</Text>
+                        </BlockStack>
+                      </InlineStack>
+                      <Text as="p" variant="heading2xl" fontWeight="bold" tone="success">
+                        {productAnalyticsData.inventoryDistribution.wellStocked}
+                      </Text>
                     </InlineStack>
-                    <Text as="p" variant="heading2xl" fontWeight="bold" tone="success">
-                      {productAnalyticsData.inventoryDistribution.wellStocked}
-                    </Text>
-                  </InlineStack>
-                </Box>
+                  </Box>
+                </div>
                 
-                <Box 
-                  padding="400" 
-                  background="bg-surface" 
-                  borderRadius="200" 
-                  borderWidth="025" 
-                  borderColor="border-warning"
-                  minWidth="280px"
-                >
-                  <InlineStack align="space-between" blockAlign="center">
-                    <InlineStack gap="300" blockAlign="center">
-                      <Box 
-                        background="bg-surface-warning" 
-                        padding="200" 
-                        borderRadius="100"
-                      >
-                        <Icon source={AlertTriangleIcon} tone="warning" />
-                      </Box>
-                      <BlockStack gap="100">
-                        <Text as="p" variant="bodyMd" fontWeight="semibold">Low Stock</Text>
-                        <Text as="p" variant="bodyXs" tone="subdued">Low inventory levels</Text>
-                      </BlockStack>
+                <div className="stock-card-wrapper">
+                  <Box 
+                    padding="300" 
+                    background="bg-surface" 
+                    borderRadius="200" 
+                    borderWidth="025" 
+                    borderColor="border-warning"
+                  >
+                    <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Box 
+                          background="bg-surface-warning" 
+                          padding="200" 
+                          borderRadius="100"
+                        >
+                          <Icon source={AlertTriangleIcon} tone="warning" />
+                        </Box>
+                        <BlockStack gap="050">
+                          <Text as="p" variant="bodyMd" fontWeight="semibold">Low Stock</Text>
+                          <Text as="p" variant="bodyXs" tone="subdued">Low levels</Text>
+                        </BlockStack>
+                      </InlineStack>
+                      <Text as="p" variant="heading2xl" fontWeight="bold">
+                        {productAnalyticsData.inventoryDistribution.lowStock}
+                      </Text>
                     </InlineStack>
-                    <Text as="p" variant="heading2xl" fontWeight="bold">
-                      {productAnalyticsData.inventoryDistribution.lowStock}
-                    </Text>
-                  </InlineStack>
-                </Box>
+                  </Box>
+                </div>
                 
-                <Box 
-                  padding="400" 
-                  background="bg-surface" 
-                  borderRadius="200" 
-                  borderWidth="025" 
-                  borderColor="border-critical"
-                  minWidth="280px"
-                >
-                  <InlineStack align="space-between" blockAlign="center">
-                    <InlineStack gap="300" blockAlign="center">
-                      <Box 
-                        background="bg-surface-critical" 
-                        padding="200" 
-                        borderRadius="100"
-                      >
-                        <Icon source={XIcon} tone="critical" />
-                      </Box>
-                      <BlockStack gap="100">
-                        <Text as="p" variant="bodyMd" fontWeight="semibold">Out of Stock</Text>
-                        <Text as="p" variant="bodyXs" tone="subdued">Immediate action needed</Text>
-                      </BlockStack>
+                <div className="stock-card-wrapper">
+                  <Box 
+                    padding="300" 
+                    background="bg-surface" 
+                    borderRadius="200" 
+                    borderWidth="025" 
+                    borderColor="border-critical"
+                  >
+                    <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Box 
+                          background="bg-surface-critical" 
+                          padding="200" 
+                          borderRadius="100"
+                        >
+                          <Icon source={XIcon} tone="critical" />
+                        </Box>
+                        <BlockStack gap="050">
+                          <Text as="p" variant="bodyMd" fontWeight="semibold">Out of Stock</Text>
+                          <Text as="p" variant="bodyXs" tone="subdued">Action needed</Text>
+                        </BlockStack>
+                      </InlineStack>
+                      <Text as="p" variant="heading2xl" fontWeight="bold" tone="critical">
+                        {productAnalyticsData.inventoryDistribution.outOfStock}
+                      </Text>
                     </InlineStack>
-                    <Text as="p" variant="heading2xl" fontWeight="bold" tone="critical">
-                      {productAnalyticsData.inventoryDistribution.outOfStock}
-                    </Text>
-                  </InlineStack>
-                </Box>
+                  </Box>
+                </div>
               </InlineStack>
+              </div>
             ) : (
               <Box padding="600" background="bg-surface-secondary" borderRadius="300">
                 <BlockStack align="center" gap="300">
@@ -758,15 +767,14 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
         {/* Price Distribution - Horizontal Slider Layout */}
         <Card>
           <BlockStack gap="400">
-            <BlockStack gap="200">
-              <InlineStack align="space-between" blockAlign="center">
-                <Text as="h3" variant="headingMd" fontWeight="semibold">
-                  Price Distribution Analysis
-                </Text>
-                {productAnalyticsData?.priceAnalysis?.priceDistribution && productAnalyticsData.priceAnalysis.priceDistribution.length > 5 && (
-                <InlineStack gap="300" blockAlign="center">
+            <InlineStack align="space-between" blockAlign="center" wrap={false}>
+              <Text as="h3" variant="headingMd" fontWeight="semibold">
+                Price Distribution Analysis
+              </Text>
+              {productAnalyticsData?.priceAnalysis?.priceDistribution && productAnalyticsData.priceAnalysis.priceDistribution.length > 5 && (
+                <InlineStack gap="300" blockAlign="center" wrap={false}>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Showing {Math.min(priceDistributionIndex + 1, productAnalyticsData.priceAnalysis.priceDistribution.length)} - {Math.min(priceDistributionIndex + 5, productAnalyticsData.priceAnalysis.priceDistribution.length)} of {productAnalyticsData.priceAnalysis.priceDistribution.length} ranges
+                    Showing {Math.min(priceDistributionIndex + 1, productAnalyticsData.priceAnalysis.priceDistribution.length)} - {Math.min(priceDistributionIndex + 5, productAnalyticsData.priceAnalysis.priceDistribution.length)} of {productAnalyticsData.priceAnalysis.priceDistribution.length}
                   </Text>
                   <InlineStack gap="200">
                     <Button
@@ -784,10 +792,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                   </InlineStack>
                 </InlineStack>
               )}
-              </InlineStack>
-              
-
-            </BlockStack>
+            </InlineStack>
             
             {productAnalyticsData?.priceAnalysis?.priceDistribution ? (
               <BlockStack gap="400">
@@ -822,7 +827,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                         }}>
                           Products
                         </th>
-                        <th style={{ 
+                        <th className="hide-mobile" style={{ 
                           padding: '12px 16px', 
                           textAlign: 'right', 
                           fontWeight: '600',
@@ -875,7 +880,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                               }}>
                                 {range.count}
                               </td>
-                              <td style={{ 
+                              <td className="hide-mobile" style={{ 
                                 padding: '16px', 
                                 textAlign: 'right',
                                 fontWeight: '600',
@@ -901,12 +906,12 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                 
                 {/* Summary Info */}
                 <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-                  <InlineStack align="space-between" blockAlign="center">
+                  <InlineStack align="space-between" blockAlign="center" wrap={true}>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      <strong>Price Range:</strong> ${productAnalyticsData.priceAnalysis.minPrice.toFixed(2)} - ${productAnalyticsData.priceAnalysis.maxPrice.toFixed(2)}
+                      <strong>Range:</strong> ${productAnalyticsData.priceAnalysis.minPrice.toFixed(2)} - ${productAnalyticsData.priceAnalysis.maxPrice.toFixed(2)}
                     </Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      <strong>Average Price:</strong> ${productAnalyticsData.priceAnalysis.avgPrice.toFixed(2)}
+                      <strong>Average:</strong> ${productAnalyticsData.priceAnalysis.avgPrice.toFixed(2)}
                     </Text>
                   </InlineStack>
                 </Box>
@@ -955,21 +960,20 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
               </InlineStack>
             </Box>
           ) : productAnalyticsData?.topProducts && productAnalyticsData.topProducts.length > 0 ? (
-            <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
+            <div className="product-carousel-container" style={{ overflowX: 'auto', paddingBottom: '8px' }}>
               <div style={{ display: 'flex', gap: '1rem', minWidth: 'max-content' }}>
                 {productAnalyticsData.topProducts.map((product, index) => (
-                  <Box 
-                    key={product.id}
-                    minWidth="280px"
-                    padding="400"
-                    background="bg-surface" 
-                    borderRadius="300"
-                    borderWidth="025" 
-                    borderColor="border"
-                  >
+                  <div key={product.id} className="product-card">
+                    <Box 
+                      padding="300"
+                      background="bg-surface" 
+                      borderRadius="300"
+                      borderWidth="025" 
+                      borderColor="border"
+                    >
                     <BlockStack gap="300">
                       <InlineStack align="space-between" blockAlign="start">
-                        <InlineStack gap="200" blockAlign="center">
+                        <InlineStack gap="200" blockAlign="center" wrap={false}>
                           <Box 
                             background="bg-surface-info" 
                             padding="150" 
@@ -987,21 +991,25 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                             {product.inventoryStatus}
                           </Badge>
                         </InlineStack>
-                        <Text as="p" variant="headingMd" fontWeight="bold" tone="success">
-                          {formatCompactCurrency(product.value)}
-                        </Text>
                       </InlineStack>
                       
                       <BlockStack gap="200">
                         <Text as="p" variant="bodyMd" fontWeight="semibold">
                           {product.name}
                         </Text>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          {product.variants} variant{product.variants !== 1 ? 's' : ''} • {product.priceRange}
-                        </Text>
+                        <InlineStack gap="100" blockAlign="center">
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            {product.variants} variant{product.variants !== 1 ? 's' : ''}
+                          </Text>
+                          <Text as="span" variant="bodySm" tone="subdued">•</Text>
+                          <Text as="p" variant="bodySm" fontWeight="semibold" tone="success">
+                            {formatCurrency(product.value)}
+                          </Text>
+                        </InlineStack>
                       </BlockStack>
                     </BlockStack>
                   </Box>
+                  </div>
                 ))}
               </div>
             </div>
@@ -1024,7 +1032,223 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
 
   return (
     <>
-      
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          /* ============================================
+             Mobile & Tablet Optimizations ONLY
+             Desktop (>900px) is COMPLETELY UNCHANGED
+             ============================================ */
+          
+          /* MOBILE ONLY: ≤768px */
+          @media (max-width: 768px) {
+            /* 1. Dashboard Header - Title with button on same line */
+            .dashboard-header-row {
+              display: flex !important;
+              justify-content: space-between !important;
+              align-items: center !important;
+              gap: 12px !important;
+              width: 100% !important;
+            }
+            
+            .dashboard-title-subtitle {
+              display: flex !important;
+              flex-direction: column !important;
+              gap: 4px !important;
+              flex: 1 !important;
+            }
+            
+            .dashboard-title h1 {
+              font-size: 18px !important;
+              line-height: 1.3 !important;
+              margin: 0 !important;
+            }
+            
+            .dashboard-subtitle p {
+              font-size: 11px !important;
+              line-height: 1.3 !important;
+              margin: 0 !important;
+            }
+            
+            .dashboard-button-wrapper {
+              flex-shrink: 0 !important;
+            }
+            
+            .dashboard-button-wrapper button {
+              font-size: 12px !important;
+              padding: 6px 12px !important;
+              min-height: 32px !important;
+            }
+            
+            /* 2. Metrics Grid - 2x2 layout, smaller, aligned */
+            .metrics-grid .metric-card-wrapper {
+              flex-basis: calc(50% - 8px) !important;
+              max-width: calc(50% - 8px) !important;
+            }
+            
+            .metric-card-wrapper .Polaris-Text--headingLg {
+              font-size: 18px !important;
+            }
+            
+            .metric-card-wrapper .Polaris-Text--bodySm {
+              font-size: 11px !important;
+            }
+            
+            .metric-card-wrapper .Polaris-Text--bodyXs {
+              font-size: 10px !important;
+            }
+            
+            /* 3. Stock Cards - Stack vertically */
+            .stock-cards-grid .stock-card-wrapper {
+              flex-basis: 100% !important;
+              max-width: 100% !important;
+            }
+            
+            .stock-card-wrapper .Polaris-Text--heading2xl {
+              font-size: 24px !important;
+            }
+            
+            .stock-card-wrapper .Polaris-Text--bodyMd {
+              font-size: 13px !important;
+            }
+            
+            .stock-card-wrapper .Polaris-Text--bodyXs {
+              font-size: 11px !important;
+            }
+            
+            /* Hide Orders column on mobile */
+            .hide-mobile {
+              display: none !important;
+            }
+            
+            /* 4. Price Distribution - Keep simple */
+            table {
+              font-size: 12px !important;
+            }
+            
+            table th {
+              padding: 8px 12px !important;
+              font-size: 11px !important;
+            }
+            
+            table td {
+              padding: 12px !important;
+              font-size: 12px !important;
+            }
+          }
+          
+          /* DESKTOP: >900px - Explicitly preserve default behavior */
+          @media (min-width: 901px) {
+            .dashboard-header-row {
+              display: revert !important;
+            }
+            
+            .dashboard-title-subtitle {
+              display: revert !important;
+            }
+            
+            .dashboard-button-wrapper {
+              display: revert !important;
+            }
+            
+            .metrics-grid .metric-card-wrapper {
+              flex: 1 !important;
+              min-width: 0 !important;
+              max-width: none !important;
+            }
+            
+            .stock-cards-grid .stock-card-wrapper {
+              flex: 1 !important;
+              width: auto !important;
+              max-width: none !important;
+              min-width: 0 !important;
+            }
+          }
+          
+          /* TABLET ONLY: 769px - 900px */
+          @media (min-width: 769px) and (max-width: 900px) {
+            /* 1. Dashboard Header - Title with button on right */
+            .dashboard-header-row {
+              display: flex !important;
+              justify-content: space-between !important;
+              align-items: center !important;
+              gap: 12px !important;
+            }
+            
+            .dashboard-title-subtitle {
+              display: flex !important;
+              flex-direction: column !important;
+              gap: 4px !important;
+            }
+            
+            .dashboard-title h1 {
+              font-size: 20px !important;
+            }
+            
+            .dashboard-subtitle p {
+              font-size: 12px !important;
+            }
+            
+            .dashboard-button-wrapper button {
+              font-size: 13px !important;
+              min-height: 34px !important;
+            }
+            
+            /* 2. Metrics Grid - 2x2 on tablet */
+            .metric-card-wrapper {
+              flex: 1 1 calc(50% - 16px) !important;
+              min-width: calc(50% - 16px) !important;
+              max-width: calc(50% - 16px) !important;
+            }
+            
+            .metric-card-wrapper .Polaris-Text--headingLg {
+              font-size: 20px !important;
+            }
+            
+            /* 3. Stock Cards - Stack vertically on tablet too */
+            .stock-card-wrapper {
+              flex: 1 1 100% !important;
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            
+            /* 4. Price Distribution - Text above arrows on tablet */
+            .price-distribution-header {
+              display: flex !important;
+              justify-content: space-between !important;
+              align-items: flex-start !important;
+              flex-wrap: wrap !important;
+              gap: 12px !important;
+            }
+            
+            .price-distribution-controls {
+              display: flex !important;
+              flex-direction: column !important;
+              align-items: flex-end !important;
+              gap: 8px !important;
+            }
+            
+            .price-distribution-controls .range-text {
+              font-size: 12px !important;
+              white-space: nowrap !important;
+            }
+            
+            /* Table styling */
+            table {
+              font-size: 13px !important;
+            }
+            
+            table th {
+              padding: 10px 14px !important;
+              font-size: 12px !important;
+            }
+            
+            table td {
+              padding: 14px !important;
+              font-size: 13px !important;
+            }
+          }
+        `
+      }} />
       <BlockStack gap="300">
         {/* Unified Dashboard Header and Content */}
         <Card>
@@ -1034,9 +1258,11 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
               <InlineStack align="space-between" blockAlign="start">
                 <BlockStack gap="200">
                   <InlineStack gap="300" blockAlign="center">
-                    <Text as="h1" variant="headingLg">
-                      Analytics Dashboard
-                    </Text>
+                    <div className="dashboard-title">
+                      <Text as="h1" variant="headingLg">
+                        Analytics Dashboard
+                      </Text>
+                    </div>
                     {isLoading && (
                       <InlineStack gap="200" blockAlign="center">
                         <Spinner size="small" />
@@ -1046,13 +1272,15 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                       </InlineStack>
                     )}
                   </InlineStack>
-                  <Text as="p" variant="bodyMd" tone="subdued">
-                    Smart insights and comprehensive analytics for your store
-                    {isLoading && !productAnalyticsData && ' • Loading product data...'}
-                  </Text>
+                  <div className="dashboard-subtitle">
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      Smart insights and comprehensive analytics for your store
+                      {isLoading && !productAnalyticsData && ' • Loading product data...'}
+                    </Text>
+                  </div>
                 </BlockStack>
                 
-                <InlineStack gap="200">
+                <div className="dashboard-button-wrapper">
                   <Button
                     onClick={() => fetchFreshData('revenue', true)}
                     loading={isLoading && isManualRefresh}
@@ -1062,9 +1290,8 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                   >
                     Refresh Data
                   </Button>
-                </InlineStack>
-
-            </InlineStack>
+                </div>
+              </InlineStack>
 
             <Divider />
           </BlockStack>
