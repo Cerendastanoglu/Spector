@@ -769,7 +769,7 @@ export function ProductTable({
                 onClick={onContinueToBulkEdit}
                 size="medium"
               >
-                Go to Step 2 ({selectedProducts.length > 0 ? selectedProducts.length : selectedVariants.length} selected)
+                {`Go to Step 2 (${selectedProducts.length > 0 ? selectedProducts.length : selectedVariants.length} selected)`}
               </Button>
             )}
           </InlineStack>

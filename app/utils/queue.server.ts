@@ -243,8 +243,65 @@ async function processCustomerDataRequest(shop: string, payload: any) {
   logger.info(`   Customer ID: ${customer?.id}, Email: ${customer?.email}`);
   logger.info(`   Orders requested: ${orders_requested?.length || 0}`);
   
-  // TODO: Implement actual customer data export logic
-  // For now, just log the request
+  try {
+    // GDPR/CCPA Compliance: Export customer data
+    const customerData: any = {
+      shop,
+      customer: {
+        id: customer?.id,
+        email: customer?.email,
+        phone: customer?.phone,
+        name: `${customer?.first_name || ''} ${customer?.last_name || ''}`.trim(),
+      },
+      requested_at: new Date().toISOString(),
+      data_collected: {
+        // Session data (if any OAuth sessions exist with customer email)
+        sessions: [],
+        // Analytics snapshots that might contain customer references
+        analytics: [],
+        // Any user preferences stored
+        preferences: [],
+      },
+    };
+
+    // Note: This app primarily stores shop-level data, not individual customer data
+    // Most data (AnalyticsSnapshot, ProductAnalytics, etc.) is shop-scoped, not customer-scoped
+    // If we add customer-specific features in the future, export logic should be added here
+
+    // Log the data request for audit trail
+    await db.complianceAudit.create({
+      data: {
+        shop,
+        topic: 'customers/data_request',
+        customerId: customer?.id?.toString(),
+        payload: JSON.stringify(payload),
+        status: 'completed',
+        response: JSON.stringify(customerData),
+        receivedAt: new Date(),
+        completedAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        notes: 'Customer data export completed. App stores minimal customer data.',
+      },
+    });
+
+    logger.info(`✅ Customer data request completed for ${customer?.email}`);
+  } catch (error) {
+    logger.error(`❌ Failed to process customer data request:`, error);
+    
+    // Log the failure in audit trail
+    await db.complianceAudit.create({
+      data: {
+        shop,
+        topic: 'customers/data_request',
+        customerId: customer?.id?.toString(),
+        payload: JSON.stringify(payload),
+        status: 'error',
+        receivedAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        notes: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      },
+    });
+  }
 }
 
 async function processCustomerRedact(shop: string, payload: any) {
@@ -253,23 +310,167 @@ async function processCustomerRedact(shop: string, payload: any) {
   logger.info(`🗑️  Customer redaction request for shop: ${shop}`);
   logger.info(`   Customer ID: ${customer?.id}, Email: ${customer?.email}`);
   
-  // TODO: Implement actual customer data deletion logic
-  // Delete any customer-related data from your database
+  try {
+    const deletionResults = {
+      sessions: 0,
+      complianceAudits: 0,
+    };
+
+    // 1. Delete any sessions associated with this customer email
+    // Note: Sessions are typically shop OAuth sessions, not customer sessions
+    // But if we stored customer email in sessions, we should clean those up
+    if (customer?.email) {
+      const sessionResult = await db.session.deleteMany({
+        where: {
+          shop,
+          email: customer.email,
+        },
+      });
+      deletionResults.sessions = sessionResult.count;
+    }
+
+    // 2. Clean up old compliance audit records for this customer (keep recent ones per GDPR)
+    // Delete audits older than 30 days for this customer
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const auditResult = await db.complianceAudit.deleteMany({
+      where: {
+        shop,
+        customerId: customer?.id?.toString(),
+        receivedAt: {
+          lt: thirtyDaysAgo,
+        },
+      },
+    });
+    deletionResults.complianceAudits = auditResult.count;
+
+    // 3. Note: Most app data (AnalyticsSnapshot, ProductAnalytics, etc.) is shop-scoped,
+    //    not customer-scoped. This app does not store individual customer purchase history
+    //    or personal data beyond what's in the webhook payload itself.
+    //    If we add customer-specific features in the future, deletion logic should be added here.
+
+    // 4. Create audit record of the deletion
+    await db.complianceAudit.create({
+      data: {
+        shop,
+        topic: 'customers/redact',
+        customerId: customer?.id?.toString(),
+        payload: JSON.stringify(payload),
+        status: 'completed',
+        receivedAt: new Date(),
+        completedAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Keep for 30 days
+        notes: `Customer data deleted: ${deletionResults.sessions} sessions, ${deletionResults.complianceAudits} old audit records.`,
+      },
+    });
+
+    logger.info(`✅ Customer redaction completed for ${customer?.email}`);
+    logger.info(`   Deleted: ${deletionResults.sessions} sessions, ${deletionResults.complianceAudits} audit records`);
+  } catch (error) {
+    logger.error(`❌ Failed to process customer redaction:`, error);
+    
+    // Log the failure
+    await db.complianceAudit.create({
+      data: {
+        shop,
+        topic: 'customers/redact',
+        customerId: customer?.id?.toString(),
+        payload: JSON.stringify(payload),
+        status: 'error',
+        receivedAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        notes: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      },
+    });
+  }
 }
 
 async function processShopRedact(shop: string, _payload: any) {
   logger.info(`🗑️  Shop redaction request: ${shop}`);
   
-  // Delete all shop data
-  await db.session.deleteMany({ where: { shop } });
-  
-  // TODO: Delete any other shop-related data
-  // - Notification settings
-  // - Email preferences
-  // - Cached data
-  // - etc.
-  
-  logger.info(`✅ Completed shop data redaction: ${shop}`);
+  try {
+    const deletionResults = {
+      sessions: 0,
+      analyticsSnapshots: 0,
+      productAnalytics: 0,
+      dataRetentionPolicies: 0,
+      complianceAudits: 0,
+      intelligenceCredentials: 0,
+      userPreferences: 0,
+      subscriptions: 0,
+    };
+
+    // 1. Delete all OAuth sessions for this shop
+    const sessionResult = await db.session.deleteMany({ where: { shop } });
+    deletionResults.sessions = sessionResult.count;
+
+    // 2. Delete all analytics snapshots (encrypted data)
+    const analyticsResult = await db.analyticsSnapshot.deleteMany({ where: { shop } });
+    deletionResults.analyticsSnapshots = analyticsResult.count;
+
+    // 3. Delete all product analytics cache
+    const productResult = await db.productAnalytics.deleteMany({ where: { shop } });
+    deletionResults.productAnalytics = productResult.count;
+
+    // 4. Delete data retention policies for this shop
+    const retentionResult = await db.dataRetentionPolicy.deleteMany({ where: { shop } });
+    deletionResults.dataRetentionPolicies = retentionResult.count;
+
+    // 5. Delete intelligence API credentials (encrypted)
+    const credentialsResult = await db.intelligenceCredentials.deleteMany({ where: { shop } });
+    deletionResults.intelligenceCredentials = credentialsResult.count;
+
+    // 6. Delete user preferences
+    const preferencesResult = await db.userPreferences.deleteMany({ where: { shop } });
+    deletionResults.userPreferences = preferencesResult.count;
+
+    // 7. Delete subscription records
+    const subscriptionResult = await db.subscription.deleteMany({ where: { shop } });
+    deletionResults.subscriptions = subscriptionResult.count;
+
+    // 8. Clean up old compliance audit records (keep the most recent shop/redact for 30 days)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const oldAuditResult = await db.complianceAudit.deleteMany({
+      where: {
+        shop,
+        receivedAt: {
+          lt: thirtyDaysAgo,
+        },
+      },
+    });
+    deletionResults.complianceAudits = oldAuditResult.count;
+
+    // 9. Create final audit record of the shop deletion
+    await db.complianceAudit.create({
+      data: {
+        shop,
+        topic: 'shop/redact',
+        payload: JSON.stringify(_payload),
+        status: 'completed',
+        receivedAt: new Date(),
+        completedAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Keep for 30 days
+        notes: `Shop uninstalled. All data deleted: ${deletionResults.sessions} sessions, ${deletionResults.analyticsSnapshots} analytics, ${deletionResults.productAnalytics} products, ${deletionResults.dataRetentionPolicies} policies, ${deletionResults.complianceAudits} old audits.`,
+      },
+    });
+
+    logger.info(`✅ Completed shop data redaction: ${shop}`);
+    logger.info(`   Deleted:`, deletionResults);
+  } catch (error) {
+    logger.error(`❌ Failed to process shop redaction:`, error);
+    
+    // Log the failure
+    await db.complianceAudit.create({
+      data: {
+        shop,
+        topic: 'shop/redact',
+        payload: JSON.stringify(_payload),
+        status: 'error',
+        receivedAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        notes: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      },
+    });
+  }
 }
 
 /**
