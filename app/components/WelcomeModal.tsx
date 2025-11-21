@@ -321,7 +321,37 @@ export function WelcomeModal({
   }
 
   return (
-    <Modal
+    <>
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          /* Force modal footer and buttons to be clickable */
+          .Polaris-Modal-Footer {
+            z-index: 10000 !important;
+            pointer-events: auto !important;
+            position: relative !important;
+          }
+          
+          .Polaris-Modal-Footer * {
+            pointer-events: auto !important;
+          }
+          
+          .Polaris-Modal-Footer button,
+          .Polaris-Modal-Footer .Polaris-Button {
+            pointer-events: auto !important;
+            touch-action: manipulation !important;
+            min-height: 44px !important;
+            cursor: pointer !important;
+            position: relative !important;
+            z-index: 10001 !important;
+          }
+          
+          /* Ensure modal content doesn't overlap footer */
+          .Polaris-Modal-Section {
+            padding-bottom: 80px !important;
+          }
+        `
+      }} />
+      <Modal
       open={isOpen}
       onClose={handleClose}
       title=""
@@ -343,9 +373,9 @@ export function WelcomeModal({
       ]}
     >
       <Modal.Section>
-        <BlockStack gap="500">
+        <BlockStack gap="300">
           {/* Icon/Logo and Title */}
-          <BlockStack gap="300" align="center">
+          <BlockStack gap="200" align="center">
             {currentSlideData.isLogoSlide ? (
               <div className={currentSlideData.iconClass}>
                 <img 
@@ -397,5 +427,6 @@ export function WelcomeModal({
         </BlockStack>
       </Modal.Section>
     </Modal>
+    </>
   );
 }

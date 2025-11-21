@@ -91,7 +91,7 @@ export function ProductTable({
   onExpandProduct,
   onViewProduct,
   onEditProduct,
-  onContinueToBulkEdit: _onContinueToBulkEdit,
+  onContinueToBulkEdit,
   shopCurrency = '$',
   showVariantSelection = false,
   totalCount,
@@ -233,7 +233,7 @@ export function ProductTable({
     <div>
       <StatusLegend />
       <div 
-        className="shared-product-table"
+        className="shared-product-table product-table-mobile"
         style={{ 
           width: '100%',
           maxWidth: '100%',
@@ -758,11 +758,21 @@ export function ProductTable({
           padding: '12px 16px', 
           borderTop: '1px solid #e5e7eb',
           backgroundColor: '#f9fafb',
-          textAlign: 'center'
         }}>
-          <Text as="p" variant="bodyXs" tone="subdued">
-            Showing {products.length}{totalCount ? ` of ${totalCount}` : ''} products
-          </Text>
+          <InlineStack align="space-between" blockAlign="center">
+            <Text as="p" variant="bodyXs" tone="subdued">
+              Showing {products.length}{totalCount ? ` of ${totalCount}` : ''} products
+            </Text>
+            {onContinueToBulkEdit && (selectedProducts.length > 0 || selectedVariants.length > 0) && (
+              <Button 
+                variant="primary" 
+                onClick={onContinueToBulkEdit}
+                size="medium"
+              >
+                Go to Step 2 ({selectedProducts.length > 0 ? selectedProducts.length : selectedVariants.length} selected)
+              </Button>
+            )}
+          </InlineStack>
         </div>
       )}
     </div>

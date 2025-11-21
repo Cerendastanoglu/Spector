@@ -1,5 +1,45 @@
 /* Glassy Welcome Modal with Smooth Animations */
 
+/* Hide Welcome Modal on Mobile - Desktop Only */
+@media (max-width: 768px) {
+  :global(.Polaris-Modal-Dialog) {
+    display: none !important;
+  }
+  
+  :global(.Polaris-Backdrop) {
+    display: none !important;
+  }
+}
+
+/* Ensure modal buttons are always clickable on mobile */
+:global(.Polaris-Modal-Footer) {
+  z-index: 1000 !important;
+  pointer-events: auto !important;
+  margin-top: 0 !important;
+  padding-top: 16px !important;
+}
+
+:global(.Polaris-Modal-Section) {
+  padding-bottom: 0 !important;
+}
+
+:global(.Polaris-Modal-Body) {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+:global(.Polaris-Modal-Dialog__Modal) {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+:global(.Polaris-Modal-Footer button) {
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+  min-height: 44px !important; /* iOS minimum tap target */
+  cursor: pointer !important;
+}
+
 /* Logo Wrapper - Transparent with Glow */
 .logoWrapper {
   width: 100px;
