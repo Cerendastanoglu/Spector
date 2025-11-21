@@ -1,68 +1,34 @@
-import { useState } from "react";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useLoaderData } from "@remix-run/react";
-import {
-  AppProvider as PolarisAppProvider,
-  Button,
-  Card,
-  FormLayout,
-  Page,
-  Text,
-  TextField,
-} from "@shopify/polaris";
-import polarisTranslations from "@shopify/polaris/locales/en.json";
-import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
+/**
+ * OAuth-Only Authentication Route
+ * 
+ * This route enforces OAuth authentication without allowing manual shop domain entry.
+ * Per Shopify App Store requirements, apps must not request manual myshopify.com URL entry.
+ * 
+ * Installation flow:
+ * 1. Merchant clicks "Add app" from App Store
+ * 2. Shopify redirects to OAuth grant page
+ * 3. After approval, merchant is redirected to the app
+ * 
+ * If accessed directly (not via OAuth), this route redirects to the main app
+ * which will trigger the OAuth flow through the authenticate.admin() call.
+ */
 
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import { redirect } from "@remix-run/node";
 import { login } from "../../shopify.server";
 
-import { loginErrorMessage } from "./error.server";
-
-export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
-
+/**
+ * Loader handles OAuth flow automatically
+ * No manual shop domain entry allowed per Shopify requirements
+ */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const errors = loginErrorMessage(await login(request));
-
-  return { errors, polarisTranslations };
+  // Attempt OAuth login - this will redirect to OAuth if needed
+  await login(request);
+  
+  // If login succeeds, redirect to app home
+  return redirect("/app");
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const errors = loginErrorMessage(await login(request));
-
-  return {
-    errors,
-  };
-};
-
-export default function Auth() {
-  const loaderData = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
-  const [shop, setShop] = useState("");
-  const { errors } = actionData || loaderData;
-
-  return (
-    <PolarisAppProvider i18n={loaderData.polarisTranslations}>
-      <Page>
-        <Card>
-          <Form method="post">
-            <FormLayout>
-              <Text variant="headingMd" as="h2">
-                Log in
-              </Text>
-              <TextField
-                type="text"
-                name="shop"
-                label="Shop domain"
-                helpText="example.myshopify.com"
-                value={shop}
-                onChange={setShop}
-                autoComplete="on"
-                error={errors.shop}
-              />
-              <Button submit>Log in</Button>
-            </FormLayout>
-          </Form>
-        </Card>
-      </Page>
-    </PolarisAppProvider>
-  );
-}
+/**
+ * No action handler needed - OAuth only, no form submission
+ */

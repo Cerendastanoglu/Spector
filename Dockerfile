@@ -18,4 +18,5 @@ COPY . .
 
 RUN npm run build
 
-CMD ["npm", "run", "docker-start"]
+# Cloud Run expects the app to listen on the PORT env var (defaults to 8080)
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run start"]

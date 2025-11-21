@@ -3,9 +3,9 @@
 client_id = "035bb80387ae6ea29247c8d0b706f67a"
 name = "Spector"
 handle = "spector"
-# Production URL - Fly.io hosting
+# Production URL - Update after Cloud Run deployment
 # Development: Update this temporarily when using dev command with tunneling
-application_url = "https://spector.fly.dev"
+application_url = "https://YOUR-SERVICE-NAME.run.app"
 embedded = true
 
 [build]
@@ -51,9 +51,9 @@ scopes = "write_products,read_products,read_orders,write_orders,read_inventory,w
 
 [auth]
 redirect_urls = [
-  "https://spector.fly.dev/auth/callback",
-  "https://spector.fly.dev/auth/shopify/callback", 
-  "https://spector.fly.dev/api/auth/callback"
+  "https://YOUR-SERVICE-NAME.run.app/auth/callback",
+  "https://YOUR-SERVICE-NAME.run.app/auth/shopify/callback",
+  "https://YOUR-SERVICE-NAME.run.app/api/auth/callback"
 ]
 
 [pos]

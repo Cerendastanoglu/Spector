@@ -1,24 +1,32 @@
+/**
+ * Public Landing Page
+ * 
+ * OAuth-only authentication per Shopify App Store requirements.
+ * Manual shop domain entry is not allowed for public apps.
+ * 
+ * Installation flow:
+ * 1. Merchant installs from Shopify App Store
+ * 2. OAuth grant page appears automatically
+ * 3. After approval, merchant is redirected to /app
+ */
+
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, useLoaderData } from "@remix-run/react";
-
-import { login } from "../../shopify.server";
 
 import styles from "./styles.module.css";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
 
+  // If shop param exists, redirect to app (will trigger OAuth)
   if (url.searchParams.get("shop")) {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
-  return { showForm: Boolean(login) };
+  return { };
 };
 
 export default function App() {
-  const { showForm } = useLoaderData<typeof loader>();
-
   return (
     <div className={styles.index}>
       <div className={styles.content}>
@@ -26,18 +34,12 @@ export default function App() {
         <p className={styles.text}>
           Intelligent inventory management for your Shopify store. Track, manage, and optimize your product inventory with advanced analytics and automation.
         </p>
-        {showForm && (
-          <Form className={styles.form} method="post" action="/auth/login">
-            <label className={styles.label}>
-              <span>Shop domain</span>
-              <input className={styles.input} type="text" name="shop" />
-              <span>e.g: my-shop-domain.myshopify.com</span>
-            </label>
-            <button className={styles.button} type="submit">
-              Log in
-            </button>
-          </Form>
-        )}
+        <div className={styles.installInfo}>
+          <p className={styles.infoText}>
+            To install Spector, visit the Shopify App Store and click "Add app". 
+            You'll be guided through a secure OAuth installation process.
+          </p>
+        </div>
         <ul className={styles.list}>
           <li>
             <strong>Smart Inventory Tracking</strong>. Real-time monitoring of stock levels with intelligent alerts when products run low.

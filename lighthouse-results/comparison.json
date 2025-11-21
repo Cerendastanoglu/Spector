@@ -1,0 +1,28 @@
+{
+  "before": 0,
+  "after": 0,
+  "difference": 0,
+  "passed": true,
+  "requirement": -10,
+  "timestamp": "2025-11-21T13:53:11.656Z",
+  "pageComparison": [
+    {
+      "page": "Home",
+      "before": 0,
+      "after": 0,
+      "difference": 0
+    },
+    {
+      "page": "Product",
+      "before": 0,
+      "after": 0,
+      "difference": 0
+    },
+    {
+      "page": "Collection",
+      "before": 0,
+      "after": 0,
+      "difference": 0
+    }
+  ]
+}
