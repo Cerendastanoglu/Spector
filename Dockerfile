@@ -1,7 +1,8 @@
 FROM node:18-alpine
 RUN apk add --no-cache openssl
 
-EXPOSE 3000
+EXPOSE 8080
+ENV PORT=8080
 
 WORKDIR /app
 
@@ -16,7 +17,11 @@ RUN npm remove @shopify/cli
 
 COPY . .
 
+# Generate Prisma client before build
+RUN npx prisma generate
+
 RUN npm run build
 
 # Cloud Run expects the app to listen on the PORT env var (defaults to 8080)
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run start"]
+# Set HOST at runtime to avoid vite.config.ts errors during build
+CMD ["sh", "-c", "npx prisma migrate deploy && HOST=0.0.0.0 npm run start"]
