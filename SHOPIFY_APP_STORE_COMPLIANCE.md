@@ -328,14 +328,14 @@ await db.analyticsSnapshot.deleteMany({ where: { shop } });
 **Support Contact**: ✅ Complete (Nov 21, 2025) - ceren@spector-app.com  
 **App Review Instructions**: ✅ Complete (Nov 21, 2025)  
 **Lighthouse Testing Automation**: ✅ Complete (Nov 21, 2025) - Ready to run  
-**Production Deployment**: ⏳ Pending - Google Cloud Run setup needed (see GOOGLE_CLOUD_RUN_SETUP.md)  
+**Production Deployment**: ✅ Complete (Nov 22, 2025) - https://spector-260800553724.us-central1.run.app  
 **App Listing Assets**: ⏳ Pending - Screenshots and feature image needed  
 
 **Ready for Submission**: 🟡 **ALMOST READY** - Just need to:
-1. Deploy to Google Cloud Run
+1. ✅ Deploy to Google Cloud Run - DONE
 2. Run Lighthouse tests and capture results
 3. Create app listing assets (feature image + screenshots)
-4. Set up demo store
+4. Set up demo store owned by Partner account
 
 ---
 
