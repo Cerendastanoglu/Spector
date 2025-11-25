@@ -1,33 +1,18 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
-import db from "../db.server";
+import db from "~/db.server";
 import { logger } from "~/utils/logger";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  try {
-    // Clone the request to avoid body reading conflicts
-    const webhookRequest = request.clone();
-    
-    // Authenticate the webhook request (verifies HMAC)
-    const { shop, payload, topic } = await authenticate.webhook(webhookRequest);
+  const { shop, payload, topic } = await authenticate.webhook(request);
 
-    logger.info(`✅ Verified webhook: ${topic} for shop: ${shop}`);
-    logger.debug(`🔐 HMAC signature verified successfully`);
+  logger.info(`✅ Verified webhook: ${topic} for shop: ${shop}`);
 
-    // 🚀 CRITICAL: Respond with 200 OK immediately (Shopify requirement)
-    // Process webhook asynchronously to avoid timeout
-    processShopRedactionAsync(shop, payload, topic);
+  // 🚀 CRITICAL: Respond with 200 OK immediately (Shopify requirement)
+  // Process webhook asynchronously to avoid timeout
+  processShopRedactionAsync(shop, payload, topic);
 
-    return new Response(null, { status: 200 });
-  } catch (error) {
-    logger.error('❌ Shop redaction webhook failed:', error);
-    
-    if (error instanceof Error && error.message.includes('verify')) {
-      return new Response('Unauthorized - HMAC verification failed', { status: 401 });
-    }
-
-    return new Response('Internal Server Error', { status: 500 });
-  }
+  return new Response();
 };
 
 // Process webhook asynchronously after sending 200 OK

@@ -11,7 +11,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   // 🚀 CRITICAL: Respond with 200 OK immediately (Shopify requirement)
   // Process cleanup asynchronously to avoid timeout
   if (session) {
-    processUninstallAsync(shop);
+    // Don't await - let it run in background
+    processUninstallAsync(shop).catch(error => {
+      logger.error('❌ Background cleanup failed:', error);
+    });
   }
 
   return new Response();
