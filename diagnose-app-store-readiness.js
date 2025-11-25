@@ -6,7 +6,7 @@
 import crypto from 'crypto';
 
 const API_SECRET = '8349678cc521791c3a4f8a4a12d638dd';
-const APP_URL = 'https://spector-260800553724.us-central1.run.app';
+const APP_URL = 'https://spector-445znzcibq-uc.a.run.app';
 const TEST_SHOP = 'spector-test-store.myshopify.com';
 
 // All required webhook endpoints for App Store
