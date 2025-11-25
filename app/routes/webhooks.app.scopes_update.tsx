@@ -11,7 +11,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Process scope update asynchronously to avoid timeout
     if (session) {
         const current = payload.current as string[];
-        processScopeUpdateAsync(session.id, current);
+        // Don't await - let it run in background
+        processScopeUpdateAsync(session.id, current).catch(error => {
+            logger.error('❌ Background scope update failed:', error);
+        });
     }
     
     return new Response();

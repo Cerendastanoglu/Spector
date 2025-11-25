@@ -1,32 +1,18 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { logger } from "~/utils/logger";
+import db from "~/db.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  try {
-    // Clone the request to avoid body reading conflicts
-    const webhookRequest = request.clone();
-    
-    // Authenticate the webhook request (verifies HMAC)
-    const { shop, payload, topic } = await authenticate.webhook(webhookRequest);
+  const { shop, payload, topic } = await authenticate.webhook(request);
 
-    logger.info(`✅ Verified webhook: ${topic} for shop: ${shop}`);
-    logger.debug(`🔐 HMAC signature verified successfully`);
+  logger.info(`✅ Verified webhook: ${topic} for shop: ${shop}`);
 
-    // 🚀 CRITICAL: Respond with 200 OK immediately (Shopify requirement)
-    // Process webhook asynchronously to avoid timeout
-    processWebhookAsync(shop, payload, topic);
+  // 🚀 CRITICAL: Respond with 200 OK immediately (Shopify requirement)
+  // Process webhook asynchronously to avoid timeout
+  processWebhookAsync(shop, payload, topic);
 
-    return new Response(null, { status: 200 });
-  } catch (error) {
-    logger.error('❌ Customer data request webhook failed:', error);
-    
-    if (error instanceof Error && error.message.includes('verify')) {
-      return new Response('Unauthorized - HMAC verification failed', { status: 401 });
-    }
-
-    return new Response('Internal Server Error', { status: 500 });
-  }
+  return new Response();
 };
 
 // Process webhook asynchronously after sending 200 OK
@@ -82,7 +68,6 @@ async function processWebhookAsync(shop: string, payload: any, _topic: string) {
 
     // Log the request for compliance audit trail
     try {
-      const db = (await import("../db.server")).default;
       
       // Create compliance audit record (30-day retention)
       const expiresAt = new Date();

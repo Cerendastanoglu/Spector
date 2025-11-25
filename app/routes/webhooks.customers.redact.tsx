@@ -1,32 +1,18 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { logger } from "~/utils/logger";
+import db from "~/db.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  try {
-    // Clone the request to avoid body reading conflicts
-    const webhookRequest = request.clone();
-    
-    // Authenticate the webhook request (verifies HMAC)
-    const { shop, payload, topic } = await authenticate.webhook(webhookRequest);
+  const { shop, payload, topic } = await authenticate.webhook(request);
 
-    logger.info(`✅ Verified webhook: ${topic} for shop: ${shop}`);
-    logger.debug(`🔐 HMAC signature verified successfully`);
+  logger.info(`✅ Verified webhook: ${topic} for shop: ${shop}`);
 
-    // 🚀 CRITICAL: Respond with 200 OK immediately (Shopify requirement)
-    // Process webhook asynchronously to avoid timeout
-    processRedactionAsync(shop, payload, topic);
+  // 🚀 CRITICAL: Respond with 200 OK immediately (Shopify requirement)
+  // Process webhook asynchronously to avoid timeout
+  processRedactionAsync(shop, payload, topic);
 
-    return new Response(null, { status: 200 });
-  } catch (error) {
-    logger.error('❌ Customer redaction webhook failed:', error);
-    
-    if (error instanceof Error && error.message.includes('verify')) {
-      return new Response('Unauthorized - HMAC verification failed', { status: 401 });
-    }
-
-    return new Response('Internal Server Error', { status: 500 });
-  }
+  return new Response();
 };
 
 // Process webhook asynchronously after sending 200 OK
@@ -63,7 +49,6 @@ async function processRedactionAsync(shop: string, payload: any, _topic: string)
     };
 
     try {
-      const db = (await import("../db.server")).default;
       
       // Note: This app stores minimal customer data
       // Most data is shop-level aggregated analytics, not customer-specific
@@ -132,7 +117,6 @@ async function processRedactionAsync(shop: string, payload: any, _topic: string)
       
       // Log the failed attempt for compliance
       try {
-        const db = (await import("../db.server")).default;
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 30);
         
