@@ -1,3 +1,46 @@
-.cache
-build
+# Dependencies
 node_modules
+.npm
+
+# Build artifacts
+build
+.cache
+dist
+
+# Environment and secrets (NEVER include in Docker)
+.env
+.env.*
+!.env.example
+
+# Development files
+*.md
+!README.md
+lighthouse-results
+scripts
+
+# Git files
+.git
+.gitignore
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+
+# Test files
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Temporary files
+tmp
+temp
+*.tmp

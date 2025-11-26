@@ -5,7 +5,7 @@ name = "Spector"
 handle = "spector"
 # Production URL - Update after Cloud Run deployment
 # Development: Update this temporarily when using dev command with tunneling
-application_url = "https://spector-445znzcibq-uc.a.run.app"
+application_url = "https://spector-260800553724.us-central1.run.app"
 embedded = true
 
 [build]
@@ -51,9 +51,9 @@ scopes = "write_products,read_products,read_orders,write_orders,read_inventory,w
 
 [auth]
 redirect_urls = [
-  "https://spector-445znzcibq-uc.a.run.app/auth/callback",
-  "https://spector-445znzcibq-uc.a.run.app/auth/shopify/callback",
-  "https://spector-445znzcibq-uc.a.run.app/api/auth/callback"
+  "https://spector-260800553724.us-central1.run.app/auth/callback",
+  "https://spector-260800553724.us-central1.run.app/auth/shopify/callback",
+  "https://spector-260800553724.us-central1.run.app/api/auth/callback"
 ]
 
 [pos]
