@@ -69,5 +69,10 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ["@shopify/app-bridge-react", "@shopify/polaris"],
+    exclude: ["bullmq", "ioredis"],
+  },
+  ssr: {
+    noExternal: false,
+    external: ["bullmq", "ioredis"],
   },
 }) satisfies UserConfig;

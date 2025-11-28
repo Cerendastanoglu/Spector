@@ -17,17 +17,23 @@ import { logger } from "~/utils/logger";
 
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "~/shopify.server";
-import prisma from "~/db.server";
+import { queueWebhook } from "~/utils/queue.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { topic, shop, admin, payload } = await authenticate.webhook(request);
 
   logger.info(`[Billing Webhook] Received ${topic} for shop: ${shop}`);
 
-  // 🚀 CRITICAL: Respond with 200 OK immediately (Shopify requirement)
-  // Process webhook asynchronously to avoid timeout
+  // 🚀 CRITICAL: Queue webhook and respond with 200 OK immediately (Shopify requirement)
   if (admin && topic === "APP_SUBSCRIPTIONS_UPDATE") {
-    processSubscriptionUpdateAsync(shop, payload);
+    queueWebhook({
+      type: 'app_subscriptions/update',
+      shop,
+      topic,
+      payload,
+    }).catch(error => {
+      logger.error('❌ Failed to queue webhook:', error);
+    });
   }
 
   return new Response();

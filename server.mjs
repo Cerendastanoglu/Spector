@@ -13,6 +13,12 @@ const handler = createRequestHandler({
 
 const server = createServer(handler);
 
+// Enable Keep-Alive for persistent connections
+// This allows Shopify to reuse connections for webhook delivery
+server.keepAliveTimeout = 65000; // 65 seconds (longer than load balancer's 60s)
+server.headersTimeout = 66000; // Slightly longer than keepAliveTimeout
+
 server.listen(PORT, HOST, () => {
   console.log(`Remix server listening on http://${HOST}:${PORT}`);
+  console.log(`Keep-Alive enabled: timeout=${server.keepAliveTimeout}ms`);
 });
