@@ -12,126 +12,39 @@
  * - Production: Add REDIS_URL environment variable
  */
 
-import { Queue, Worker, QueueEvents } from 'bullmq';
+import { Redis } from '@upstash/redis';
 import { logger } from './logger';
 import db from '../db.server';
 
-// Redis connection configuration
-const redisConnection = process.env.REDIS_URL 
-  ? {
-      url: process.env.REDIS_URL,
-      maxRetriesPerRequest: null,
-    }
-  : undefined;
-
-// Queue availability flag
-let queueAvailable = false;
-
-// Webhook queue instance
-let webhookQueue: Queue | null = null;
-let webhookWorker: Worker | null = null;
-let queueEvents: QueueEvents | null = null;
+// Upstash Redis client (REST-based, works everywhere)
+const redis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+  ? new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    })
+  : null;
 
 /**
  * Initialize the webhook queue (call this on server startup)
  */
 export async function initializeQueue() {
-  if (!redisConnection) {
+  if (!redis) {
     logger.info('⚠️  Redis not configured - using async fallback for webhooks');
     return;
   }
 
   try {
-    // Create the queue
-    webhookQueue = new Queue('webhooks', {
-      connection: redisConnection,
-      defaultJobOptions: {
-        attempts: 3, // Retry failed jobs up to 3 times
-        backoff: {
-          type: 'exponential',
-          delay: 2000, // Start with 2 second delay
-        },
-        removeOnComplete: 100, // Keep last 100 completed jobs
-        removeOnFail: 500, // Keep last 500 failed jobs
-      },
-    });
-
-    // Create queue events listener for monitoring
-    queueEvents = new QueueEvents('webhooks', {
-      connection: redisConnection,
-    });
-
-    // Monitor queue events
-    queueEvents.on('completed', ({ jobId }) => {
-      logger.info(`✅ Webhook job ${jobId} completed`);
-    });
-
-    queueEvents.on('failed', ({ jobId, failedReason }) => {
-      logger.error(`❌ Webhook job ${jobId} failed:`, failedReason);
-    });
-
-    // Create the worker to process jobs
-    webhookWorker = new Worker(
-      'webhooks',
-      async (job) => {
-        const { type, shop, payload } = job.data;
-        
-        logger.info(`🔄 Processing webhook job ${job.id}: ${type} for ${shop}`);
-
-        try {
-          // Route to appropriate handler based on type
-          switch (type) {
-            case 'app/uninstalled':
-              await processUninstall(shop);
-              break;
-            
-            case 'app/scopes_update':
-              await processScopeUpdate(job.data.sessionId, job.data.scopes);
-              break;
-            
-            case 'app_subscriptions/update':
-              await processSubscriptionUpdate(shop, payload);
-              break;
-            
-            case 'customers/data_request':
-              await processCustomerDataRequest(shop, payload);
-              break;
-            
-            case 'customers/redact':
-              await processCustomerRedact(shop, payload);
-              break;
-            
-            case 'shop/redact':
-              await processShopRedact(shop, payload);
-              break;
-            
-            default:
-              logger.warn(`⚠️  Unknown webhook type: ${type}`);
-          }
-          
-          logger.info(`✅ Completed ${type} for ${shop}`);
-        } catch (error) {
-          logger.error(`❌ Error processing ${type} for ${shop}:`, error);
-          throw error; // Re-throw to trigger retry logic
-        }
-      },
-      {
-        connection: redisConnection,
-        concurrency: 10, // Process up to 10 webhooks concurrently
-      }
-    );
-
-    queueAvailable = true;
-    logger.info('✅ Webhook queue system initialized with Redis');
+    // Test Redis connection
+    await redis.ping();
+    logger.info('✅ Webhook queue system initialized with Upstash Redis (REST)');
   } catch (error) {
-    logger.error('❌ Failed to initialize webhook queue:', error);
+    logger.error('❌ Failed to connect to Redis:', error);
     logger.info('⚠️  Falling back to async webhook processing');
-    queueAvailable = false;
   }
 }
 
 /**
- * Queue a webhook for processing
+ * Queue a webhook for processing with Redis persistence
  */
 export async function queueWebhook(data: {
   type: string;
@@ -141,21 +54,62 @@ export async function queueWebhook(data: {
   sessionId?: string;
   scopes?: string[];
 }) {
-  if (!queueAvailable || !webhookQueue) {
-    // Fallback to async processing if queue not available
-    logger.info(`⚡ Queue unavailable - processing ${data.type} async`);
+  if (!redis) {
+    // Fallback to async processing if Redis not available
+    logger.info(`⚡ Redis unavailable - processing ${data.type} async`);
     return processWebhookAsync(data);
   }
 
   try {
-    const job = await webhookQueue.add(data.type, data, {
-      jobId: `${data.shop}-${data.type}-${Date.now()}`,
+    // Store webhook in Redis with TTL (24 hours)
+    const jobId = `webhook:${data.shop}:${data.type}:${Date.now()}`;
+    await redis.setex(jobId, 86400, JSON.stringify(data));
+    logger.info(`📬 Queued webhook: ${jobId}`);
+    
+    // Process immediately in background with retry logic
+    processWebhookWithRetry(jobId, data, 0).catch(error => {
+      logger.error(`❌ Webhook processing failed for ${jobId}:`, error);
     });
-    logger.info(`📬 Queued webhook job ${job.id}`);
   } catch (error) {
     logger.error('❌ Failed to queue webhook, falling back to async:', error);
-    // Fallback to async if queue fails
+    // Fallback to async if Redis fails
     await processWebhookAsync(data);
+  }
+}
+
+/**
+ * Process webhook with exponential backoff retry
+ */
+async function processWebhookWithRetry(
+  jobId: string,
+  data: any,
+  attempt: number
+): Promise<void> {
+  const maxAttempts = 3;
+  
+  try {
+    await processWebhookAsync(data);
+    // Success - remove from Redis
+    if (redis) {
+      await redis.del(jobId);
+    }
+    logger.info(`✅ Completed webhook ${jobId}`);
+  } catch (error) {
+    if (attempt < maxAttempts - 1) {
+      // Exponential backoff: 2s, 4s, 8s
+      const delay = Math.pow(2, attempt + 1) * 1000;
+      logger.warn(`⚠️  Webhook ${jobId} failed (attempt ${attempt + 1}/${maxAttempts}), retrying in ${delay}ms`);
+      
+      setTimeout(() => {
+        processWebhookWithRetry(jobId, data, attempt + 1);
+      }, delay);
+    } else {
+      logger.error(`❌ Webhook ${jobId} failed after ${maxAttempts} attempts:`, error);
+      // Mark as failed in Redis
+      if (redis) {
+        await redis.setex(`${jobId}:failed`, 86400, JSON.stringify({ error: String(error), attempts: maxAttempts }));
+      }
+    }
   }
 }
 
