@@ -25,4 +25,5 @@ RUN npm run build
 RUN npm prune --omit=dev && npm remove @shopify/cli || true
 
 # Cloud Run expects the app to listen on the PORT env var (defaults to 8080)
+# Prisma 7: DATABASE_URL must be in environment for migrations
 CMD ["sh", "-c", "npx prisma migrate deploy && node server.mjs"]
