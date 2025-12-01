@@ -72,7 +72,6 @@ export default defineConfig({
     exclude: ["bullmq", "ioredis"],
   },
   ssr: {
-    noExternal: false,
     external: ["bullmq", "ioredis"],
   },
 }) satisfies UserConfig;

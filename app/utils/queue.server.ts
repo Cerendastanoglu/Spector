@@ -431,14 +431,7 @@ async function processShopRedact(shop: string, _payload: any) {
  * Graceful shutdown - close queue connections
  */
 export async function closeQueue() {
-  if (webhookQueue) {
-    await webhookQueue.close();
-  }
-  if (webhookWorker) {
-    await webhookWorker.close();
-  }
-  if (queueEvents) {
-    await queueEvents.close();
-  }
+  // Note: Using Upstash Redis REST API which doesn't maintain persistent connections
+  // No explicit cleanup needed
   logger.info('✅ Webhook queue closed');
 }

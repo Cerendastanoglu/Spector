@@ -1,3 +1,4 @@
 {
-    "chat.agent.maxRequests": 1000
+    "chat.agent.maxRequests": 1000,
+    "json.schemaDownload.enable": true
 }

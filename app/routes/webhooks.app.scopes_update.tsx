@@ -23,20 +23,3 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     
     return new Response();
 };
-
-// Process scope update asynchronously after sending 200 OK
-async function processScopeUpdateAsync(sessionId: string, scopes: string[]) {
-    try {
-        await db.session.update({   
-            where: {
-                id: sessionId
-            },
-            data: {
-                scope: scopes.toString(),
-            },
-        });
-        logger.info(`✅ Updated session scopes: ${scopes.join(', ')}`);
-    } catch (error) {
-        logger.error('❌ Failed to update session scopes:', error);
-    }
-}

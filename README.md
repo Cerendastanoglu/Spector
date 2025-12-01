@@ -57,12 +57,14 @@ The app is deployed to Google Cloud Run. See deployment documentation for detail
 
 ### Environment Variables Required
 
-- `SHOPIFY_API_KEY`: Your Shopify app's Client ID
-- `SHOPIFY_API_SECRET`: Your Shopify app's Client Secret  
+- `SHOPIFY_API_KEY`: Your Shopify app's Client ID (Shopify now calls this "Client ID", formerly "API Key")
+- `SHOPIFY_API_SECRET`: Your Shopify app's Client secret (Shopify now calls this "Client secret", formerly "API Secret")
 - `SHOPIFY_APP_URL`: Your deployed app URL
 - `DATABASE_URL`: PostgreSQL connection string
-- `SCOPES`: Shopify API scopes
-- `ENCRYPTION_KEY`: For encrypting sensitive data
+- `SCOPES`: Shopify API scopes (comma-separated)
+- `ENCRYPTION_KEY`: For encrypting sensitive data (32+ characters)
+
+**Note:** Find your Client ID and Client secret in Partner Dashboard → Your App → Configuration → Client credentials
 
 ## Project Structure
 

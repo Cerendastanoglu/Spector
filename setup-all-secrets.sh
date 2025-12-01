@@ -64,10 +64,14 @@ create_or_update_secret() {
 
 # Get Shopify credentials
 echo -e "${BLUE}🛍️ Shopify Configuration${NC}"
-echo "Please provide your Shopify app credentials (from Partner Dashboard or 'shopify app env show'):"
+echo "Please provide your Shopify app credentials from Partner Dashboard:"
+echo "Go to: apps.shopify.com/partners → Your App → Configuration → Client credentials"
+echo ""
+echo "Note: Shopify now calls these 'Client ID' and 'Client secret' (same values as old API Key/Secret)"
+echo ""
 
-read -p "Shopify API Key: " SHOPIFY_API_KEY
-read -s -p "Shopify API Secret: " SHOPIFY_API_SECRET
+read -p "Client ID (or API Key): " SHOPIFY_API_KEY
+read -s -p "Client secret (or API Secret): " SHOPIFY_API_SECRET
 echo
 
 if [ -z "$SHOPIFY_API_KEY" ] || [ -z "$SHOPIFY_API_SECRET" ]; then
@@ -115,30 +119,25 @@ fi
 DATABASE_URL="postgresql://$DB_USER:$DB_PASSWORD@/$DB_NAME?host=/cloudsql/$PROJECT_ID:us-central1:$DB_INSTANCE_NAME"
 create_or_update_secret "DATABASE_URL" "$DATABASE_URL" "PostgreSQL connection string"
 
-# Redis setup (using Upstash for free tier)
-echo -e "${BLUE}🔴 Redis Configuration${NC}"
-echo "For Redis, we recommend using Upstash (free tier available):"
+# Redis setup (using Upstash REST API - required for Cloud Run)
+echo -e "${BLUE}🔴 Redis Configuration (Optional but Recommended)${NC}"
+echo "For Redis queue system, we use Upstash REST API (free tier available):"
 echo "1. Go to https://console.upstash.com/"
 echo "2. Create a new Redis database"
-echo "3. Copy the Redis URL"
+echo "3. In database details, find 'REST API' section"
+echo "4. Copy BOTH: REST URL and REST TOKEN (not the regular Redis URL!)"
 echo ""
-read -p "Redis URL (or press Enter to skip): " REDIS_URL
-
-if [ -n "$REDIS_URL" ]; then
-    create_or_update_secret "REDIS_URL" "$REDIS_URL" "Redis connection URL"
-else
-    echo -e "${YELLOW}⚠️ Skipping Redis setup - some features may not work${NC}"
+read -p "Upstash Redis REST URL (or press Enter to skip): " UPSTASH_REDIS_REST_URL
+if [ -n "$UPSTASH_REDIS_REST_URL" ]; then
+    read -p "Upstash Redis REST TOKEN: " UPSTASH_REDIS_REST_TOKEN
 fi
 
-# Email service (Resend)
-echo -e "${BLUE}📧 Email Service Configuration${NC}"
-echo "For email notifications, get your API key from https://resend.com/api-keys"
-read -p "Resend API Key (or press Enter to skip): " RESEND_API_KEY
-
-if [ -n "$RESEND_API_KEY" ]; then
-    create_or_update_secret "RESEND_API_KEY" "$RESEND_API_KEY" "Resend email service API key"
+if [ -n "$UPSTASH_REDIS_REST_URL" ] && [ -n "$UPSTASH_REDIS_REST_TOKEN" ]; then
+    create_or_update_secret "UPSTASH_REDIS_REST_URL" "$UPSTASH_REDIS_REST_URL" "Upstash Redis REST API URL"
+    create_or_update_secret "UPSTASH_REDIS_REST_TOKEN" "$UPSTASH_REDIS_REST_TOKEN" "Upstash Redis REST API Token"
+    echo -e "${GREEN}✅ Redis configured for webhook queue${NC}"
 else
-    echo -e "${YELLOW}⚠️ Skipping email setup - notifications will be disabled${NC}"
+    echo -e "${YELLOW}⚠️ Skipping Redis - webhook queue will use async fallback${NC}"
 fi
 
 # Encryption key
@@ -159,11 +158,8 @@ echo -e "${YELLOW}🚀 Deploying to Cloud Run...${NC}"
 
 # Build the secrets list
 SECRETS_LIST="SHOPIFY_API_SECRET=SHOPIFY_API_SECRET:latest,DATABASE_URL=DATABASE_URL:latest,ENCRYPTION_KEY=ENCRYPTION_KEY:latest,SCOPES=SCOPES:latest"
-if [ -n "$REDIS_URL" ]; then
-    SECRETS_LIST="$SECRETS_LIST,REDIS_URL=REDIS_URL:latest"
-fi
-if [ -n "$RESEND_API_KEY" ]; then
-    SECRETS_LIST="$SECRETS_LIST,RESEND_API_KEY=RESEND_API_KEY:latest"
+if [ -n "$UPSTASH_REDIS_REST_URL" ] && [ -n "$UPSTASH_REDIS_REST_TOKEN" ]; then
+    SECRETS_LIST="$SECRETS_LIST,UPSTASH_REDIS_REST_URL=UPSTASH_REDIS_REST_URL:latest,UPSTASH_REDIS_REST_TOKEN=UPSTASH_REDIS_REST_TOKEN:latest"
 fi
 
 gcloud run deploy spector \
@@ -173,7 +169,7 @@ gcloud run deploy spector \
     --allow-unauthenticated \
     --add-cloudsql-instances "$PROJECT_ID:us-central1:$DB_INSTANCE_NAME" \
     --set-env-vars "SHOPIFY_API_KEY=$SHOPIFY_API_KEY" \
-    --set-env-vars "SHOPIFY_APP_URL=https://spector-260800553724.us-central1.run.app" \
+    --set-env-vars "SHOPIFY_APP_URL=https://spector-app-260800553724.us-central1.run.app" \
     --set-secrets "$SECRETS_LIST" \
     --min-instances 0 \
     --max-instances 10 \
@@ -188,7 +184,7 @@ echo -e "${GREEN}🎉 Deployment complete!${NC}"
 echo -e "${BLUE}📍 Your app is running at: $DEPLOYED_URL${NC}"
 
 # Update Shopify configuration if URL changed
-if [ "$DEPLOYED_URL" != "https://spector-260800553724.us-central1.run.app" ]; then
+if [ "$DEPLOYED_URL" != "https://spector-app-260800553724.us-central1.run.app" ]; then
     echo -e "${YELLOW}🔄 Updating Shopify app URL...${NC}"
     gcloud run services update spector \
         --region us-central1 \

@@ -1,7 +1,11 @@
 import { createRequestHandler } from "@remix-run/node";
 import { createServer } from "http";
 import process from "process";
+import dotenv from "dotenv";
 import * as build from "./build/server/index.js";
+
+// Load environment variables from .env file
+dotenv.config();
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
 const HOST = process.env.HOST || "0.0.0.0";

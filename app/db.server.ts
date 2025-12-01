@@ -5,6 +5,8 @@ declare global {
   var prismaGlobal: PrismaClient;
 }
 
+// Prisma 7: DATABASE_URL is automatically read from environment
+// No need to pass config explicitly
 if (process.env.NODE_ENV !== "production") {
   if (!global.prismaGlobal) {
     global.prismaGlobal = new PrismaClient();
