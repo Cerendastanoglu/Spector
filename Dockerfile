@@ -21,9 +21,8 @@ RUN npx prisma generate
 # Build the app
 RUN npm run build
 
-# Remove dev dependencies except Prisma (needed for migrations)
+# Remove dev dependencies (Prisma is now in prod deps for migrations)
 RUN npm prune --omit=dev && npm remove @shopify/cli || true
-RUN npm install prisma@7.0.1 --save-dev
 
 # Cloud Run expects the app to listen on the PORT env var (defaults to 8080)
 CMD ["sh", "-c", "npx prisma migrate deploy && node server.mjs"]
