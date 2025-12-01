@@ -10,17 +10,19 @@ ENV NODE_ENV=production
 
 COPY package.json package-lock.json* ./
 
-RUN npm ci --omit=dev && npm cache clean --force
-# Remove CLI packages since we don't need them in production by default.
-# Remove this line if you want to run CLI commands in your container.
-RUN npm remove @shopify/cli
+# Install ALL dependencies (including dev) for building
+RUN npm ci && npm cache clean --force
 
 COPY . .
 
 # Generate Prisma client before build
 RUN npx prisma generate
 
+# Build the app
 RUN npm run build
+
+# Remove dev dependencies and CLI after build
+RUN npm prune --omit=dev && npm remove @shopify/cli || true
 
 # Cloud Run expects the app to listen on the PORT env var (defaults to 8080)
 # Set HOST at runtime to avoid vite.config.ts errors during build
