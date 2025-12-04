@@ -493,53 +493,39 @@ export function ProductTable({
                         borderBottom: '1px solid #e5e7eb'
                       }}
                     >
-                      <BlockStack gap="200">
-                        {/* Product Info - Creative card layout */}
+                      <BlockStack gap="300">
+                        {/* Product Info - 2x2 grid layout */}
                         <div style={{
-                          display: 'flex',
-                          gap: '12px',
-                          flexWrap: 'wrap'
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(2, 1fr)',
+                          gap: '16px',
+                          padding: '16px',
+                          backgroundColor: '#fafafa',
+                          borderRadius: '8px',
+                          border: '1px solid #e5e7eb'
                         }}>
-                          {/* Handle Badge */}
-                          <div style={{
-                            padding: '8px 14px',
-                            backgroundColor: '#fff',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '20px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                          }}>
-                            <div style={{
-                              width: '6px',
-                              height: '6px',
-                              borderRadius: '50%',
-                              backgroundColor: '#8b5cf6'
-                            }} />
-                            <Text as="span" variant="bodySm">
-                              {product.handle}
-                            </Text>
+                          {/* Description - Full width if exists */}
+                          {product.description && (
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <Text as="p" variant="bodyXs" tone="subdued" fontWeight="semibold">DESCRIPTION</Text>
+                              <Text as="p" variant="bodySm" breakWord>
+                                {product.description}
+                              </Text>
+                            </div>
+                          )}
+                          
+                          {/* Handle */}
+                          <div>
+                            <Text as="p" variant="bodyXs" tone="subdued" fontWeight="semibold">HANDLE</Text>
+                            <Text as="p" variant="bodySm">{product.handle}</Text>
                           </div>
                           
-                          {/* SKU Badge */}
+                          {/* SKU */}
                           {product.variants?.edges?.[0]?.node?.sku && (
-                            <div style={{
-                              padding: '8px 14px',
-                              backgroundColor: '#fff',
-                              border: '1px solid #e5e7eb',
-                              borderRadius: '20px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}>
-                              <div style={{
-                                width: '6px',
-                                height: '6px',
-                                borderRadius: '50%',
-                                backgroundColor: '#06b6d4'
-                              }} />
-                              <Text as="span" variant="bodySm">
-                                SKU: {product.variants.edges.length > 1 
+                            <div>
+                              <Text as="p" variant="bodyXs" tone="subdued" fontWeight="semibold">SKU</Text>
+                              <Text as="p" variant="bodySm">
+                                {product.variants.edges.length > 1 
                                   ? `${product.variants.edges.length} variants` 
                                   : product.variants.edges[0].node.sku}
                               </Text>
@@ -547,56 +533,32 @@ export function ProductTable({
                           )}
                           
                           {/* Tags */}
-                          {product.tags && product.tags.length > 0 && product.tags.map((tag, index) => (
-                            <div key={index} style={{
-                              padding: '8px 14px',
-                              backgroundColor: '#eff6ff',
-                              border: '1px solid #bfdbfe',
-                              borderRadius: '20px'
-                            }}>
-                              <Text as="span" variant="bodySm" tone="subdued">
-                                {tag}
-                              </Text>
+                          {product.tags && product.tags.length > 0 && (
+                            <div>
+                              <Text as="p" variant="bodyXs" tone="subdued" fontWeight="semibold">TAGS</Text>
+                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                {product.tags.map((tag, index) => (
+                                  <Badge key={index}>{tag}</Badge>
+                                ))}
+                              </div>
                             </div>
-                          ))}
+                          )}
                           
                           {/* Collections */}
                           {product.collections?.edges && product.collections.edges.length > 0 && (
-                            product.collections.edges.map((collection) => (
-                              <div key={collection.node.id} style={{
-                                padding: '8px 14px',
-                                backgroundColor: '#ecfdf5',
-                                border: '1px solid #a7f3d0',
-                                borderRadius: '20px'
-                              }}>
-                                <Text as="span" variant="bodySm" tone="subdued">
-                                  📁 {collection.node.title}
-                                </Text>
+                            <div>
+                              <Text as="p" variant="bodyXs" tone="subdued" fontWeight="semibold">COLLECTIONS</Text>
+                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                {product.collections.edges.map((collection) => (
+                                  <Badge key={collection.node.id} tone="info">{collection.node.title}</Badge>
+                                ))}
                               </div>
-                            ))
+                            </div>
                           )}
                         </div>
                         
-                        {/* Description - Elegant box */}
-                        {product.description && (
-                          <div style={{
-                            padding: '12px 16px',
-                            backgroundColor: '#fff',
-                            border: '1px solid #e5e7eb',
-                            borderLeft: '3px solid #8b5cf6',
-                            borderRadius: '8px'
-                          }}>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                              {product.description}
-                            </Text>
-                          </div>
-                        )}
-                        
-                        {/* Variants section - Simplified table */}
-                        <div style={{ 
-                          paddingTop: '16px',
-                          borderTop: '1px solid #e5e7eb'
-                        }}>
+                        {/* Variants section */}
+                        <div>
                           <div style={{ marginBottom: '12px' }}>
                             <InlineStack gap="200" align="space-between">
                               <Text as="span" variant="bodyXs" tone="subdued" fontWeight="semibold">
