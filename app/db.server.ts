@@ -5,8 +5,6 @@ declare global {
   var prismaGlobal: PrismaClient;
 }
 
-// Prisma 7: DATABASE_URL is read from environment automatically
-// No need to pass it to constructor
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");
 }
