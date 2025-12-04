@@ -1,0 +1,61 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: 
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/spector:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/spector:latest'
+      - '.'
+    timeout: 1200s
+
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: 
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/spector:$BUILD_ID'
+
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'spector'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/spector:$BUILD_ID'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--add-cloudsql-instances'
+      - 'tough-bearing-478915-t7:us-central1:spector-db'
+      - '--set-env-vars'
+      - 'SHOPIFY_API_KEY=035bb80387ae6ea29247c8d0b706f67a,SHOPIFY_APP_URL=https://spector-260800553724.us-central1.run.app,NODE_ENV=production'
+      - '--update-secrets'
+      - 'SHOPIFY_API_SECRET=SHOPIFY_API_SECRET:latest,DATABASE_URL=DATABASE_URL:latest,ENCRYPTION_KEY=ENCRYPTION_KEY:latest,SCOPES=SCOPES:latest,UPSTASH_REDIS_REST_URL=UPSTASH_REDIS_REST_URL:latest,UPSTASH_REDIS_REST_TOKEN=UPSTASH_REDIS_REST_TOKEN:latest'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '10'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--timeout'
+      - '300'
+      - '--port'
+      - '8080'
+
+images:
+  - 'gcr.io/$PROJECT_ID/spector:$BUILD_ID'
+  - 'gcr.io/$PROJECT_ID/spector:latest'
+
+timeout: 1800s
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
