@@ -488,250 +488,182 @@ export function ProductTable({
                     <td 
                       colSpan={5} 
                       style={{ 
-                        padding: '16px',
-                        backgroundColor: '#f8fafc',
+                        padding: '20px',
+                        backgroundColor: '#fafafa',
                         borderBottom: '1px solid #e5e7eb'
                       }}
                     >
-                      <BlockStack gap="400">
-                        {/* Product metadata - Improved alignment */}
+                      <BlockStack gap="200">
+                        {/* Product Info - Creative card layout */}
                         <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr 1fr',
-                          gap: '24px',
-                          padding: '8px 0'
+                          display: 'flex',
+                          gap: '12px',
+                          flexWrap: 'wrap'
                         }}>
-                          {/* Handle Section - ALWAYS SHOW */}
-                          <div style={{ minWidth: '120px' }}>
-                            <BlockStack gap="150">
-                              <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
-                                Handle
-                              </Text>
+                          {/* Handle Badge */}
+                          <div style={{
+                            padding: '8px 14px',
+                            backgroundColor: '#fff',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '20px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            <div style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              backgroundColor: '#8b5cf6'
+                            }} />
+                            <Text as="span" variant="bodySm">
+                              {product.handle}
+                            </Text>
+                          </div>
+                          
+                          {/* SKU Badge */}
+                          {product.variants?.edges?.[0]?.node?.sku && (
+                            <div style={{
+                              padding: '8px 14px',
+                              backgroundColor: '#fff',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '20px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}>
                               <div style={{
-                                padding: '6px 8px',
-                                backgroundColor: '#ffffff',
-                                borderRadius: '6px',
-                                border: '1px solid #e5e7eb'
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                backgroundColor: '#06b6d4'
+                              }} />
+                              <Text as="span" variant="bodySm">
+                                SKU: {product.variants.edges.length > 1 
+                                  ? `${product.variants.edges.length} variants` 
+                                  : product.variants.edges[0].node.sku}
+                              </Text>
+                            </div>
+                          )}
+                          
+                          {/* Tags */}
+                          {product.tags && product.tags.length > 0 && product.tags.map((tag, index) => (
+                            <div key={index} style={{
+                              padding: '8px 14px',
+                              backgroundColor: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '20px'
+                            }}>
+                              <Text as="span" variant="bodySm" tone="subdued">
+                                {tag}
+                              </Text>
+                            </div>
+                          ))}
+                          
+                          {/* Collections */}
+                          {product.collections?.edges && product.collections.edges.length > 0 && (
+                            product.collections.edges.map((collection) => (
+                              <div key={collection.node.id} style={{
+                                padding: '8px 14px',
+                                backgroundColor: '#ecfdf5',
+                                border: '1px solid #a7f3d0',
+                                borderRadius: '20px'
                               }}>
-                                <Text as="span" variant="bodyXs" fontWeight="medium" tone="base">
-                                  {product.handle || 'No handle'}
+                                <Text as="span" variant="bodySm" tone="subdued">
+                                  📁 {collection.node.title}
                                 </Text>
                               </div>
-                            </BlockStack>
+                            ))
+                          )}
+                        </div>
+                        
+                        {/* Description - Elegant box */}
+                        {product.description && (
+                          <div style={{
+                            padding: '12px 16px',
+                            backgroundColor: '#fff',
+                            border: '1px solid #e5e7eb',
+                            borderLeft: '3px solid #8b5cf6',
+                            borderRadius: '8px'
+                          }}>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              {product.description}
+                            </Text>
+                          </div>
+                        )}
+                        
+                        {/* Variants section - Simplified table */}
+                        <div style={{ 
+                          paddingTop: '16px',
+                          borderTop: '1px solid #e5e7eb'
+                        }}>
+                          <div style={{ marginBottom: '12px' }}>
+                            <InlineStack gap="200" align="space-between">
+                              <Text as="span" variant="bodyXs" tone="subdued" fontWeight="semibold">
+                                VARIANTS ({product.variants.edges.length})
+                              </Text>
+                            </InlineStack>
                           </div>
                           
-                          {/* Tags Section - ALWAYS SHOW */}
-                          <div style={{ minWidth: '120px' }}>
-                            <BlockStack gap="150">
-                              <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
-                                Tags
-                              </Text>
-                              <div style={{
-                                padding: '6px 8px',
-                                backgroundColor: '#ffffff',
-                                borderRadius: '6px',
-                                border: '1px solid #e5e7eb',
-                                minHeight: '28px',
-                                display: 'flex',
-                                alignItems: 'center'
-                              }}>
-                                {product.tags && product.tags.length > 0 ? (
-                                  <div style={{
-                                    maxWidth: '200px',
-                                    overflowX: 'auto',
-                                    whiteSpace: 'nowrap',
-                                    scrollbarWidth: 'none', /* Firefox */
-                                    msOverflowStyle: 'none', /* IE/Edge */
-                                    padding: '4px 0'
-                                  }}>
-                                    <InlineStack gap="100">
-                                      {product.tags.map((tag, index) => (
-                                        <Badge key={index} size="small" tone="info">{tag}</Badge>
-                                      ))}
-                                    </InlineStack>
-                                  </div>
-                                ) : (
-                                  <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
-                                    No tags
-                                  </Text>
-                                )}
-                              </div>
-                            </BlockStack>
-                          </div>
-                          
-                          {/* Collections Section - ALWAYS SHOW */}
-                          <div style={{ minWidth: '120px' }}>
-                            <BlockStack gap="150">
-                              <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
-                                Collections
-                              </Text>
-                              <div style={{
-                                padding: '6px 8px',
-                                backgroundColor: '#ffffff',
-                                borderRadius: '6px',
-                                border: '1px solid #e5e7eb',
-                                minHeight: '28px',
-                                display: 'flex',
-                                alignItems: 'center'
-                              }}>
-                                {product.collections?.edges && product.collections.edges.length > 0 ? (
-                                  <InlineStack gap="100" wrap={false}>
-                                    {product.collections.edges.slice(0, 1).map((collection) => (
-                                      <Badge key={collection.node.id} size="small" tone="success">
-                                        {collection.node.title}
-                                      </Badge>
-                                    ))}
-                                    {product.collections.edges.length > 1 && (
-                                      <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
-                                        +{product.collections.edges.length - 1}
-                                      </Text>
+                          <div style={{ 
+                            backgroundColor: '#fff',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            border: '1px solid #e5e7eb'
+                          }}>
+                            {product.variants.edges.map((variant, index) => {
+                              const isVariantSelected = showVariantSelection && selectedVariants.includes(variant.node.id);
+                              
+                              return (
+                                <div 
+                                  key={variant.node.id}
+                                  style={{
+                                    padding: '12px 16px',
+                                    backgroundColor: isVariantSelected ? '#f0f9ff' : 'transparent',
+                                    borderBottom: index < product.variants.edges.length - 1 ? '1px solid #f0f0f0' : 'none',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '16px'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                                    {showVariantSelection && (
+                                      <Checkbox
+                                        checked={isVariantSelected}
+                                        onChange={(checked) => onVariantSelect(variant.node.id, checked)}
+                                        label=""
+                                      />
                                     )}
-                                  </InlineStack>
-                                ) : (
-                                  <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
-                                    No collections
-                                  </Text>
-                                )}
-                              </div>
-                            </BlockStack>
-                          </div>
-                        </div>
-                        
-                        {/* Description & SKU Section - ALWAYS SHOW */}
-                        <div>
-                          <BlockStack gap="300">
-                            <div>
-                              <BlockStack gap="150">
-                                <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
-                                  Description
-                                </Text>
-                                <div style={{
-                                  padding: '8px',
-                                  backgroundColor: '#ffffff',
-                                  borderRadius: '6px',
-                                  border: '1px solid #e5e7eb',
-                                  maxHeight: '80px',
-                                  overflowY: 'auto',
-                                  minHeight: '28px',
-                                  display: 'flex',
-                                  alignItems: 'center'
-                                }}>
-                                  {product.description ? (
-                                    <Text as="p" variant="bodyXs" tone="base">
-                                      {product.description}
-                                    </Text>
-                                  ) : (
-                                    <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
-                                      No description
-                                    </Text>
-                                  )}
-                                </div>
-                              </BlockStack>
-                            </div>
-                            
-                            {/* SKU Section */}
-                            <div>
-                              <BlockStack gap="150">
-                                <Text as="h4" variant="headingXs" fontWeight="semibold" tone="base">
-                                  SKU
-                                </Text>
-                                <div style={{
-                                  padding: '6px 8px',
-                                  backgroundColor: '#ffffff',
-                                  borderRadius: '6px',
-                                  border: '1px solid #e5e7eb',
-                                  minHeight: '28px',
-                                  display: 'flex',
-                                  alignItems: 'center'
-                                }}>
-                                  {product.variants?.edges?.[0]?.node?.sku ? (
-                                    <Text as="span" variant="bodyXs" fontWeight="medium" tone="base">
-                                      {product.variants.edges.length > 1 
-                                        ? `${product.variants.edges.length} variants with SKUs` 
-                                        : product.variants.edges[0].node.sku}
-                                    </Text>
-                                  ) : (
-                                    <Text as="span" variant="bodyXs" tone="subdued" fontWeight="medium">
-                                      No SKU
-                                    </Text>
-                                  )}
-                                </div>
-                              </BlockStack>
-                            </div>
-                          </BlockStack>
-                        </div>
-                        
-                        {/* Variants section */}
-                        <div>
-                          <InlineStack gap="200" align="space-between">
-                            <Text as="h4" variant="headingXs" fontWeight="medium">Variants</Text>
-                            {product.variants.edges.length > 1 && (
-                              <Badge size="small">{`${product.variants.edges.length} total`}</Badge>
-                            )}
-                          </InlineStack>
-                          
-                          <div style={{ marginTop: '8px' }}>
-                            <BlockStack gap="200">
-                              {product.variants.edges.map((variant) => {
-                                const isVariantSelected = showVariantSelection && selectedVariants.includes(variant.node.id);
-                                
-                                return (
-                                  <div 
-                                    key={variant.node.id}
-                                    style={{
-                                      padding: '12px',
-                                      backgroundColor: isVariantSelected ? '#f0f9ff' : '#fff',
-                                      border: '1px solid #e5e7eb',
-                                      borderRadius: '6px',
-                                      borderLeft: isVariantSelected ? '3px solid #3b82f6' : '3px solid #e5e7eb'
-                                    }}
-                                  >
-                                    <InlineStack gap="400" align="space-between">
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        {showVariantSelection && (
-                                          <Checkbox
-                                            checked={isVariantSelected}
-                                            onChange={(checked) => onVariantSelect(variant.node.id, checked)}
-                                            label=""
-                                          />
-                                        )}
-                                        <Text as="span" variant="bodySm" fontWeight="medium">
-                                          {variant.node.title}
+                                    <div>
+                                      <Text as="span" variant="bodySm" fontWeight="medium">
+                                        {variant.node.title}
+                                      </Text>
+                                      {variant.node.sku && (
+                                        <Text as="p" variant="bodyXs" tone="subdued">
+                                          SKU: {variant.node.sku}
                                         </Text>
-                                        {variant.node.sku && (
-                                          <Badge size="small" tone="info">
-                                            {`SKU: ${variant.node.sku}`}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      
-                                      <InlineStack gap="400">
-                                        <div style={{ textAlign: 'center' }}>
-                                          <Text as="p" variant="bodyXs" tone="subdued">Inventory</Text>
-                                          <Text as="p" variant="bodySm" fontWeight="medium">
-                                            {variant.node.inventoryQuantity}
-                                          </Text>
-                                        </div>
-                                        <div style={{ textAlign: 'center' }}>
-                                          <Text as="p" variant="bodyXs" tone="subdued">Price</Text>
-                                          <Text as="p" variant="bodySm" fontWeight="medium">
-                                            {shopCurrency}{variant.node.price}
-                                          </Text>
-                                        </div>
-                                        <div style={{ textAlign: 'center' }}>
-                                          <Text as="p" variant="bodyXs" tone="subdued">Compare At</Text>
-                                          <Text as="p" variant="bodySm" fontWeight="medium" tone={variant.node.compareAtPrice ? "base" : "subdued"}>
-                                            {variant.node.compareAtPrice 
-                                              ? `${shopCurrency}${variant.node.compareAtPrice}`
-                                              : 'No compare at'}
-                                          </Text>
-                                        </div>
-                                      </InlineStack>
-                                    </InlineStack>
+                                      )}
+                                    </div>
                                   </div>
-                                );
-                              })}
-                            </BlockStack>
+                                  
+                                  <InlineStack gap="300" align="end">
+                                    <div style={{ textAlign: 'right', minWidth: '60px' }}>
+                                      <Text as="p" variant="bodyXs" tone="subdued">Stock</Text>
+                                      <Text as="p" variant="bodySm" fontWeight="medium">
+                                        {variant.node.inventoryQuantity}
+                                      </Text>
+                                    </div>
+                                    <div style={{ textAlign: 'right', minWidth: '70px' }}>
+                                      <Text as="p" variant="bodyXs" tone="subdued">Price</Text>
+                                      <Text as="p" variant="bodySm" fontWeight="medium">
+                                        {shopCurrency}{variant.node.price}
+                                      </Text>
+                                    </div>
+                                  </InlineStack>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       </BlockStack>
