@@ -1,29 +1,8 @@
-/*
-  Warnings:
-
-  - You are about to drop the `Session` table. If the table is not empty, all the data it contains will be lost.
-
-*/
--- DropTable
-DROP TABLE "Session";
-
--- CreateTable
-CREATE TABLE "session" (
-    "id" TEXT NOT NULL,
-    "shop" TEXT NOT NULL,
-    "state" TEXT NOT NULL,
-    "isOnline" BOOLEAN NOT NULL DEFAULT false,
-    "scope" TEXT,
-    "expires" TIMESTAMP(3),
-    "accessToken" TEXT NOT NULL,
-    "userId" BIGINT,
-    "firstName" TEXT,
-    "lastName" TEXT,
-    "email" TEXT,
-    "accountOwner" BOOLEAN NOT NULL DEFAULT false,
-    "locale" TEXT,
-    "collaborator" BOOLEAN DEFAULT false,
-    "emailVerified" BOOLEAN DEFAULT false,
-
-    CONSTRAINT "session_pkey" PRIMARY KEY ("id")
-);
+-- AlterTable (rename Session to session)
+-- This migration is a no-op if the table is already lowercase
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'Session') THEN
+        ALTER TABLE "Session" RENAME TO "session";
+    END IF;
+END $$;
