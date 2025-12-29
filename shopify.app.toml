@@ -5,7 +5,7 @@ name = "Spector"
 handle = "spector"
 # Production URL - Update after Cloud Run deployment
 # Development: Update this temporarily when using dev command with tunneling
-application_url = "https://spector-app-260800553724.us-central1.run.app"
+application_url = "https://spector-260800553724.us-central1.run.app"
 embedded = true
 
 [build]
@@ -13,6 +13,11 @@ automatically_update_urls_on_dev = true
 
 [webhooks]
 api_version = "2025-10"
+
+  # GDPR/Compliance webhooks - REQUIRED for App Store
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "/webhooks"
 
   [[webhooks.subscriptions]]
   topics = [ "app/uninstalled" ]
@@ -32,28 +37,18 @@ api_version = "2025-10"
   topics = [ "app_subscriptions/update" ]
   uri = "/webhooks/app/subscription_update"
 
-  # NOTE: GDPR webhooks (customers/data_request, customers/redact, shop/redact)
-  # CANNOT be added via shopify.app.toml - Shopify blocks automated registration.
-  # These webhooks are automatically registered by Shopify when you:
-  # 1. Request "Protected customer data access" in Partner Dashboard
-  # 2. Get approved (usually 1-3 business days)
-  # 3. Shopify will automatically create these webhook subscriptions
-  # Your webhook handlers are already implemented and will verify HMAC correctly.
-
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 # Added read_orders for revenue tracking and order analytics
 # Added write_products for inventory management features
 # Added read_products for product listing and analytics
-# Added read_inventory and write_inventory for stock level management
-# Added read_locations to access inventory locations
-scopes = "write_products,read_products,read_orders,write_orders,read_inventory,write_inventory,read_locations"
+scopes = "write_products,read_products,read_orders,write_orders"
 
 [auth]
 redirect_urls = [
-  "https://spector-app-260800553724.us-central1.run.app/auth/callback",
-  "https://spector-app-260800553724.us-central1.run.app/auth/shopify/callback",
-  "https://spector-app-260800553724.us-central1.run.app/api/auth/callback"
+  "https://spector-260800553724.us-central1.run.app/auth/callback",
+  "https://spector-260800553724.us-central1.run.app/auth/shopify/callback",
+  "https://spector-260800553724.us-central1.run.app/api/auth/callback"
 ]
 
 [pos]

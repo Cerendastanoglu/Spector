@@ -32,7 +32,11 @@ const shopify = shopifyApp({
   scopes: process.env.SCOPES.split(","),
   appUrl: process.env.SHOPIFY_APP_URL,
   authPathPrefix: "/auth",
-  sessionStorage: new PrismaSessionStorage(prisma),
+  sessionStorage: new PrismaSessionStorage(prisma, {
+    // Increase retries for Cloud SQL socket connections which can be slow on cold start
+    connectionRetries: 10,
+    connectionRetryIntervalMs: 3000,
+  }),
   distribution: AppDistribution.AppStore,
   future: {
     unstable_newEmbeddedAuthStrategy: true,

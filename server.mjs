@@ -2,7 +2,6 @@ import { createRequestHandler } from "@remix-run/node";
 import { createServer } from "http";
 import process from "process";
 import dotenv from "dotenv";
-import * as build from "./build/server/index.js";
 
 // Load environment variables from .env file
 dotenv.config();
@@ -10,8 +9,20 @@ dotenv.config();
 const PORT = parseInt(process.env.PORT || "8080", 10);
 const HOST = process.env.HOST || "0.0.0.0";
 
+// Dynamically import the build to ensure it's loaded correctly
+const build = await import("./build/server/index.js");
+
+const buildToUse = build.default || build;
+
+console.log("=== DEBUG BUILD OBJECT ===");
+console.log("Using build.default?", !!build.default);
+console.log("buildToUse keys:", Object.keys(buildToUse));
+console.log("buildToUse.routes:", typeof buildToUse.routes, buildToUse.routes === null ? "null" : buildToUse.routes === undefined ? "undefined" : "exists");
+console.log("buildToUse.entry:", typeof buildToUse.entry);
+console.log("buildToUse.isSpaMode:", buildToUse.isSpaMode);
+
 const handler = createRequestHandler({
-  build,
+  build: buildToUse,
   mode: process.env.NODE_ENV || "production",
 });
 

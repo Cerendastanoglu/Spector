@@ -1,3 +1,7 @@
 import { flatRoutes } from "@remix-run/fs-routes";
+import type { RouteConfig } from "@remix-run/route-config";
 
-export default flatRoutes();
+const routes = flatRoutes();
+
+export default routes || [] as RouteConfig;
+

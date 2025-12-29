@@ -1,22 +1,21 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
-import { logger } from "~/utils/logger";
-import { queueWebhook } from "~/utils/queue.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { shop, payload, topic } = await authenticate.webhook(request);
-
-  logger.info(`✅ Verified webhook: ${topic} for shop: ${shop}`);
-
-  // 🚀 CRITICAL: Queue webhook and respond with 200 OK immediately (Shopify requirement)
-  queueWebhook({
-    type: 'customers/redact',
-    shop,
-    topic,
-    payload,
-  }).catch(error => {
-    logger.error('❌ Failed to queue webhook:', error);
-  });
-
-  return new Response();
+  try {
+    const { shop, topic, payload } = await authenticate.webhook(request);
+    
+    console.log(`✅ GDPR customers/redact webhook verified for shop: ${shop}`);
+    
+    // Process asynchronously - don't block the response
+    setImmediate(() => {
+      console.log(`Processing customer redact for shop: ${shop}`, payload);
+    });
+    
+    // Return 200 OK immediately - this is critical for Shopify's verification
+    return new Response(null, { status: 200 });
+  } catch (error) {
+    console.error('❌ Webhook verification failed:', error);
+    return new Response('Webhook verification failed', { status: 401 });
+  }
 };

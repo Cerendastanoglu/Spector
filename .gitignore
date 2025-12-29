@@ -24,3 +24,6 @@ database.sqlite
 # Ignore shopify files created during app dev
 .shopify/*
 .shopify.lock
+# Test scripts with potential secrets
+test-hmac.mjs
+check-*.mjs
