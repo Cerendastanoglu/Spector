@@ -23,14 +23,12 @@ import {
   SkeletonBodyText,
   SkeletonDisplayText,
   Divider,
-  Icon,
   ProgressBar,
   Thumbnail,
   EmptyState,
 } from "@shopify/polaris";
 import {
   ProductIcon,
-  AlertTriangleIcon,
   RefreshIcon,
   ChevronRightIcon,
   InfoIcon,
@@ -140,12 +138,6 @@ export default function MarketResearchPage() {
                 onSelectProduct={setSelectedProduct}
               />
             </Layout.Section>
-            
-            {analysisData.insights.length > 0 && (
-              <Layout.Section>
-                <InsightsCard insights={analysisData.insights} />
-              </Layout.Section>
-            )}
           </>
         ) : (
           <Layout.Section>
@@ -394,43 +386,6 @@ function InsightRow({ insight }: { insight: ProductInsight }) {
         <Text variant="bodySm" as="span">{insight.recommendation}</Text>
       </BlockStack>
     </Banner>
-  );
-}
-
-function InsightsCard({ insights }: { insights: ProductInsight[] }) {
-  const grouped = {
-    critical: insights.filter(i => i.severity === 'critical'),
-    warning: insights.filter(i => i.severity === 'warning'),
-    info: insights.filter(i => i.severity === 'info'),
-  };
-  
-  return (
-    <Card>
-      <BlockStack gap="400">
-        <Text variant="headingMd" as="h2">All Insights</Text>
-        {grouped.critical.length > 0 && (
-          <BlockStack gap="200">
-            <InlineStack gap="200">
-              <Icon source={AlertTriangleIcon} tone="critical" />
-              <Text variant="headingSm" as="h3" tone="critical">Critical ({grouped.critical.length})</Text>
-            </InlineStack>
-            {grouped.critical.slice(0, 5).map((insight, i) => <Text key={i} variant="bodySm" as="span">{insight.title}</Text>)}
-          </BlockStack>
-        )}
-        {grouped.warning.length > 0 && (
-          <BlockStack gap="200">
-            <Text variant="headingSm" as="h3" tone="caution">Warnings ({grouped.warning.length})</Text>
-            {grouped.warning.slice(0, 5).map((insight, i) => <Text key={i} variant="bodySm" as="span">{insight.title}</Text>)}
-          </BlockStack>
-        )}
-        {grouped.info.length > 0 && (
-          <BlockStack gap="200">
-            <Text variant="headingSm" as="h3">Suggestions ({grouped.info.length})</Text>
-            {grouped.info.slice(0, 5).map((insight, i) => <Text key={i} variant="bodySm" as="span">{insight.title}</Text>)}
-          </BlockStack>
-        )}
-      </BlockStack>
-    </Card>
   );
 }
 
