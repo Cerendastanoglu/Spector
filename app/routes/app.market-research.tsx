@@ -31,11 +31,9 @@ import {
 import {
   ProductIcon,
   AlertTriangleIcon,
-  ChartVerticalIcon,
   RefreshIcon,
-  StarIcon,
   ChevronRightIcon,
-  SearchIcon,
+  InfoIcon,
 } from "@shopify/polaris-icons";
 import { authenticate } from "~/shopify.server";
 import { getMarketResearchAccess } from "~/services/marketResearch.server";
@@ -144,14 +142,10 @@ export default function MarketResearchPage() {
             </Layout.Section>
             
             {analysisData.insights.length > 0 && (
-              <Layout.Section variant="oneThird">
+              <Layout.Section>
                 <InsightsCard insights={analysisData.insights} />
               </Layout.Section>
             )}
-            
-            <Layout.Section>
-              <ComingSoonFeatures access={access} />
-            </Layout.Section>
           </>
         ) : (
           <Layout.Section>
@@ -196,51 +190,64 @@ function SummaryCards({ data }: { data: AnalysisResponse }) {
   const { summary } = data;
   
   return (
-    <InlineStack gap="400" wrap={false}>
-      <Box minWidth="200px">
-        <Card>
-          <BlockStack gap="200">
-            <Text variant="headingMd" as="h3">Products Analyzed</Text>
-            <Text variant="heading2xl" as="p">{summary.productsAnalyzed}</Text>
-            <Text variant="bodySm" as="span" tone="subdued">
-              of {summary.totalProducts} total
-            </Text>
-          </BlockStack>
-        </Card>
-      </Box>
-      
-      <Box minWidth="200px">
-        <Card>
-          <BlockStack gap="200">
-            <InlineStack gap="200" align="start">
-              <Text variant="headingMd" as="h3">Underperformers</Text>
-              <Badge tone="critical">{String(summary.underperformersCount)}</Badge>
+    <BlockStack gap="400">
+      <Card>
+        <InlineStack gap="800" align="space-between" wrap={false}>
+          <BlockStack gap="100">
+            <Text variant="bodySm" as="span" tone="subdued">Products Analyzed</Text>
+            <InlineStack gap="100" blockAlign="baseline">
+              <Text variant="headingLg" as="p" fontWeight="bold">{summary.productsAnalyzed}</Text>
+              <Text variant="bodySm" as="span" tone="subdued">of {summary.totalProducts}</Text>
             </InlineStack>
-            <Text variant="heading2xl" as="p" tone={summary.underperformersCount > 0 ? "critical" : "success"}>
-              {summary.underperformersCount}
-            </Text>
-            <Text variant="bodySm" as="span" tone="subdued">need attention</Text>
           </BlockStack>
-        </Card>
-      </Box>
-      
-      <Box minWidth="200px">
-        <Card>
-          <BlockStack gap="200">
-            <Text variant="headingMd" as="h3">Average Score</Text>
+          
+          <BlockStack gap="100">
+            <Text variant="bodySm" as="span" tone="subdued">Underperformers</Text>
             <InlineStack gap="200" blockAlign="center">
-              <Text variant="heading2xl" as="p">{summary.averageScore}</Text>
-              <Text variant="bodySm" as="span" tone="subdued">/100</Text>
+              <Text variant="headingLg" as="p" fontWeight="bold" tone={summary.underperformersCount > 0 ? "critical" : "success"}>
+                {summary.underperformersCount}
+              </Text>
+              {summary.underperformersCount > 0 && <Badge tone="critical" size="small">Needs Attention</Badge>}
             </InlineStack>
-            <ProgressBar 
-              progress={summary.averageScore} 
-              tone={summary.averageScore > 50 ? "success" : summary.averageScore > 25 ? "highlight" : "critical"}
-              size="small"
-            />
           </BlockStack>
-        </Card>
-      </Box>
-    </InlineStack>
+          
+          <BlockStack gap="100">
+            <Text variant="bodySm" as="span" tone="subdued">Average Score</Text>
+            <InlineStack gap="200" blockAlign="center">
+              <Text variant="headingLg" as="p" fontWeight="bold">{summary.averageScore}</Text>
+              <Text variant="bodySm" as="span" tone="subdued">/100</Text>
+              <Box minWidth="80px">
+                <ProgressBar 
+                  progress={summary.averageScore} 
+                  tone={summary.averageScore > 50 ? "success" : summary.averageScore > 25 ? "highlight" : "critical"}
+                  size="small"
+                />
+              </Box>
+            </InlineStack>
+          </BlockStack>
+        </InlineStack>
+      </Card>
+      
+      <ScoringExplanation />
+    </BlockStack>
+  );
+}
+
+function ScoringExplanation() {
+  return (
+    <Banner icon={InfoIcon} tone="info">
+      <BlockStack gap="200">
+        <Text as="span" fontWeight="semibold">How we calculate scores</Text>
+        <Text as="p" variant="bodySm">
+          Each product gets a score from 0-100 based on: <strong>Sales (40%)</strong> — recent sales volume and revenue, 
+          <strong> Recency (30%)</strong> — days since last sale, 
+          <strong> Inventory (15%)</strong> — stock levels and sell-through rate, 
+          <strong> Listing (10%)</strong> — product images and descriptions, 
+          <strong> Pricing (5%)</strong> — margin analysis. 
+          Products scoring below 50 are flagged as underperformers.
+        </Text>
+      </BlockStack>
+    </Banner>
   );
 }
 
@@ -427,39 +434,6 @@ function InsightsCard({ insights }: { insights: ProductInsight[] }) {
   );
 }
 
-function ComingSoonFeatures({ access }: { access: MarketResearchAccess }) {
-  const features = [
-    { title: "Google Trends Integration", description: "See how demand for your products changes over time", icon: ChartVerticalIcon, available: access.limits.trendsEnabled, tier: "Basic" },
-    { title: "Price Intelligence", description: "Compare your pricing with market competitors", icon: SearchIcon, available: access.limits.priceIntelEnabled, tier: "Pro" },
-    { title: "AI Recommendations", description: "Get AI-powered suggestions to improve listings", icon: StarIcon, available: access.limits.aiSuggestionsEnabled, tier: "Pro" },
-  ];
-  
-  return (
-    <Card>
-      <BlockStack gap="400">
-        <Text variant="headingMd" as="h2">Coming Soon</Text>
-        <Text variant="bodySm" as="p" tone="subdued">These features are in development and will be available in future updates.</Text>
-        <InlineStack gap="400" wrap>
-          {features.map((feature, i) => (
-            <Box key={i} minWidth="200px" maxWidth="300px">
-              <Card background="bg-surface-secondary">
-                <BlockStack gap="200">
-                  <InlineStack gap="200" blockAlign="center">
-                    <Icon source={feature.icon} tone="subdued" />
-                    <Text variant="headingSm" as="h3">{feature.title}</Text>
-                    {!feature.available && <Badge size="small">{feature.tier}</Badge>}
-                  </InlineStack>
-                  <Text variant="bodySm" as="p" tone="subdued">{feature.description}</Text>
-                </BlockStack>
-              </Card>
-            </Box>
-          ))}
-        </InlineStack>
-      </BlockStack>
-    </Card>
-  );
-}
-
 function AnalysisSkeleton() {
   return (
     <BlockStack gap="400">
@@ -477,10 +451,29 @@ function AnalysisSkeleton() {
 
 function EmptyStateCard({ onRunAnalysis }: { onRunAnalysis: () => void }) {
   return (
-    <Card>
-      <EmptyState heading="Discover your underperforming products" action={{ content: "Run Analysis", onAction: onRunAnalysis }} image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
-        <p>Analyze your product catalog to identify items that aren't selling well. Get actionable insights and recommendations to improve performance.</p>
-      </EmptyState>
-    </Card>
+    <BlockStack gap="400">
+      <Card>
+        <EmptyState 
+          heading="Find products that need attention" 
+          action={{ content: "Run Analysis", onAction: onRunAnalysis }} 
+          image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+        >
+          <BlockStack gap="200">
+            <Text as="p">Click "Run Analysis" to scan your catalog and identify products that aren't performing well.</Text>
+          </BlockStack>
+        </EmptyState>
+      </Card>
+      
+      <Banner icon={InfoIcon} tone="info">
+        <BlockStack gap="200">
+          <Text as="span" fontWeight="semibold">What the analysis does</Text>
+          <Text as="p" variant="bodySm">
+            We'll look at your last 30 days of sales data and score each product based on sales performance, 
+            inventory levels, listing quality, and pricing. Products with low scores will be flagged with 
+            specific recommendations to help you improve them.
+          </Text>
+        </BlockStack>
+      </Banner>
+    </BlockStack>
   );
 }
