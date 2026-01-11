@@ -5,6 +5,7 @@ import { ProductConstants } from "../utils/scopedConstants";
 import { ProductTable } from "./ProductTable";
 import styles from "./StepsUI.module.css";
 import { logger } from "~/utils/logger";
+import { BILLING_CONFIG } from "~/config/billing.config";
 import {
   BulkPriceEditor,
   BulkTagEditor,
@@ -26,6 +27,7 @@ import {
   Icon,
   Collapsible,
   ProgressBar,
+  Modal,
 } from '@shopify/polaris';
 // Import only the icons we actually use
 import { 
@@ -109,6 +111,9 @@ interface ProductManagementProps {
   initialCategory?: InventoryCategory;
   shopDomain?: string;
   initialProducts?: Product[] | null; // Add support for server-side loaded products
+  subscriptionStatus?: 'trialing' | 'active' | 'cancelled' | 'expired' | 'none';
+  hasActiveSubscription?: boolean;
+  managedPricingUrl?: string;
 }
 
 type InventoryCategory = 'all' | 'out-of-stock' | 'critical' | 'low-stock' | 'in-stock';
@@ -118,7 +123,15 @@ type SortDirection = 'asc' | 'desc';
 
 
 
-export function ProductManagement({ isVisible, initialCategory = 'all', shopDomain, initialProducts = null }: ProductManagementProps) {
+export function ProductManagement({ 
+  isVisible, 
+  initialCategory = 'all', 
+  shopDomain, 
+  initialProducts = null,
+  subscriptionStatus = 'none',
+  hasActiveSubscription = false,
+  managedPricingUrl = ''
+}: ProductManagementProps) {
   // Add CSS animations - Fixed to prevent header interference
   useEffect(() => {
     const styles = document.createElement('style');
@@ -277,7 +290,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     onAction?: () => void;
   }>({ show: false, message: '' });
   
-  const [tagOperation, setTagOperation] = useState<'add' | 'remove' | 'replace'>('add');
+  const [tagOperation, setTagOperation] = useState<'add' | 'remove'>('add');
   const [tagValue, setTagValue] = useState('');
   const [tagRemoveValue, setTagRemoveValue] = useState('');
   
@@ -316,6 +329,42 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   // Collapsible tag filter state
   const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
   
+  // Trial limit modal state
+  const [showTrialLimitModal, setShowTrialLimitModal] = useState(false);
+  
+  // Check if user is in trial mode (not actively subscribed)
+  const isTrialMode = !hasActiveSubscription && subscriptionStatus !== 'active';
+  const trialProductLimit = BILLING_CONFIG.TRIAL_PRODUCT_LIMIT;
+  
+  // Function to check trial limit before bulk operations
+  const checkTrialLimit = useCallback((productCount: number): boolean => {
+    if (isTrialMode && productCount > trialProductLimit) {
+      setShowTrialLimitModal(true);
+      return false; // Operation should not proceed
+    }
+    return true; // Operation can proceed
+  }, [isTrialMode, trialProductLimit]);
+  
+  // Handle subscribe button click from trial limit modal
+  const handleSubscribeFromModal = useCallback((source: string = 'unknown') => {
+    setShowTrialLimitModal(false);
+    
+    // Track in Google Analytics
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag('event', 'subscribe_click', {
+        'event_category': 'subscription',
+        'event_label': source,
+        'value': 9.99
+      });
+    }
+    
+    if (managedPricingUrl) {
+      // Add UTM parameters for tracking
+      const urlWithUTM = `${managedPricingUrl}?utm_source=spector_app&utm_medium=${encodeURIComponent(source)}&utm_campaign=trial_upgrade`;
+      window.open(urlWithUTM, '_blank');
+    }
+  }, [managedPricingUrl]);
+  
   // Bulk operations modal state
   // Removed state variables related to the bulk operation modal
   const [pendingBulkOperation, setPendingBulkOperation] = useState<{
@@ -344,6 +393,30 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   // Select all filtered products and their variants
   const handleSelectAllFiltered = () => {
     const allFilteredProductIds = filteredProducts.map(p => p.id);
+    
+    // Check trial limit
+    if (isTrialMode && allFilteredProductIds.length > trialProductLimit) {
+      // Only select up to the limit
+      const limitedProductIds = allFilteredProductIds.slice(0, trialProductLimit);
+      const limitedProducts = filteredProducts.filter(p => limitedProductIds.includes(p.id));
+      const limitedVariantIds = limitedProducts.flatMap(p => 
+        p.variants.edges.map(v => v.node.id)
+      );
+      
+      setSelectedProducts(limitedProductIds);
+      setSelectedVariants(limitedVariantIds);
+      
+      // Show warning notification
+      setNotification({
+        show: true,
+        message: `⚠️ Trial limit reached! Only ${trialProductLimit} products selected. Subscribe to select unlimited products.`,
+        error: false,
+        actionLabel: 'Subscribe',
+        onAction: handleSubscribeFromModal
+      });
+      return;
+    }
+    
     const allFilteredVariantIds = filteredProducts.flatMap(p => 
       p.variants.edges.map(v => v.node.id)
     );
@@ -362,6 +435,18 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     const variantIds = getProductVariantIds(productId);
     
     if (checked) {
+      // Check trial limit before adding
+      if (isTrialMode && !selectedProducts.includes(productId) && selectedProducts.length >= trialProductLimit) {
+        setNotification({
+          show: true,
+          message: `⚠️ Trial limit reached! You can only select up to ${trialProductLimit} products. Subscribe to select unlimited products.`,
+          error: false,
+          actionLabel: 'Subscribe',
+          onAction: handleSubscribeFromModal
+        });
+        return;
+      }
+      
       // Select all variants for this product
       setSelectedVariants(prev => [...new Set([...prev, ...variantIds])]);
       // Also add to selectedProducts for compatibility with existing bulk operations
@@ -379,6 +464,21 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
     const variantIds = getProductVariantIds(productId);
     
     if (checked) {
+      // Check if this would add a NEW product (not already selected)
+      const isNewProduct = !selectedProducts.includes(productId);
+      
+      // Check trial limit if adding a new product
+      if (isTrialMode && isNewProduct && selectedProducts.length >= trialProductLimit) {
+        setNotification({
+          show: true,
+          message: `⚠️ Trial limit reached! You can only select up to ${trialProductLimit} products. Subscribe to select unlimited products.`,
+          error: false,
+          actionLabel: 'Subscribe',
+          onAction: handleSubscribeFromModal
+        });
+        return;
+      }
+      
       // Use functional updates to ensure we're working with latest state
       setSelectedVariants(prevVariants => {
         const newSelectedVariants = [...prevVariants, variantId];
@@ -954,6 +1054,17 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       return;
     }
     
+    // Check trial limit - count unique products from selected variants
+    const uniqueProductIds = new Set(
+      selectedVariants.map(variantId => {
+        const product = products.find(p => p.variants.edges.some(v => v.node.id === variantId));
+        return product?.id;
+      }).filter(Boolean)
+    );
+    if (!checkTrialLimit(uniqueProductIds.size)) {
+      return;
+    }
+    
     console.log('✅ Passed variant selection check');
     
     // Check if user is updating ONLY cost/tax/unit price without price changes
@@ -1430,6 +1541,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       return;
     }
     
+    // Check trial limit
+    if (!checkTrialLimit(selectedProducts.length)) {
+      return;
+    }
+    
     if (selectedCollections.length === 0) {
       setError("Please select at least one collection.");
       return;
@@ -1530,6 +1646,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   const handleBulkTags = async () => {
     if (selectedProducts.length === 0) {
       setError("Please select at least one product to update tags.");
+      return;
+    }
+    
+    // Check trial limit
+    if (!checkTrialLimit(selectedProducts.length)) {
       return;
     }
     
@@ -1689,6 +1810,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       return;
     }
     
+    // Check trial limit
+    if (!checkTrialLimit(selectedProducts.length)) {
+      return;
+    }
+    
     if (titleOperation === 'replace' && !titleReplaceFrom) {
       setError("Please provide text to find.");
       return;
@@ -1805,6 +1931,11 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       return;
     }
     
+    // Check trial limit
+    if (!checkTrialLimit(selectedProducts.length)) {
+      return;
+    }
+    
     if (descriptionOperation === 'replace' && !descriptionReplaceFrom) {
       setError("Please provide text to find in descriptions.");
       return;
@@ -1838,6 +1969,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
 
       const result = await response.json();
       
+      console.log('📝 Description update result:', result);
+      
       if (!response.ok) {
         throw new Error(result.error || 'Failed to update descriptions');
       }
@@ -1857,18 +1990,27 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
         });
       }
 
-      // Update local state to reflect changes
+      // Update local state to reflect changes immediately in Step 1
+      console.log('📦 Full API result:', JSON.stringify(result, null, 2));
       if (result.success && result.results) {
         setProducts(prevProducts => {
           const updatedProducts = [...prevProducts];
           result.results.forEach((resultItem: any) => {
+            console.log('🔍 Processing result item:', resultItem);
             if (resultItem.success && resultItem.product) {
               const index = updatedProducts.findIndex(p => p.id === resultItem.productId);
+              console.log('🔎 Found product at index:', index, 'for productId:', resultItem.productId);
               if (index !== -1) {
+                const newDescriptionHtml = resultItem.product.descriptionHtml;
+                // Strip HTML tags for plain text description
+                const newDescription = newDescriptionHtml?.replace(/<[^>]*>/g, '') || '';
+                console.log('📝 New description:', { newDescriptionHtml, newDescription });
                 updatedProducts[index] = {
                   ...updatedProducts[index],
-                  descriptionHtml: resultItem.product.descriptionHtml
+                  descriptionHtml: newDescriptionHtml,
+                  description: newDescription
                 };
+                console.log(`✅ Updated product ${updatedProducts[index].title} description in local state:`, updatedProducts[index].descriptionHtml?.substring(0, 100));
               }
             }
           });
@@ -1884,7 +2026,27 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       } else if (descriptionOperation === 'suffix') {
         operationText = `added suffix to descriptions of`;
       } else {
-        operationText = `replaced text in descriptions of`;
+        // For replace operation, include match info
+        const matchCount = result.totalMatchesFound || 0;
+        const noMatchCount = result.productsWithNoMatches || 0;
+        
+        console.log('🔍 Replace operation stats:', { matchCount, noMatchCount, successful: successful.length, failed: failed.length });
+        
+        if (matchCount === 0) {
+          setNotification({
+            show: true,
+            message: `⚠️ No matches found for "${descriptionReplaceFrom}" in any of the ${selectedProducts.length} selected product(s). The text might not exist in the product descriptions, or may be part of HTML formatting.`,
+            error: true
+          });
+          setIsLoading(false);
+          return;
+        }
+        
+        operationText = `replaced ${matchCount} occurrence${matchCount === 1 ? '' : 's'} of "${descriptionReplaceFrom}" in`;
+        
+        if (noMatchCount > 0) {
+          operationText += ` (${noMatchCount} product${noMatchCount === 1 ? '' : 's'} had no matches)`;
+        }
       }
       
       if (successful.length > 0) {
@@ -1924,6 +2086,17 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
   const handleBulkInventoryUpdate = async () => {
     if (selectedVariants.length === 0) {
       setError("Please select at least one variant to update inventory.");
+      return;
+    }
+    
+    // Check trial limit - count unique products from selected variants
+    const uniqueProductIds = new Set(
+      selectedVariants.map(variantId => {
+        const product = products.find(p => p.variants.edges.some(v => v.node.id === variantId));
+        return product?.id;
+      }).filter(Boolean)
+    );
+    if (!checkTrialLimit(uniqueProductIds.size)) {
       return;
     }
     
@@ -2477,10 +2650,28 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                   </Text>
                   
                   {selectedProducts.length > 0 && (
-                    <div className={styles.stepSuccess}>
+                    <div className={styles.stepSuccess} style={{
+                      backgroundColor: isTrialMode && selectedProducts.length >= trialProductLimit ? '#FFF8E5' : undefined,
+                      border: isTrialMode && selectedProducts.length >= trialProductLimit ? '1px solid #FFD79D' : undefined,
+                      padding: isTrialMode && selectedProducts.length >= trialProductLimit ? '8px 12px' : undefined,
+                      borderRadius: '6px'
+                    }}>
                       <Text as="p" variant="bodySm" tone="base" fontWeight="medium">
-                        {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} selected
+                        {isTrialMode 
+                          ? `${selectedProducts.length}/${trialProductLimit} products selected`
+                          : `${selectedProducts.length} product${selectedProducts.length !== 1 ? 's' : ''} selected`
+                        }
+                        {isTrialMode && selectedProducts.length >= trialProductLimit && (
+                          <span style={{ color: '#B98900', marginLeft: '8px' }}>
+                            — Trial limit reached
+                          </span>
+                        )}
                       </Text>
+                      {isTrialMode && selectedProducts.length >= trialProductLimit && (
+                        <Text as="p" variant="bodySm" tone="caution">
+                          Subscribe to unlock unlimited product selection
+                        </Text>
+                      )}
                     </div>
                   )}
                 </BlockStack>
@@ -2490,7 +2681,21 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
             {/* Step 2: Bulk Edit */}
             <div 
               className={`${styles.stepCard} ${activeMainTab === 1 ? `${styles.active} ${styles.activeInfo}` : ''}`}
-              onClick={() => selectedVariants.length > 0 && setActiveMainTab(1)}
+              onClick={() => {
+                if (selectedVariants.length === 0) return;
+                // Check trial limit before proceeding to Step 2
+                if (isTrialMode && selectedProducts.length > trialProductLimit) {
+                  setNotification({
+                    show: true,
+                    message: `⚠️ Please reduce your selection to ${trialProductLimit} products or fewer to continue. You have ${selectedProducts.length} selected.`,
+                    error: true,
+                    actionLabel: 'Subscribe for Unlimited',
+                    onAction: () => handleSubscribeFromModal('step2_blocked')
+                  });
+                  return;
+                }
+                setActiveMainTab(1);
+              }}
             >
               <Card>
                 <BlockStack gap="300">
@@ -2692,12 +2897,40 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
           
           {/* Bulk Operation Categories - Only show in Step 2 */}
           {activeMainTab === 1 && (
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
-              gap: '12px',
-              width: '100%'
-            }}>
+            <>
+              {/* Trial Mode Warning Banner */}
+              {isTrialMode && (
+                <div style={{
+                  padding: '12px 16px',
+                  backgroundColor: '#FFF8E5',
+                  border: '1px solid #FFD79D',
+                  borderRadius: '8px',
+                  marginBottom: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '8px'
+                }}>
+                  <div>
+                    <Text as="p" variant="bodySm" fontWeight="semibold">
+                      🎯 Trial Mode: Edit up to {trialProductLimit} products at once
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Subscribe to unlock unlimited bulk editing
+                    </Text>
+                  </div>
+                  <Button size="slim" onClick={handleSubscribeFromModal}>
+                    Subscribe Now
+                  </Button>
+                </div>
+              )}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+                gap: '12px',
+                width: '100%'
+              }}>
               {[
                 { id: 0, label: 'Pricing', icon: MoneyIcon },
                 { id: 1, label: 'Collections', icon: CollectionIcon },
@@ -2718,6 +2951,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                 </Button>
               ))}
             </div>
+            </>
           )}
       </BlockStack>
 
@@ -3141,16 +3375,36 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                         variant="secondary"
                         size="slim"
                         onClick={() => {
+                          const allProductIds = products.map(p => p.id);
+                          
+                          // Check trial limit
+                          if (isTrialMode && allProductIds.length > trialProductLimit) {
+                            const limitedProductIds = allProductIds.slice(0, trialProductLimit);
+                            const limitedProducts = products.filter(p => limitedProductIds.includes(p.id));
+                            const limitedVariants = limitedProducts.flatMap(p => 
+                              p.variants.edges.map(v => v.node.id)
+                            );
+                            setSelectedVariants(limitedVariants);
+                            setSelectedProducts(limitedProductIds);
+                            setNotification({
+                              show: true,
+                              message: `⚠️ Trial limit reached! Only ${trialProductLimit} products selected. Subscribe to select unlimited products.`,
+                              error: false,
+                              actionLabel: 'Subscribe',
+                              onAction: handleSubscribeFromModal
+                            });
+                            return;
+                          }
+                          
                           const allVariants = products.flatMap(p => 
                             p.variants.edges.map(v => v.node.id)
                           );
                           setSelectedVariants(allVariants);
-                          const allProductIds = products.map(p => p.id);
                           setSelectedProducts(allProductIds);
                         }}
                         disabled={products.length === 0}
                       >
-                        Select All
+                        {isTrialMode ? `Select All (max ${trialProductLimit})` : 'Select All'}
                       </Button>
                       <Button
                         variant="secondary"
@@ -3158,13 +3412,36 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                         onClick={handleSelectAllFiltered}
                         disabled={!hasFiltersApplied() || filteredProducts.length === 0}
                       >
-                        {`Select All Filtered (${filteredProducts.length})`}
+                        {isTrialMode 
+                          ? `Select Filtered (max ${Math.min(filteredProducts.length, trialProductLimit)})`
+                          : `Select All Filtered (${filteredProducts.length})`
+                        }
                       </Button>
                       <Button
                         variant="tertiary"
                         size="slim"
                         onClick={() => {
                           const outOfStockProducts = filteredProducts.filter(p => p.totalInventory === 0);
+                          
+                          // Check trial limit
+                          if (isTrialMode && outOfStockProducts.length > trialProductLimit) {
+                            const limitedProducts = outOfStockProducts.slice(0, trialProductLimit);
+                            const limitedVariants = limitedProducts.flatMap(p => 
+                              p.variants.edges.map(v => v.node.id)
+                            );
+                            const limitedProductIds = limitedProducts.map(p => p.id);
+                            setSelectedVariants(limitedVariants);
+                            setSelectedProducts(limitedProductIds);
+                            setNotification({
+                              show: true,
+                              message: `⚠️ Trial limit reached! Only ${trialProductLimit} out-of-stock products selected. Subscribe to select unlimited products.`,
+                              error: false,
+                              actionLabel: 'Subscribe',
+                              onAction: handleSubscribeFromModal
+                            });
+                            return;
+                          }
+                          
                           const allVariants = outOfStockProducts.flatMap(p => 
                             p.variants.edges.map(v => v.node.id)
                           );
@@ -3297,7 +3574,20 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                         onExpandProduct={toggleProductExpansion}
                         onViewProduct={(product) => navigateToProduct(product, 'storefront')}
                         onEditProduct={(product) => navigateToProduct(product, 'admin')}
-                        onContinueToBulkEdit={() => setActiveMainTab(1)}
+                        onContinueToBulkEdit={() => {
+                          // Check trial limit before proceeding to Step 2
+                          if (isTrialMode && selectedProducts.length > trialProductLimit) {
+                            setNotification({
+                              show: true,
+                              message: `⚠️ Please reduce your selection to ${trialProductLimit} products or fewer to continue. You have ${selectedProducts.length} selected.`,
+                              error: true,
+                              actionLabel: 'Subscribe for Unlimited',
+                              onAction: () => handleSubscribeFromModal('continue_button_blocked')
+                            });
+                            return;
+                          }
+                          setActiveMainTab(1);
+                        }}
                       shopCurrency={currencySymbol}
                       showVariantSelection={true}
                       totalCount={displayProducts.length}
@@ -3665,8 +3955,8 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                                             </>
                                           ) : (
                                             <Text as="p" variant="bodyXs" tone="subdued">
-                                              {product.description || product.descriptionHtml ? 
-                                                (product.description || product.descriptionHtml?.replace(/<[^>]*>/g, '') || '').substring(0, 150) + (((product.description || product.descriptionHtml?.replace(/<[^>]*>/g, '') || '').length > 150) ? '...' : '') : 
+                                              {product.descriptionHtml || product.description ? 
+                                                (product.descriptionHtml?.replace(/<[^>]*>/g, '') || product.description || '').substring(0, 150) + (((product.descriptionHtml?.replace(/<[^>]*>/g, '') || product.description || '').length > 150) ? '...' : '') : 
                                                 'No description'
                                               }
                                             </Text>
@@ -4358,7 +4648,7 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
                         variant="primary"
                         onClick={handleBulkInventoryUpdate}
                         loading={isLoading}
-                        disabled={!stockQuantity}
+                        disabled={!stockQuantity && !applySkuChanges && !applyBarcodeChanges && !applyContinueSellingChanges}
                         size="large"
                       >
                         Update Inventory for {String(selectedVariants.length)} Variant{selectedVariants.length !== 1 ? 's' : ''}
@@ -4480,6 +4770,71 @@ export function ProductManagement({ isVisible, initialCategory = 'all', shopDoma
       )}
 
       {/* Bulk Operation Modal removed - changes now apply directly */}
+      
+      {/* Trial Limit Modal */}
+      <Modal
+        open={showTrialLimitModal}
+        onClose={() => setShowTrialLimitModal(false)}
+        title="🚀 Upgrade to Unlock Unlimited Editing"
+        primaryAction={{
+          content: 'Subscribe Now',
+          onAction: handleSubscribeFromModal,
+        }}
+        secondaryActions={[
+          {
+            content: 'Maybe Later',
+            onAction: () => setShowTrialLimitModal(false),
+          },
+        ]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text as="p" variant="bodyMd">
+              You've selected <strong>{selectedProducts.length} products</strong>, but your free trial allows editing up to <strong>{trialProductLimit} products</strong> at once.
+            </Text>
+            
+            <Text as="p" variant="bodyMd">
+              Subscribe to Spector to unlock:
+            </Text>
+            
+            <BlockStack gap="200">
+              <InlineStack align="start" blockAlign="center" gap="200">
+                <Badge tone="success">✓</Badge>
+                <Text as="p" variant="bodySm">
+                  <strong>Unlimited</strong> bulk product editing
+                </Text>
+              </InlineStack>
+              <InlineStack align="start" blockAlign="center" gap="200">
+                <Badge tone="success">✓</Badge>
+                <Text as="p" variant="bodySm">
+                  Advanced inventory forecasting
+                </Text>
+              </InlineStack>
+              <InlineStack align="start" blockAlign="center" gap="200">
+                <Badge tone="success">✓</Badge>
+                <Text as="p" variant="bodySm">
+                  Real-time analytics dashboard
+                </Text>
+              </InlineStack>
+              <InlineStack align="start" blockAlign="center" gap="200">
+                <Badge tone="success">✓</Badge>
+                <Text as="p" variant="bodySm">
+                  Priority email support
+                </Text>
+              </InlineStack>
+            </BlockStack>
+
+            <BlockStack gap="100">
+              <Text as="p" variant="bodyMd" fontWeight="semibold">
+                Only ${BILLING_CONFIG.MONTHLY_PRICE}/month
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Cancel anytime. No hidden fees.
+              </Text>
+            </BlockStack>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
     </BlockStack>
     </>
   );

@@ -79,7 +79,7 @@ export function SubscriptionModal({
               <InlineStack align="start" blockAlign="center" gap="200">
                 <Badge tone="success">✓</Badge>
                 <Text as="p" variant="bodySm">
-                  Unlimited product management & bulk operations
+                  <strong>Unlimited</strong> product management & bulk operations
                 </Text>
               </InlineStack>
               <InlineStack align="start" blockAlign="center" gap="200">
@@ -98,6 +98,26 @@ export function SubscriptionModal({
                 <Badge tone="success">✓</Badge>
                 <Text as="p" variant="bodySm">
                   Email support
+                </Text>
+              </InlineStack>
+            </BlockStack>
+          </BlockStack>
+
+          <BlockStack gap="200">
+            <Text as="h3" variant="headingMd">
+              Trial limitations:
+            </Text>
+            <BlockStack gap="100">
+              <InlineStack align="start" blockAlign="center" gap="200">
+                <Badge tone="warning">⚠</Badge>
+                <Text as="p" variant="bodySm">
+                  Edit up to <strong>10 products</strong> at once during trial
+                </Text>
+              </InlineStack>
+              <InlineStack align="start" blockAlign="center" gap="200">
+                <Badge tone="info">→</Badge>
+                <Text as="p" variant="bodySm">
+                  Subscribe to unlock <strong>unlimited</strong> bulk editing
                 </Text>
               </InlineStack>
             </BlockStack>

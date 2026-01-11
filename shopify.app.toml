@@ -42,7 +42,9 @@ api_version = "2025-10"
 # Added read_orders for revenue tracking and order analytics
 # Added write_products for inventory management features
 # Added read_products for product listing and analytics
-scopes = "write_products,read_products,read_orders,write_orders"
+# Added read_inventory, write_inventory for stock management
+# Added read_locations for inventory location access
+scopes = "write_products,read_products,read_orders,write_orders,read_inventory,write_inventory,read_locations"
 
 [auth]
 redirect_urls = [

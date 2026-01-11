@@ -312,7 +312,16 @@ export default function Index() {
   const renderActiveTabContent = () => {
     switch (activeTab) {
       case "out-of-stock":
-        return <OptimizedComponents.ProductManagement isVisible={true} shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} initialProducts={initialProducts} />;
+        return (
+          <OptimizedComponents.ProductManagement 
+            isVisible={true} 
+            shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} 
+            initialProducts={initialProducts}
+            subscriptionStatus={settingsData.hasActiveSubscription ? 'active' : (subscription.status === 'ACTIVE' ? 'active' : 'trialing')}
+            hasActiveSubscription={settingsData.hasActiveSubscription}
+            managedPricingUrl={settingsData.managedPricingUrl}
+          />
+        );
 
       case "forecasting":
         return <ForecastingTab shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} initialForecastData={forecastingData} />;

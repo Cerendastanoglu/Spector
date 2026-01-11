@@ -89,6 +89,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   title
                   handle
                   description
+                  descriptionHtml
                   status
                   totalInventory
                   tags
@@ -188,6 +189,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   id
                   title
                   handle
+                  descriptionHtml
                   status
                   totalInventory
                   featuredMedia {
@@ -256,6 +258,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   id
                   title
                   handle
+                  descriptionHtml
                   status
                   totalInventory
                   featuredMedia {
@@ -379,6 +382,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   title
                   handle
                   description
+                  descriptionHtml
                   status
                   totalInventory
                   tags
@@ -1002,61 +1006,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   }
                 }
               }`;
-          } else if (tagOperation === 'replace') {
-            // For replace, we first need to get current tags, then remove all and add new ones
-            const currentTagsResponse = await admin.graphql(
-              `#graphql
-                query getProductTags($id: ID!) {
-                  product(id: $id) {
-                    tags
-                  }
-                }`,
-              { variables: { id: productId } }
-            );
-
-            const currentTagsJson = await currentTagsResponse.json();
-            const currentTags = currentTagsJson.data?.product?.tags || [];
-            
-            // Remove all current tags
-            if (currentTags.length > 0) {
-              await admin.graphql(
-                `#graphql
-                  mutation tagsRemove($id: ID!, $tags: [String!]!) {
-                    tagsRemove(id: $id, tags: $tags) {
-                      userErrors {
-                        field
-                        message
-                      }
-                    }
-                  }`,
-                { variables: { id: productId, tags: currentTags } }
-              );
-            }
-            
-            // Add new tags (only if there are tags to add)
-            if (tagsArray.length > 0) {
-              mutation = `#graphql
-                mutation tagsAdd($id: ID!, $tags: [String!]!) {
-                  tagsAdd(id: $id, tags: $tags) {
-                    node {
-                      id
-                    }
-                    userErrors {
-                      field
-                      message
-                    }
-                  }
-                }`;
-            } else {
-              // No tags to add after removal, just mark as successful
-              results.push({
-                productId,
-                success: true,
-                operation: tagOperation,
-                tags: []
-              });
-              continue;
-            }
           }
           
           const response = await admin.graphql(mutation, { variables });
@@ -1280,7 +1229,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
 
       const currentProducts = await Promise.all(productPromises);
-      const results = [];
+      const results: any[] = [];
+      let totalMatchesFound = 0;
+      let productsWithNoMatches = 0;
 
       for (let i = 0; i < productIds.length; i++) {
         const productId = productIds[i];
@@ -1298,6 +1249,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         try {
           // Calculate new description based on operation
           let newDescription = currentProduct.descriptionHtml || '';
+          let matchesInThisProduct = 0;
           
           console.log('📝 Description Update Debug:', {
             productId,
@@ -1341,16 +1293,34 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             // Allow empty descriptionReplaceTo to delete the found text
             if (newDescription && descriptionReplaceFrom) {
               const oldDescription = newDescription;
-              newDescription = newDescription.replace(
-                new RegExp(descriptionReplaceFrom, 'g'), 
-                descriptionReplaceTo !== undefined ? descriptionReplaceTo : ''
-              );
-              console.log('🔄 REPLACE operation:', {
-                oldDescription,
-                newDescription,
-                findText: descriptionReplaceFrom,
-                replaceText: descriptionReplaceTo
-              });
+              
+              // Escape special regex characters to treat search string literally
+              const escapedSearchString = descriptionReplaceFrom.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              
+              // Count matches before replacing (case-insensitive)
+              const matches = (newDescription.match(new RegExp(escapedSearchString, 'gi')) || []).length;
+              matchesInThisProduct = matches;
+              totalMatchesFound += matches;
+              
+              if (matches > 0) {
+                newDescription = newDescription.replace(
+                  new RegExp(escapedSearchString, 'gi'), 
+                  descriptionReplaceTo !== undefined ? descriptionReplaceTo : ''
+                );
+                console.log('🔄 REPLACE operation:', {
+                  oldDescription,
+                  newDescription,
+                  findText: descriptionReplaceFrom,
+                  replaceText: descriptionReplaceTo,
+                  matchesFound: matches
+                });
+              } else {
+                console.log('⚠️ No matches found for:', descriptionReplaceFrom);
+                productsWithNoMatches++;
+              }
+            } else if (!newDescription) {
+              console.log('⚠️ Product has no description to search in');
+              productsWithNoMatches++;
             }
           }
 
@@ -1389,12 +1359,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             results.push({
               productId,
               success: false,
-              error
+              error,
+              matchesFound: matchesInThisProduct
             });
           } else {
             results.push({
               productId,
               success: true,
+              matchesFound: matchesInThisProduct,
               product: {
                 id: productId,
                 descriptionHtml: updateJson.data?.productUpdate?.product?.descriptionHtml
@@ -1419,7 +1391,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           description: r.product?.descriptionHtml
         })),
         successful: results.filter(r => r.success).length,
-        failed: results.filter(r => !r.success).length
+        failed: results.filter(r => !r.success).length,
+        totalMatchesFound,
+        productsWithNoMatches
       });
       
     } catch (error) {
@@ -1604,6 +1578,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       // Prepare changes for bulk update
       const changes: any[] = [];
+      const setQuantities: any[] = []; // For 'set' operation using inventorySetOnHandQuantities
       const variantMap = new Map();
       const skippedVariants: any[] = [];
 
@@ -1618,37 +1593,51 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           continue;
         }
 
-        // Calculate the delta based on update method
-        let delta = 0;
         if (stockUpdateMethod === 'set') {
-          delta = quantity - (variant.inventoryQuantity || 0);
-        } else if (stockUpdateMethod === 'add') {
-          delta = quantity;
-        } else if (stockUpdateMethod === 'subtract') {
-          delta = -quantity;
-        }
-
-        if (delta !== 0) {
-          changes.push({
-            delta: delta,
+          // For 'set' operation, use inventorySetOnHandQuantities (absolute value)
+          setQuantities.push({
             inventoryItemId: variant.inventoryItem.id,
-            locationId: locationId
+            locationId: locationId,
+            quantity: quantity
           });
 
           variantMap.set(variant.id, {
             oldQuantity: variant.inventoryQuantity || 0,
-            newQuantity: (variant.inventoryQuantity || 0) + delta,
-            delta: delta
+            newQuantity: quantity,
+            delta: quantity - (variant.inventoryQuantity || 0)
           });
+        } else {
+          // For 'add' and 'subtract', use delta-based adjustment
+          let delta = 0;
+          if (stockUpdateMethod === 'add') {
+            delta = quantity;
+          } else if (stockUpdateMethod === 'subtract') {
+            delta = -quantity;
+          }
+
+          if (delta !== 0) {
+            changes.push({
+              delta: delta,
+              inventoryItemId: variant.inventoryItem.id,
+              locationId: locationId
+            });
+
+            variantMap.set(variant.id, {
+              oldQuantity: variant.inventoryQuantity || 0,
+              newQuantity: (variant.inventoryQuantity || 0) + delta,
+              delta: delta
+            });
+          }
         }
       }
 
-      console.log(`🔧 Preparing to adjust ${changes.length} variants in a single mutation`);
+      const totalChanges = stockUpdateMethod === 'set' ? setQuantities.length : changes.length;
+      console.log(`🔧 Preparing to ${stockUpdateMethod === 'set' ? 'set' : 'adjust'} ${totalChanges} variants`);
       if (skippedVariants.length > 0) {
         console.log(`⚠️ Skipped ${skippedVariants.length} variants (inventory not tracked)`);
       }
 
-      if (changes.length === 0 && !isOnlyMetadata) {
+      if (totalChanges === 0 && !isOnlyMetadata) {
         return json({
           success: skippedVariants.length === 0, // Only success if nothing was skipped
           results: [],
@@ -1663,50 +1652,100 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
       }
 
-      // Execute inventory adjustment ONLY if we have stock changes
-      if (!isOnlyMetadata && changes.length > 0) {
-        const adjustResponse = await admin.graphql(
-          `#graphql
-            mutation InventoryAdjustQuantities($input: InventoryAdjustQuantitiesInput!) {
-              inventoryAdjustQuantities(input: $input) {
-                inventoryAdjustmentGroup {
-                  createdAt
-                  reason
-                  changes {
-                    name
-                    delta
+      // Execute inventory update based on the operation type
+      if (!isOnlyMetadata && totalChanges > 0) {
+        if (stockUpdateMethod === 'set' && setQuantities.length > 0) {
+          // Use inventorySetOnHandQuantities for 'set' operation (exact/absolute values)
+          console.log(`📦 Using inventorySetOnHandQuantities for ${setQuantities.length} items`);
+          
+          const setResponse = await admin.graphql(
+            `#graphql
+              mutation InventorySetOnHandQuantities($input: InventorySetOnHandQuantitiesInput!) {
+                inventorySetOnHandQuantities(input: $input) {
+                  inventoryAdjustmentGroup {
+                    createdAt
+                    reason
+                    changes {
+                      name
+                      delta
+                    }
+                  }
+                  userErrors {
+                    field
+                    message
+                    code
                   }
                 }
-                userErrors {
-                  field
-                  message
-                  code
+              }`,
+            {
+              variables: {
+                input: {
+                  reason: "correction",
+                  referenceDocumentUri: "gid://spector-app/BulkUpdate/" + Date.now(),
+                  setQuantities: setQuantities
                 }
-              }
-            }`,
-          {
-            variables: {
-              input: {
-                reason: "correction",
-                name: "available",
-                referenceDocumentUri: "gid://spector-app/BulkUpdate/" + Date.now(),
-                changes: changes
-              }
-            },
+              },
+            }
+          );
+
+          const setJson: any = await setResponse.json();
+          
+          if (setJson.errors || setJson.data?.inventorySetOnHandQuantities?.userErrors?.length > 0) {
+            const errorMessage = setJson.errors?.[0]?.message || 
+                               setJson.data?.inventorySetOnHandQuantities?.userErrors?.[0]?.message || 
+                               'Unknown error';
+            console.error(`❌ Bulk inventory set failed:`, errorMessage);
+            return json({ error: errorMessage }, { status: 500 });
           }
-        );
 
-        const adjustJson: any = await adjustResponse.json();
-        
-        if (adjustJson.errors || adjustJson.data?.inventoryAdjustQuantities?.userErrors?.length > 0) {
-          const errorMessage = adjustJson.errors?.[0]?.message || 
-                             adjustJson.data?.inventoryAdjustQuantities?.userErrors?.[0]?.message || 
-                             'Unknown error';
-          console.error(`❌ Bulk inventory adjust failed:`, errorMessage);
-          return json({ error: errorMessage }, { status: 500 });
+          console.log(`✅ Bulk inventory set successful for ${setQuantities.length} variants`);
+        } else if (changes.length > 0) {
+          // Use inventoryAdjustQuantities for 'add' and 'subtract' operations (delta-based)
+          console.log(`📦 Using inventoryAdjustQuantities for ${changes.length} items`);
+          
+          const adjustResponse = await admin.graphql(
+            `#graphql
+              mutation InventoryAdjustQuantities($input: InventoryAdjustQuantitiesInput!) {
+                inventoryAdjustQuantities(input: $input) {
+                  inventoryAdjustmentGroup {
+                    createdAt
+                    reason
+                    changes {
+                      name
+                      delta
+                    }
+                  }
+                  userErrors {
+                    field
+                    message
+                    code
+                  }
+                }
+              }`,
+            {
+              variables: {
+                input: {
+                  reason: "correction",
+                  name: "available",
+                  referenceDocumentUri: "gid://spector-app/BulkUpdate/" + Date.now(),
+                  changes: changes
+                }
+              },
+            }
+          );
+
+          const adjustJson: any = await adjustResponse.json();
+          
+          if (adjustJson.errors || adjustJson.data?.inventoryAdjustQuantities?.userErrors?.length > 0) {
+            const errorMessage = adjustJson.errors?.[0]?.message || 
+                               adjustJson.data?.inventoryAdjustQuantities?.userErrors?.[0]?.message || 
+                               'Unknown error';
+            console.error(`❌ Bulk inventory adjust failed:`, errorMessage);
+            return json({ error: errorMessage }, { status: 500 });
+          }
+
+          console.log(`✅ Bulk inventory adjustment successful for ${changes.length} variants`);
         }
-
-        console.log(`✅ Bulk inventory adjustment successful for ${changes.length} variants`);
       }
 
       // Update SKU, Barcode, and Continue Selling if requested
@@ -1714,97 +1753,232 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       
       if (applySku || applyBarcode || applyContinueSelling) {
         console.log(`🏷️ Updating metadata for ${variantIds.length} variants...`);
+        console.log(`📋 Metadata values - SKU: "${sku}", Barcode: "${barcode}", ContinueSelling: ${continueSelling}`);
         
-        for (const variantId of variantIds) {
-          try {
-            // Build the variant input object
-            const variantInput: any = { id: variantId };
-            
-            if (applySku) {
-              variantInput.sku = sku || '';
-            }
-            
-            if (applyBarcode) {
-              variantInput.barcode = barcode || '';
-            }
-            
-            if (applyContinueSelling && continueSelling !== null) {
-              variantInput.inventoryPolicy = continueSelling ? 'CONTINUE' : 'DENY';
-            }
-            
-            // Update the variant using productVariantsBulkUpdate
-            // First, get the product ID for this variant
-            const variantDataResponse = await admin.graphql(
-              `#graphql
-                query getVariantProduct($variantId: ID!) {
-                  productVariant(id: $variantId) {
-                    id
-                    product {
-                      id
-                    }
-                  }
-                }`,
-              {
-                variables: { variantId }
-              }
-            );
-            
-            const variantDataJson: any = await variantDataResponse.json();
-            const productId = variantDataJson.data?.productVariant?.product?.id;
-            
-            if (!productId) {
-              throw new Error('Could not find product for variant');
-            }
-            
-            // Now update the variant
-            const variantUpdateResponse = await admin.graphql(
-              `#graphql
-                mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-                  productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-                    productVariants {
-                      id
-                      sku
-                      barcode
-                      inventoryPolicy
-                    }
-                    userErrors {
-                      field
-                      message
-                    }
-                  }
-                }`,
-              {
-                variables: {
-                  productId: productId,
-                  variants: [variantInput]
+        // Group variants by their product ID for bulk updates
+        const variantsByProduct = new Map<string, string[]>();
+        
+        // First, fetch product IDs for all variants
+        for (let i = 0; i < variantIds.length; i += 100) {
+          const batchIds = variantIds.slice(i, i + 100);
+          
+          const variantQueries = batchIds.map((id: string, index: number) => {
+            return `
+              variant${index}: productVariant(id: "${id}") {
+                id
+                product {
+                  id
                 }
               }
-            );
-            
-            const variantUpdateJson: any = await variantUpdateResponse.json();
-            
-            if (variantUpdateJson.data?.productVariantsBulkUpdate?.userErrors?.length > 0) {
-              const errors = variantUpdateJson.data.productVariantsBulkUpdate.userErrors;
-              console.warn(`⚠️ Metadata update failed for ${variantId}:`, errors);
+            `;
+          }).join('\n');
+
+          const batchResponse = await admin.graphql(`#graphql
+            query getVariantProducts {
+              ${variantQueries}
+            }
+          `);
+
+          const batchJson: any = await batchResponse.json();
+          
+          if (!batchJson.errors) {
+            Object.values(batchJson.data || {}).forEach((variant: any) => {
+              if (variant?.product?.id) {
+                const productId = variant.product.id;
+                if (!variantsByProduct.has(productId)) {
+                  variantsByProduct.set(productId, []);
+                }
+                variantsByProduct.get(productId)!.push(variant.id);
+              }
+            });
+          }
+        }
+
+        console.log(`📦 Found ${variantsByProduct.size} products to update`);
+
+        // Handle SKU updates separately using inventoryItemUpdate mutation
+        // SKU is stored on the inventory item, not the variant
+        if (applySku) {
+          console.log(`🔧 Updating SKU for ${variantIds.length} variants using inventoryItemUpdate...`);
+          
+          for (const variantData of allVariantsData) {
+            const inventoryItemId = variantData.inventoryItem?.id;
+            if (!inventoryItemId) {
+              console.warn(`⚠️ No inventory item found for variant ${variantData.id}`);
+              continue;
+            }
+
+            try {
+              const skuUpdateResponse = await admin.graphql(
+                `#graphql
+                  mutation inventoryItemUpdate($id: ID!, $input: InventoryItemInput!) {
+                    inventoryItemUpdate(id: $id, input: $input) {
+                      inventoryItem {
+                        id
+                        sku
+                      }
+                      userErrors {
+                        field
+                        message
+                      }
+                    }
+                  }`,
+                {
+                  variables: {
+                    id: inventoryItemId,
+                    input: {
+                      sku: sku || ''
+                    }
+                  }
+                }
+              );
+
+              const skuUpdateJson: any = await skuUpdateResponse.json();
+              
+              if (skuUpdateJson.errors) {
+                console.error(`❌ SKU update error for ${variantData.id}:`, skuUpdateJson.errors);
+                metadataResults.push({
+                  variantId: variantData.id,
+                  success: false,
+                  error: skuUpdateJson.errors.map((e: any) => e.message).join(', ')
+                });
+              } else if (skuUpdateJson.data?.inventoryItemUpdate?.userErrors?.length > 0) {
+                const errors = skuUpdateJson.data.inventoryItemUpdate.userErrors;
+                console.warn(`⚠️ SKU update failed for ${variantData.id}:`, errors);
+                metadataResults.push({
+                  variantId: variantData.id,
+                  success: false,
+                  error: errors.map((e: any) => e.message).join(', ')
+                });
+              } else {
+                console.log(`✅ SKU updated for variant ${variantData.id}`);
+                metadataResults.push({
+                  variantId: variantData.id,
+                  success: true,
+                  sku: skuUpdateJson.data?.inventoryItemUpdate?.inventoryItem?.sku
+                });
+              }
+            } catch (error) {
+              console.error(`❌ Error updating SKU for variant ${variantData.id}:`, error);
               metadataResults.push({
-                variantId,
+                variantId: variantData.id,
                 success: false,
-                error: errors.map((e: any) => e.message).join(', ')
-              });
-            } else {
-              console.log(`✅ Updated metadata for ${variantId}`);
-              metadataResults.push({
-                variantId,
-                success: true
+                error: error instanceof Error ? error.message : 'Unknown error'
               });
             }
-          } catch (error) {
-            console.error(`❌ Error updating metadata for ${variantId}:`, error);
-            metadataResults.push({
-              variantId,
-              success: false,
-              error: error instanceof Error ? error.message : 'Unknown error'
-            });
+          }
+        }
+
+        // Handle barcode and continue selling using productVariantsBulkUpdate
+        // These fields are on the variant, not the inventory item
+        if (applyBarcode || (applyContinueSelling && continueSelling !== null)) {
+          console.log(`🔧 Updating barcode/continue selling using productVariantsBulkUpdate...`);
+          
+          for (const [productId, productVariantIds] of variantsByProduct) {
+            try {
+              // Build variant inputs for this product (only barcode and inventoryPolicy)
+              const variantInputs = productVariantIds.map(variantId => {
+                const input: any = { id: variantId };
+                
+                // Barcode is a direct field on ProductVariantsBulkInput
+                if (applyBarcode) {
+                  input.barcode = barcode || '';
+                }
+                
+                if (applyContinueSelling && continueSelling !== null) {
+                  input.inventoryPolicy = continueSelling ? 'CONTINUE' : 'DENY';
+                }
+                
+                return input;
+              });
+
+              console.log(`📝 Updating ${variantInputs.length} variants for product ${productId}`);
+              
+              const variantUpdateResponse = await admin.graphql(
+                `#graphql
+                  mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+                    productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+                      productVariants {
+                        id
+                        sku
+                        barcode
+                        inventoryPolicy
+                      }
+                      userErrors {
+                        field
+                        message
+                      }
+                    }
+                  }`,
+                {
+                  variables: {
+                    productId: productId,
+                    variants: variantInputs
+                  }
+                }
+              );
+              
+              const variantUpdateJson: any = await variantUpdateResponse.json();
+              
+              console.log(`📤 Bulk update response for product ${productId}:`, JSON.stringify(variantUpdateJson).substring(0, 500));
+              
+              if (variantUpdateJson.errors) {
+                console.error(`❌ GraphQL errors for product ${productId}:`, variantUpdateJson.errors);
+                productVariantIds.forEach(variantId => {
+                  // Only add error if we haven't already processed this variant for SKU
+                  if (!applySku) {
+                    metadataResults.push({
+                      variantId,
+                      success: false,
+                      error: variantUpdateJson.errors.map((e: any) => e.message).join(', ')
+                    });
+                  }
+                });
+              } else if (variantUpdateJson.data?.productVariantsBulkUpdate?.userErrors?.length > 0) {
+                const errors = variantUpdateJson.data.productVariantsBulkUpdate.userErrors;
+                console.warn(`⚠️ Metadata update failed for product ${productId}:`, errors);
+                productVariantIds.forEach(variantId => {
+                  if (!applySku) {
+                    metadataResults.push({
+                      variantId,
+                      success: false,
+                      error: errors.map((e: any) => e.message).join(', ')
+                    });
+                  }
+                });
+              } else {
+                const updatedVariants = variantUpdateJson.data?.productVariantsBulkUpdate?.productVariants || [];
+                console.log(`✅ Updated ${updatedVariants.length} variants for product ${productId}`);
+                updatedVariants.forEach((updatedVariant: any) => {
+                  // Only add success if we haven't already processed this variant for SKU
+                  if (!applySku) {
+                    metadataResults.push({
+                      variantId: updatedVariant.id,
+                      success: true,
+                      sku: updatedVariant.sku,
+                      barcode: updatedVariant.barcode
+                    });
+                  } else {
+                    // Update the existing result with barcode
+                    const existingResult = metadataResults.find(r => r.variantId === updatedVariant.id);
+                    if (existingResult) {
+                      existingResult.barcode = updatedVariant.barcode;
+                    }
+                  }
+                });
+              }
+            } catch (error) {
+              console.error(`❌ Error updating variants for product ${productId}:`, error);
+              productVariantIds.forEach(variantId => {
+                if (!applySku) {
+                  metadataResults.push({
+                    variantId,
+                    success: false,
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                  });
+                }
+              });
+            }
           }
         }
         

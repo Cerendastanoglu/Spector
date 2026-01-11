@@ -217,7 +217,7 @@ export function WelcomeModal({
                   Content Updates
                 </Text>
                 <Text as="p" variant="bodySm" tone="subdued">
-                  Modify titles, descriptions, and tags with prefix/suffix/replace
+                  Modify titles with prefix/suffix/replace, update descriptions and tags
                 </Text>
               </div>
             </div>

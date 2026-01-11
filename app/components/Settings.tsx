@@ -244,6 +244,22 @@ export function Settings({
                     </div>
                     <BlockStack gap="050">
                       <Text as="p" variant="bodyMd" fontWeight="semibold">
+                        Bulk Product Management
+                      </Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {hasActiveSubscription 
+                          ? 'Edit unlimited products at once with bulk operations'
+                          : 'Edit up to 10 products at once (unlimited with subscription)'}
+                      </Text>
+                    </BlockStack>
+                  </div>
+                  
+                  <div className={styles.featureItem}>
+                    <div className={styles.featureIcon}>
+                      <Icon source={CheckIcon} />
+                    </div>
+                    <BlockStack gap="050">
+                      <Text as="p" variant="bodyMd" fontWeight="semibold">
                         Real-time Inventory Monitoring
                       </Text>
                       <Text as="p" variant="bodySm" tone="subdued">
@@ -294,6 +310,15 @@ export function Settings({
                     </BlockStack>
                   </div>
                 </BlockStack>
+
+                {!hasActiveSubscription && (
+                  <>
+                    <Divider />
+                    <Banner tone="warning" title="Trial Limitations">
+                      <p>During your free trial, you can edit up to <strong>10 products</strong> at once. Subscribe to unlock unlimited bulk editing.</p>
+                    </Banner>
+                  </>
+                )}
               </BlockStack>
             </Card>
           </div>

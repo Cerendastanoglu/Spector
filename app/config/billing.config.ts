@@ -15,6 +15,7 @@ export const BILLING_CONFIG = {
   // Trial Configuration
   TRIAL_DAYS: 3,
   TRIAL_HOURS: 3 * 24, // 72 hours
+  TRIAL_PRODUCT_LIMIT: 10, // Max products that can be edited in trial mode
   
   // Billing Interval
   BILLING_INTERVAL: 'EVERY_30_DAYS' as const,

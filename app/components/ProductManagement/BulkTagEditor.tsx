@@ -33,8 +33,8 @@ interface Product {
 }
 
 interface BulkTagEditorProps {
-  tagOperation: 'add' | 'remove' | 'replace';
-  setTagOperation: (value: 'add' | 'remove' | 'replace') => void;
+  tagOperation: 'add' | 'remove';
+  setTagOperation: (value: 'add' | 'remove') => void;
   tagValue: string;
   setTagValue: (value: string) => void;
   tagRemoveValue: string;
@@ -82,7 +82,6 @@ export function BulkTagEditor({
   const tagOperationOptions = [
     { label: 'Add tags', value: 'add' },
     { label: 'Remove tags', value: 'remove' },
-    { label: 'Replace all tags', value: 'replace' },
   ];
 
   return (
@@ -312,24 +311,6 @@ export function BulkTagEditor({
             </div>
           )}
 
-          {tagOperation === 'replace' && (
-            <div style={{ flex: 2 }}>
-              <div>
-                <div style={{ marginBottom: '4px' }}>
-                  <Text as="span" variant="bodyMd" fontWeight="medium">New tags</Text>
-                  <Text as="span" variant="bodySm" tone="subdued"> (replaces all existing)</Text>
-                </div>
-                <TextField
-                  label=""
-                  labelHidden
-                  value={tagValue}
-                  onChange={setTagValue}
-                  placeholder="new, updated, current"
-                  autoComplete="off"
-                />
-              </div>
-            </div>
-          )}
         </InlineStack>
 
         <Button

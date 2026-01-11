@@ -593,7 +593,6 @@ export function Help({ isVisible: _isVisible, onNavigateToDashboard: _onNavigate
                               <ul style={{ margin: 0, paddingLeft: '20px' }}>
                                 <li><strong>Add tags</strong> - Attach new tags while keeping existing ones (e.g., add "sale", "new")</li>
                                 <li><strong>Remove tags</strong> - Delete specific tags from all selected products</li>
-                                <li><strong>Replace all tags</strong> - Completely replace old tags with new ones (careful!)</li>
                               </ul>
                             </BlockStack>
 
@@ -1004,6 +1003,81 @@ export function Help({ isVisible: _isVisible, onNavigateToDashboard: _onNavigate
                 </BlockStack>
               </div>
             </Collapsible>
+          </div>
+        </BlockStack>
+      </Card>
+
+      {/* Legal & Policies Card */}
+      <Card>
+        <BlockStack gap="400">
+          <BlockStack gap="200">
+            <Text as="h2" variant="headingLg">
+              Legal & Policies
+            </Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Important information about using Spector
+            </Text>
+          </BlockStack>
+          
+          <BlockStack gap="300">
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '12px' 
+            }}>
+              <a 
+                href="https://aquarionlabs.com/spector-privacy-policy/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{ 
+                  color: brandColor, 
+                  textDecoration: 'none',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                📄 Privacy Policy
+                <span style={{ fontSize: '12px', color: '#666' }}>↗</span>
+              </a>
+              
+              <a 
+                href="https://aquarionlabs.com/spector-terms-of-service/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{ 
+                  color: brandColor, 
+                  textDecoration: 'none',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                📋 Terms of Service
+                <span style={{ fontSize: '12px', color: '#666' }}>↗</span>
+              </a>
+            </div>
+          </BlockStack>
+
+          <div style={{ 
+            backgroundColor: '#f6f6f7', 
+            padding: '16px', 
+            borderRadius: '8px',
+            marginTop: '8px'
+          }}>
+            <BlockStack gap="200">
+              <Text as="p" variant="bodyMd" fontWeight="semibold">
+                ⚠️ Disclaimer
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Spector is provided "as is" without warranty of any kind. We are not responsible for any data loss, 
+                incorrect product updates, pricing errors, or any other issues that may arise from using this application. 
+                Always review changes before applying bulk operations and maintain your own backups. 
+                By using Spector, you agree to our Terms of Service and acknowledge that you use the app at your own risk.
+              </Text>
+            </BlockStack>
           </div>
         </BlockStack>
       </Card>
