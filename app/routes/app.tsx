@@ -47,6 +47,9 @@ export default function App() {
             <Link to="/app" rel="home">
               Home
             </Link>
+            <Link to="/app/market-research">
+              Market Research
+            </Link>
           </NavMenu>
           <Outlet />
         </Frame>
