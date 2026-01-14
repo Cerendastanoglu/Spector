@@ -121,31 +121,6 @@ export default function Settings() {
             </Layout.Section>
           )}
 
-          {/* Free Trial Banner - Show when no active subscription */}
-          {!hasActiveSubscription && !error && (
-            <Layout.Section>
-              <div style={{ marginBottom: '24px' }}>
-                <Banner
-                  title="🎉 You're on the Free Trial"
-                  tone="info"
-                >
-                  <BlockStack gap="200">
-                    <Text as="p">
-                      Enjoy full access to all Spector features for <strong>3 days</strong>. 
-                      After your trial ends, subscribe to continue using the app.
-                    </Text>
-                    <Button 
-                      onClick={handleManageSubscription}
-                      loading={isLoading}
-                    >
-                      View Pricing Plans
-                    </Button>
-                  </BlockStack>
-                </Banner>
-              </div>
-            </Layout.Section>
-          )}
-
           {/* Subscription Overview Card */}
           <Layout.Section>
             <div style={{ marginBottom: '20px' }}>

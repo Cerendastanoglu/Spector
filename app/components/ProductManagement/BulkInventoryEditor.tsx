@@ -20,7 +20,6 @@ export function BulkInventoryEditor({
 }: BulkInventoryEditorProps) {
   const [inventoryOperation, setInventoryOperation] = useState<'set' | 'add' | 'subtract'>('set');
   const [inventoryValue, setInventoryValue] = useState('');
-  const [skuValue, setSkuValue] = useState('');
   const [weightValue, setWeightValue] = useState('');
   const [costValue, setCostValue] = useState('');
 
@@ -28,13 +27,6 @@ export function BulkInventoryEditor({
     if (inventoryValue) {
       onApply(inventoryOperation, inventoryValue);
       setInventoryValue('');
-    }
-  };
-
-  const handleApplySKU = () => {
-    if (skuValue) {
-      onApply('sku', skuValue);
-      setSkuValue('');
     }
   };
 
@@ -109,37 +101,6 @@ export function BulkInventoryEditor({
               Apply
             </Button>
           </InlineStack>
-        </BlockStack>
-
-        {/* SKU */}
-        <BlockStack gap="200">
-          <Text as="p" variant="bodyMd" fontWeight="semibold">
-            SKU (Stock Keeping Unit)
-          </Text>
-          
-          <InlineStack gap="200" blockAlign="end">
-            <div style={{ flexGrow: 1 }}>
-              <TextField
-                label=""
-                value={skuValue}
-                onChange={setSkuValue}
-                placeholder="Enter SKU"
-                autoComplete="off"
-                disabled={isLoading}
-              />
-            </div>
-            <Button
-              onClick={handleApplySKU}
-              loading={isLoading}
-              disabled={!skuValue || isLoading}
-            >
-              Apply
-            </Button>
-          </InlineStack>
-          
-          <Text as="p" variant="bodyXs" tone="subdued">
-            Set or update SKU for selected variants
-          </Text>
         </BlockStack>
 
         {/* Weight */}
@@ -225,7 +186,7 @@ export function BulkInventoryEditor({
                 • <strong>Subtract:</strong> Decrease stock by specified amount
               </Text>
               <Text as="p" variant="bodyXs" tone="subdued">
-                • SKU, weight, and cost updates replace existing values
+                • Weight and cost updates replace existing values
               </Text>
             </BlockStack>
           </BlockStack>
