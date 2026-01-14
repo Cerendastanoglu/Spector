@@ -3,6 +3,10 @@
         "shopify-dev-mcp": {
             "command": "npx",
             "args": ["-y", "@shopify/dev-mcp@latest"]
+        },
+        "shopify-cloudrun-helper": {
+            "command": "node",
+            "args": ["./mcp-servers/shopify-cloudrun-helper.mjs"]
         }
     }
 }

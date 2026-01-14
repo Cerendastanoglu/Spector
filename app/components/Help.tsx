@@ -807,8 +807,6 @@ export function Help({ isVisible: _isVisible, onNavigateToDashboard: _onNavigate
                                 <li><strong>Set to exact number</strong> - Set all variants to the same stock level (e.g., all to 100)</li>
                                 <li><strong>Add inventory</strong> - Increase stock by a number (e.g., add 50 to current levels)</li>
                                 <li><strong>Remove inventory</strong> - Decrease stock by a number (e.g., reduce all by 10)</li>
-                                <li><strong>Update SKU</strong> - Change product SKU codes in bulk</li>
-                                <li><strong>Update barcode</strong> - Set barcode values across products</li>
                                 <li><strong>Allow overselling</strong> - Let customers buy when out of stock</li>
                               </ul>
                             </BlockStack>

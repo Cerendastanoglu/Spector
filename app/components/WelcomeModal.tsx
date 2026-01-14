@@ -62,26 +62,6 @@ export function WelcomeModal({
       isLogoSlide: true,
       content: (
         <BlockStack gap="400">
-          {/* Subscription Banner - Only show if no subscription */}
-          {!hasSubscription && (
-            <div className={styles.glassyBanner}>
-              <div className={styles.bannerGlow}></div>
-              <div className={styles.bannerContent}>
-                <span className={styles.bannerIcon}>
-                  <Icon source={StarFilledIcon} tone="base" />
-                </span>
-                <div>
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">
-                    Start Your Free 3-Day Trial
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {subscriptionPrice} after • Cancel anytime • No credit card required
-                  </Text>
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className={styles.introText}>
             <Text as="p" variant="bodyLg" tone="subdued" alignment="center">
               Transform how you manage your Shopify catalog with powerful tools designed for efficiency

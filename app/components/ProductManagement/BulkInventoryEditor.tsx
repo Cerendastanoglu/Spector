@@ -103,7 +103,7 @@ export function BulkInventoryEditor({
           </InlineStack>
         </BlockStack>
 
-        {/* Weight */
+        {/* Weight */}
         <BlockStack gap="200">
           <Text as="p" variant="bodyMd" fontWeight="semibold">
             Weight (kg)

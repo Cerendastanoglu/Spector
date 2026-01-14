@@ -16,7 +16,6 @@ import { Help } from "../components/Help";
 import { Settings } from "../components/Settings";
 import { ForecastingTab } from "../components/ForecastingTab";
 import { OptimizedComponents, useComponentPreloader } from "../utils/lazyLoader";
-import { SubscriptionBanner } from "../components/SubscriptionBanner";
 import { checkAccess, checkSubscriptionStatus, getManagedPricingUrl } from "../services/billing.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -377,15 +376,6 @@ export default function Index() {
             }
           }}
         />
-        
-        {/* Subscription Banner - Only shows if no active subscription AND not on settings tab */}
-        {!subscription.hasAccess && activeTab !== 'settings' && (
-          <SubscriptionBanner
-            subscription={subscription as any}
-            onSubscribe={handleSubscribe}
-            loading={false}
-          />
-        )}
         
         <Layout>
           <Layout.Section>
