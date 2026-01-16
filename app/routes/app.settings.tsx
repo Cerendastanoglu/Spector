@@ -1,5 +1,4 @@
 import { logger } from "~/utils/logger";
-import { useState } from "react";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
@@ -10,7 +9,6 @@ import {
   BlockStack,
   InlineStack,
   Text,
-  Button,
   Badge,
   Divider,
   Banner,
@@ -18,7 +16,7 @@ import {
 } from "@shopify/polaris";
 import { CreditCardIcon, CalendarIcon, CheckIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
-import { checkSubscriptionStatus, getManagedPricingUrl } from "../services/billing.server";
+import { checkSubscriptionStatus } from "../services/billing.server";
 import styles from "../styles/settings.module.css";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -51,23 +49,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     } : null,
     hasActiveSubscription,
     error,
-    managedPricingUrl: getManagedPricingUrl(shop),
   });
 };
 
 export default function Settings() {
-  const { subscription, hasActiveSubscription, error, managedPricingUrl } = useLoaderData<typeof loader>();
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleManageSubscription = () => {
-    setIsLoading(true);
-    // Redirect to Shopify's managed pricing page
-    if (window.top) {
-      window.top.location.href = managedPricingUrl;
-    } else {
-      window.location.href = managedPricingUrl;
-    }
-  };
+  const { subscription, hasActiveSubscription, error } = useLoaderData<typeof loader>();
 
   const getStatusBadge = (status: string) => {
     switch (status?.toUpperCase()) {
@@ -219,26 +205,6 @@ export default function Settings() {
                       </InlineStack>
                     )}
                   </BlockStack>
-
-                  <Divider />
-
-                  <BlockStack gap="200">
-                    {/* Manage Subscription Button */}
-                    <Button
-                      variant="primary"
-                      onClick={handleManageSubscription}
-                      loading={isLoading}
-                      fullWidth
-                    >
-                      {hasActiveSubscription ? 'Manage Subscription' : 'View Pricing & Subscribe'}
-                    </Button>
-
-                    {hasActiveSubscription && (
-                      <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-                        Upgrade, downgrade, or cancel your subscription through Shopify's billing page.
-                      </Text>
-                    )}
-                  </BlockStack>
                 </BlockStack>
               </Card>
             </div>
@@ -254,7 +220,7 @@ export default function Settings() {
                       What's Included
                     </Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      All features available during your {hasActiveSubscription ? 'subscription' : 'free trial'}
+                      All features available in Spector
                     </Text>
                   </BlockStack>
                   

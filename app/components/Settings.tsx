@@ -1,11 +1,9 @@
-import { useState } from "react";
 import {
   Layout,
   Card,
   BlockStack,
   InlineStack,
   Text,
-  Button,
   Badge,
   Divider,
   Banner,
@@ -29,27 +27,13 @@ interface SettingsProps {
   subscription: Subscription | null;
   hasActiveSubscription: boolean;
   error?: string;
-  managedPricingUrl: string;
 }
 
 export function Settings({
   subscription,
   hasActiveSubscription,
   error,
-  managedPricingUrl,
 }: SettingsProps) {
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleManageSubscription = () => {
-    setIsLoading(true);
-    // Redirect to Shopify's managed pricing page
-    if (window.top) {
-      window.top.location.href = managedPricingUrl;
-    } else {
-      window.location.href = managedPricingUrl;
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     switch (status?.toUpperCase()) {
       case 'ACTIVE':
@@ -196,26 +180,6 @@ export function Settings({
                     </InlineStack>
                   )}
                 </BlockStack>
-
-                <Divider />
-
-                <BlockStack gap="200">
-                  {/* Manage Subscription Button */}
-                  <Button
-                    variant="primary"
-                    onClick={handleManageSubscription}
-                    loading={isLoading}
-                    fullWidth
-                  >
-                    {hasActiveSubscription ? 'Manage Subscription' : 'View Pricing & Subscribe'}
-                  </Button>
-
-                  {hasActiveSubscription && (
-                    <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-                      Upgrade, downgrade, or cancel your subscription through Shopify's billing page.
-                    </Text>
-                  )}
-                </BlockStack>
               </BlockStack>
             </Card>
           </div>
@@ -310,15 +274,6 @@ export function Settings({
                     </BlockStack>
                   </div>
                 </BlockStack>
-
-                {!hasActiveSubscription && (
-                  <>
-                    <Divider />
-                    <Banner tone="warning" title="Trial Limitations">
-                      <p>During your free trial, you can edit up to <strong>10 products</strong> at once. Subscribe to unlock unlimited bulk editing.</p>
-                    </Banner>
-                  </>
-                )}
               </BlockStack>
             </Card>
           </div>

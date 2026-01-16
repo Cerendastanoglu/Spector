@@ -318,7 +318,6 @@ export default function Index() {
             initialProducts={initialProducts}
             subscriptionStatus={settingsData.hasActiveSubscription ? 'active' : (subscription.status === 'ACTIVE' ? 'active' : 'trialing')}
             hasActiveSubscription={settingsData.hasActiveSubscription}
-            managedPricingUrl={settingsData.managedPricingUrl}
           />
         );
 
@@ -341,7 +340,6 @@ export default function Index() {
             subscription={settingsData.subscription}
             hasActiveSubscription={settingsData.hasActiveSubscription}
             error={settingsData.error}
-            managedPricingUrl={settingsData.managedPricingUrl}
           />
         );
       default:

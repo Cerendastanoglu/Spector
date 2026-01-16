@@ -113,7 +113,6 @@ interface ProductManagementProps {
   initialProducts?: Product[] | null; // Add support for server-side loaded products
   subscriptionStatus?: 'trialing' | 'active' | 'cancelled' | 'expired' | 'none';
   hasActiveSubscription?: boolean;
-  managedPricingUrl?: string;
 }
 
 type InventoryCategory = 'all' | 'out-of-stock' | 'critical' | 'low-stock' | 'in-stock';
@@ -129,8 +128,7 @@ export function ProductManagement({
   shopDomain, 
   initialProducts = null,
   subscriptionStatus = 'none',
-  hasActiveSubscription = false,
-  managedPricingUrl = ''
+  hasActiveSubscription = false
 }: ProductManagementProps) {
   // Add CSS animations - Fixed to prevent header interference
   useEffect(() => {
@@ -325,41 +323,11 @@ export function ProductManagement({
   // Collapsible tag filter state
   const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
   
-  // Trial limit modal state
-  const [showTrialLimitModal, setShowTrialLimitModal] = useState(false);
-  
-  // Check if user is in trial mode (not actively subscribed)
-  const isTrialMode = !hasActiveSubscription && subscriptionStatus !== 'active';
-  const trialProductLimit = BILLING_CONFIG.TRIAL_PRODUCT_LIMIT;
-  
-  // Function to check trial limit before bulk operations
-  const checkTrialLimit = useCallback((productCount: number): boolean => {
-    if (isTrialMode && productCount > trialProductLimit) {
-      setShowTrialLimitModal(true);
-      return false; // Operation should not proceed
-    }
-    return true; // Operation can proceed
-  }, [isTrialMode, trialProductLimit]);
-  
-  // Handle subscribe button click from trial limit modal
-  const handleSubscribeFromModal = useCallback((source: string = 'unknown') => {
-    setShowTrialLimitModal(false);
-    
-    // Track in Google Analytics
-    if (typeof window !== 'undefined' && (window as any).gtag) {
-      (window as any).gtag('event', 'subscribe_click', {
-        'event_category': 'subscription',
-        'event_label': source,
-        'value': 9.99
-      });
-    }
-    
-    if (managedPricingUrl) {
-      // Add UTM parameters for tracking
-      const urlWithUTM = `${managedPricingUrl}?utm_source=spector_app&utm_medium=${encodeURIComponent(source)}&utm_campaign=trial_upgrade`;
-      window.open(urlWithUTM, '_blank');
-    }
-  }, [managedPricingUrl]);
+  // Trial mode disabled - pricing not set up yet
+  const isTrialMode = false;
+  const trialProductLimit = Infinity;
+  const checkTrialLimit = useCallback((_productCount: number): boolean => true, []);
+  const handleSubscribeFromModal = useCallback(() => {}, []);
   
   // Bulk operations modal state
   // Removed state variables related to the bulk operation modal
@@ -4664,71 +4632,6 @@ export function ProductManagement({
       )}
 
       {/* Bulk Operation Modal removed - changes now apply directly */}
-      
-      {/* Trial Limit Modal */}
-      <Modal
-        open={showTrialLimitModal}
-        onClose={() => setShowTrialLimitModal(false)}
-        title="🚀 Upgrade to Unlock Unlimited Editing"
-        primaryAction={{
-          content: 'Subscribe Now',
-          onAction: handleSubscribeFromModal,
-        }}
-        secondaryActions={[
-          {
-            content: 'Maybe Later',
-            onAction: () => setShowTrialLimitModal(false),
-          },
-        ]}
-      >
-        <Modal.Section>
-          <BlockStack gap="400">
-            <Text as="p" variant="bodyMd">
-              You've selected <strong>{selectedProducts.length} products</strong>, but your free trial allows editing up to <strong>{trialProductLimit} products</strong> at once.
-            </Text>
-            
-            <Text as="p" variant="bodyMd">
-              Subscribe to Spector to unlock:
-            </Text>
-            
-            <BlockStack gap="200">
-              <InlineStack align="start" blockAlign="center" gap="200">
-                <Badge tone="success">✓</Badge>
-                <Text as="p" variant="bodySm">
-                  <strong>Unlimited</strong> bulk product editing
-                </Text>
-              </InlineStack>
-              <InlineStack align="start" blockAlign="center" gap="200">
-                <Badge tone="success">✓</Badge>
-                <Text as="p" variant="bodySm">
-                  Advanced inventory forecasting
-                </Text>
-              </InlineStack>
-              <InlineStack align="start" blockAlign="center" gap="200">
-                <Badge tone="success">✓</Badge>
-                <Text as="p" variant="bodySm">
-                  Real-time analytics dashboard
-                </Text>
-              </InlineStack>
-              <InlineStack align="start" blockAlign="center" gap="200">
-                <Badge tone="success">✓</Badge>
-                <Text as="p" variant="bodySm">
-                  Priority email support
-                </Text>
-              </InlineStack>
-            </BlockStack>
-
-            <BlockStack gap="100">
-              <Text as="p" variant="bodyMd" fontWeight="semibold">
-                Only ${BILLING_CONFIG.MONTHLY_PRICE}/month
-              </Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Cancel anytime. No hidden fees.
-              </Text>
-            </BlockStack>
-          </BlockStack>
-        </Modal.Section>
-      </Modal>
     </BlockStack>
     </>
   );
