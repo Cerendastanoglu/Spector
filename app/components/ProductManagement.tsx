@@ -234,10 +234,6 @@ export function ProductManagement({
   const [unitPriceValue, setUnitPriceValue] = useState('');
   
   // Inventory bulk update state (for pricing tab)
-  const [applySkuChanges, setApplySkuChanges] = useState(false);
-  const [bulkSkuValue, setBulkSkuValue] = useState('');
-  const [applyBarcodeChanges, setApplyBarcodeChanges] = useState(false);
-  const [barcodeValue, setBarcodeValue] = useState('');
   const [applyContinueSellingChanges, setApplyContinueSellingChanges] = useState(false);
   const [continueSellingWhenOutOfStock, setContinueSellingWhenOutOfStock] = useState<boolean | null>(null);
   
@@ -2080,13 +2076,12 @@ export function ProductManagement({
     setIsLoading(true);
     setError("");
     
-    // Check if user is updating only metadata (SKU/Barcode/Continue Selling) without stock changes
-    const isOnlyUpdatingMetadata = !stockQuantity && 
-      (applySkuChanges || applyBarcodeChanges || applyContinueSellingChanges);
+    // Check if user is updating only metadata (Continue Selling) without stock changes
+    const isOnlyUpdatingMetadata = !stockQuantity && applyContinueSellingChanges;
     
     // Validate stock quantity only if we're actually changing stock
     if (!isOnlyUpdatingMetadata && (!stockQuantity || stockQuantity.trim() === '')) {
-      setError("Please enter a stock quantity, or only update SKU/Barcode/Continue Selling.");
+      setError("Please enter a stock quantity, or update Continue Selling option.");
       setIsLoading(false);
       return;
     }
@@ -2103,10 +2098,6 @@ export function ProductManagement({
           stockQuantity: isOnlyUpdatingMetadata ? undefined : stockQuantity,
           stockUpdateMethod: isOnlyUpdatingMetadata ? undefined : stockUpdateMethod,
           // Metadata fields
-          applySku: applySkuChanges,
-          sku: applySkuChanges ? bulkSkuValue : undefined,
-          applyBarcode: applyBarcodeChanges,
-          barcode: applyBarcodeChanges ? barcodeValue : undefined,
           applyContinueSelling: applyContinueSellingChanges,
           continueSelling: applyContinueSellingChanges ? continueSellingWhenOutOfStock : undefined,
         }),
@@ -4392,56 +4383,6 @@ export function ProductManagement({
                                                     </div>
                                                   )}
                                                   
-                                                  {/* SKU with Before/After Preview */}
-                                                  <div>
-                                                    <Text as="p" variant="bodyXs" tone="subdued">
-                                                      SKU:
-                                                    </Text>
-                                                    {applySkuChanges && bulkSkuValue ? (
-                                                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                                        {variant.node.sku && variant.node.sku !== bulkSkuValue && (
-                                                          <Text as="span" variant="bodyXs" tone="subdued">
-                                                            <span style={{ textDecoration: 'line-through' }}>
-                                                              {variant.node.sku}
-                                                            </span>
-                                                          </Text>
-                                                        )}
-                                                        <Text as="span" variant="bodyXs" fontWeight="semibold" tone="success">
-                                                          {bulkSkuValue}
-                                                        </Text>
-                                                      </div>
-                                                    ) : (
-                                                      <Text as="span" variant="bodyXs" fontWeight="medium">
-                                                        {variant.node.sku || '—'}
-                                                      </Text>
-                                                    )}
-                                                  </div>
-                                                  
-                                                  {/* Barcode with Before/After Preview */}
-                                                  <div>
-                                                    <Text as="p" variant="bodyXs" tone="subdued">
-                                                      Barcode:
-                                                    </Text>
-                                                    {applyBarcodeChanges && barcodeValue ? (
-                                                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                                        {variant.node.barcode && variant.node.barcode !== barcodeValue && (
-                                                          <Text as="span" variant="bodyXs" tone="subdued">
-                                                            <span style={{ textDecoration: 'line-through' }}>
-                                                              {variant.node.barcode}
-                                                            </span>
-                                                          </Text>
-                                                        )}
-                                                        <Text as="span" variant="bodyXs" fontWeight="semibold" tone="success">
-                                                          {barcodeValue}
-                                                        </Text>
-                                                      </div>
-                                                    ) : (
-                                                      <Text as="span" variant="bodyXs" fontWeight="medium">
-                                                        {variant.node.barcode || '—'}
-                                                      </Text>
-                                                    )}
-                                                  </div>
-                                                  
                                                   {/* Continue Selling with Before/After Preview */}
                                                   <div>
                                                     <Text as="p" variant="bodyXs" tone="subdued">
@@ -4530,53 +4471,6 @@ export function ProductManagement({
                         />
                       </div>
 
-                      {/* SKU and Barcode - Side by Side */}
-                      <InlineStack gap="400" blockAlign="start">
-                        <div style={{ flex: 1 }}>
-                          <BlockStack gap="200">
-                            <Checkbox
-                              label="Update SKU"
-                              checked={applySkuChanges}
-                              onChange={setApplySkuChanges}
-                            />
-
-                            {applySkuChanges && (
-                              <TextField
-                                label="SKU (Stock Keeping Unit)"
-                                type="text"
-                                value={bulkSkuValue}
-                                onChange={setBulkSkuValue}
-                                placeholder="SKU-123"
-                                autoComplete="off"
-                                helpText="Unique identifier for inventory tracking"
-                              />
-                            )}
-                          </BlockStack>
-                        </div>
-
-                        <div style={{ flex: 1 }}>
-                          <BlockStack gap="200">
-                            <Checkbox
-                              label="Update Barcode"
-                              checked={applyBarcodeChanges}
-                              onChange={setApplyBarcodeChanges}
-                            />
-
-                            {applyBarcodeChanges && (
-                              <TextField
-                                label="Barcode (ISBN, UPC, GTIN, etc.)"
-                                type="text"
-                                value={barcodeValue}
-                                onChange={setBarcodeValue}
-                                placeholder="1234567890123"
-                                autoComplete="off"
-                                helpText="Scannable barcode identifier"
-                              />
-                            )}
-                          </BlockStack>
-                        </div>
-                      </InlineStack>
-
                       {/* Continue Selling When Out of Stock - 3-State Control */}
                       <div>
                         <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
@@ -4625,7 +4519,7 @@ export function ProductManagement({
                         variant="primary"
                         onClick={handleBulkInventoryUpdate}
                         loading={isLoading}
-                        disabled={!stockQuantity && !applySkuChanges && !applyBarcodeChanges && !applyContinueSellingChanges}
+                        disabled={!stockQuantity && !applyContinueSellingChanges}
                         size="large"
                       >
                         Update Inventory for {String(selectedVariants.length)} Variant{selectedVariants.length !== 1 ? 's' : ''}
