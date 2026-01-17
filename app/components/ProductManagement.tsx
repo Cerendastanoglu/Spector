@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useFetcher } from "@remix-run/react";
+import { useFetcher, useNavigate } from "@remix-run/react";
 import { openInNewTab } from "../utils/browserUtils";
 import { ProductConstants } from "../utils/scopedConstants";
 import { ProductTable } from "./ProductTable";
@@ -323,11 +323,20 @@ export function ProductManagement({
   // Collapsible tag filter state
   const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
   
-  // Trial mode disabled - pricing not set up yet
-  const isTrialMode = false;
-  const trialProductLimit = Infinity;
-  const checkTrialLimit = useCallback((_productCount: number): boolean => true, []);
-  const handleSubscribeFromModal = useCallback(() => {}, []);
+  // Navigation for subscription
+  const navigate = useNavigate();
+  
+  // Trial mode - enabled when user doesn't have active subscription
+  const isTrialMode = !hasActiveSubscription && subscriptionStatus !== 'active';
+  const trialProductLimit = isTrialMode ? BILLING_CONFIG.TRIAL_PRODUCT_LIMIT : Infinity;
+  const checkTrialLimit = useCallback((productCount: number): boolean => {
+    if (!isTrialMode) return true;
+    return productCount <= trialProductLimit;
+  }, [isTrialMode, trialProductLimit]);
+  const handleSubscribeFromModal = useCallback(() => {
+    // Navigate to Settings page where user can subscribe
+    navigate('/app/settings');
+  }, [navigate]);
   
   // Bulk operations modal state
   // Removed state variables related to the bulk operation modal
@@ -2880,7 +2889,7 @@ export function ProductManagement({
                     </Text>
                   </div>
                   <Button size="slim" onClick={handleSubscribeFromModal}>
-                    Subscribe Now
+                    View Pricing Plans
                   </Button>
                 </div>
               )}
