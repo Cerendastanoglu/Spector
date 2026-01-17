@@ -299,11 +299,14 @@ export default function Index() {
     setActiveTab(tab);
   };
 
-  // Handle "Start Free Trial" - just close modal and stay on dashboard
+  // Handle "Start Free Trial" - redirect to Shopify pricing page
   const handleSubscribe = () => {
     // Close the welcome modal
     handleWelcomeModalClose();
-    // User stays on the dashboard to explore the app
+    // Redirect to Shopify's managed pricing page for the app
+    if (settingsData?.managedPricingUrl) {
+      window.open(settingsData.managedPricingUrl, '_top');
+    }
   };
 
   // Remove the subscription modal useEffect - WelcomeModal handles everything now

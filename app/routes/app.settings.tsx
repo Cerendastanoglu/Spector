@@ -13,10 +13,11 @@ import {
   Divider,
   Banner,
   Icon,
+  Button,
 } from "@shopify/polaris";
 import { CreditCardIcon, CalendarIcon, CheckIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
-import { checkSubscriptionStatus } from "../services/billing.server";
+import { checkSubscriptionStatus, getManagedPricingUrl } from "../services/billing.server";
 import styles from "../styles/settings.module.css";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -49,11 +50,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     } : null,
     hasActiveSubscription,
     error,
+    managedPricingUrl: getManagedPricingUrl(shop),
   });
 };
 
 export default function Settings() {
-  const { subscription, hasActiveSubscription, error } = useLoaderData<typeof loader>();
+  const { subscription, hasActiveSubscription, error, managedPricingUrl } = useLoaderData<typeof loader>();
+
+  const handleManageSubscription = () => {
+    if (managedPricingUrl) {
+      window.open(managedPricingUrl, '_top');
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status?.toUpperCase()) {
@@ -205,6 +213,18 @@ export default function Settings() {
                       </InlineStack>
                     )}
                   </BlockStack>
+
+                  <Divider />
+
+                  {/* Manage Subscription Button */}
+                  <InlineStack align="end">
+                    <Button
+                      variant="primary"
+                      onClick={handleManageSubscription}
+                    >
+                      {hasActiveSubscription ? 'Manage Subscription' : 'View Pricing & Subscribe'}
+                    </Button>
+                  </InlineStack>
                 </BlockStack>
               </Card>
             </div>

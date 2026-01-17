@@ -337,7 +337,7 @@ export function WelcomeModal({
       title=""
       primaryAction={{
         content: isLastSlide 
-          ? "Get Started"
+          ? (hasSubscription ? "Get Started" : "Start Free Trial")
           : "Next →",
         onAction: isLastSlide ? handleFinalAction : nextSlide,
       }}
