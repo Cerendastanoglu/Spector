@@ -202,8 +202,8 @@ export async function checkAccess(
   subscription?: ShopifySubscription | null;
 }> {
   // Allow development/test stores to bypass subscription requirement
-  const devStores: string[] = [
-    // 'spector-test-store.myshopify.com', // Temporarily disabled for testing
+  const devStores = [
+    'spector-test-store.myshopify.com',
     // Add more dev/test stores here if needed
   ];
   
