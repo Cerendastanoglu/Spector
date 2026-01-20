@@ -326,6 +326,7 @@ async function getProductAnalytics(request: Request) {
     logger.info(`🔵 Product Analytics API: Total order items processed: ${totalOrderItems}`);
     logger.info(`🔵 Product Analytics API: Orders with valid prices: ${ordersWithValidPrices}`);
     logger.info(`🔵 Product Analytics API: Unique price points: ${Object.keys(priceToOrdersMap).length}`);
+    logger.info(`🔵 Product Analytics API: Processing ${products.length} products for inventory...`);
 
     products.forEach(({ node: product }: any) => {
       if (product.status === 'ACTIVE') {
@@ -338,15 +339,22 @@ async function getProductAnalytics(request: Request) {
         let totalInventory = 0;
         let validVariants = 0;
         let hasTrackedInventory = false;
+        
+        // Debug: Log each product's inventory
+        logger.info(`🔵 Processing product: ${product.title} (${product.id}), variants: ${variants.length}`);
 
         variants.forEach(({ node: variant }: any) => {
           try {
             const price = parseFloat(variant.price || "0");
             // Handle null/undefined inventory - treat as 0 for OOS detection
-            const inventory = variant.inventoryQuantity !== null && variant.inventoryQuantity !== undefined 
-              ? parseInt(variant.inventoryQuantity) 
+            const rawInventory = variant.inventoryQuantity;
+            const inventory = rawInventory !== null && rawInventory !== undefined 
+              ? parseInt(rawInventory) 
               : 0;
             const isTracked = variant.inventoryItem?.tracked === true;
+            
+            // Debug: Log each variant's inventory
+            logger.info(`   Variant: ${variant.title || variant.id}, inventoryQuantity: ${rawInventory}, parsed: ${inventory}, tracked: ${isTracked}`);
             
             if (isTracked) {
               hasTrackedInventory = true;
@@ -370,6 +378,9 @@ async function getProductAnalytics(request: Request) {
             logger.warn(`🔴 Error processing variant:`, e);
           }
         });
+        
+        // Debug: Log total inventory for this product
+        logger.info(`   Product total inventory: ${totalInventory}, validVariants: ${validVariants}`);
 
         // Only process products with valid variants
         // Consider product OOS if total inventory is 0 OR if inventory is not tracked
@@ -380,6 +391,7 @@ async function getProductAnalytics(request: Request) {
           if (totalInventory === 0) {
             inventoryStatus = 'Out of Stock';
             outOfStock++;
+            logger.info(`   ❌ Product marked OUT OF STOCK`);
             
             // Add to out-of-stock products list
             const firstVariant = variants[0]?.node;
@@ -500,6 +512,10 @@ async function getProductAnalytics(request: Request) {
 
     // Sort top products by value
     topProducts.sort((a, b) => b.value - a.value);
+
+    // Debug: Log final inventory distribution
+    logger.info(`🔵 FINAL INVENTORY DISTRIBUTION: wellStocked=${wellStocked}, lowStock=${lowStock}, outOfStock=${outOfStock}`);
+    logger.info(`🔵 OOS Products list has ${outOfStockProducts.length} items`);
 
     // Ensure we have valid price data
     if (allPrices.length === 0) {
