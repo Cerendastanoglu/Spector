@@ -113,6 +113,7 @@ interface ProductManagementProps {
   initialProducts?: Product[] | null; // Add support for server-side loaded products
   subscriptionStatus?: 'trialing' | 'active' | 'cancelled' | 'expired' | 'none';
   hasActiveSubscription?: boolean;
+  isDevelopmentStore?: boolean; // Whether this is a development/partner store
 }
 
 type InventoryCategory = 'all' | 'out-of-stock' | 'critical' | 'low-stock' | 'in-stock';
@@ -128,7 +129,8 @@ export function ProductManagement({
   shopDomain, 
   initialProducts = null,
   subscriptionStatus = 'none',
-  hasActiveSubscription = false
+  hasActiveSubscription = false,
+  isDevelopmentStore = false
 }: ProductManagementProps) {
   // Add CSS animations - Fixed to prevent header interference
   useEffect(() => {
@@ -326,17 +328,22 @@ export function ProductManagement({
   // Navigation for subscription
   const navigate = useNavigate();
   
-  // Trial mode - enabled when user doesn't have active subscription
+  // Trial mode - enabled when user doesn't have active subscription AND it's not a dev store
+  // Development stores get full access without restrictions
   const isTrialMode = !hasActiveSubscription && subscriptionStatus !== 'active';
-  const trialProductLimit = isTrialMode ? BILLING_CONFIG.TRIAL_PRODUCT_LIMIT : Infinity;
+  const shouldApplyTrialRestrictions = isTrialMode && !isDevelopmentStore;
+  const trialProductLimit = shouldApplyTrialRestrictions ? BILLING_CONFIG.TRIAL_PRODUCT_LIMIT : Infinity;
   const checkTrialLimit = useCallback((productCount: number): boolean => {
-    if (!isTrialMode) return true;
+    if (!shouldApplyTrialRestrictions) return true;
     return productCount <= trialProductLimit;
-  }, [isTrialMode, trialProductLimit]);
+  }, [shouldApplyTrialRestrictions, trialProductLimit]);
   const handleSubscribeFromModal = useCallback(() => {
     // Navigate to Settings page where user can subscribe
     navigate('/app/settings');
   }, [navigate]);
+  
+  // Trial limit modal state
+  const [showTrialLimitModal, setShowTrialLimitModal] = useState(false);
   
   // Bulk operations modal state
   // Removed state variables related to the bulk operation modal
@@ -367,8 +374,8 @@ export function ProductManagement({
   const handleSelectAllFiltered = () => {
     const allFilteredProductIds = filteredProducts.map(p => p.id);
     
-    // Check trial limit
-    if (isTrialMode && allFilteredProductIds.length > trialProductLimit) {
+    // Check trial limit (only for non-dev stores in trial)
+    if (shouldApplyTrialRestrictions && allFilteredProductIds.length > trialProductLimit) {
       // Only select up to the limit
       const limitedProductIds = allFilteredProductIds.slice(0, trialProductLimit);
       const limitedProducts = filteredProducts.filter(p => limitedProductIds.includes(p.id));
@@ -379,14 +386,8 @@ export function ProductManagement({
       setSelectedProducts(limitedProductIds);
       setSelectedVariants(limitedVariantIds);
       
-      // Show warning notification
-      setNotification({
-        show: true,
-        message: `⚠️ Trial limit reached! Only ${trialProductLimit} products selected. Subscribe to select unlimited products.`,
-        error: false,
-        actionLabel: 'Subscribe',
-        onAction: handleSubscribeFromModal
-      });
+      // Show trial limit modal
+      setShowTrialLimitModal(true);
       return;
     }
     
@@ -408,15 +409,9 @@ export function ProductManagement({
     const variantIds = getProductVariantIds(productId);
     
     if (checked) {
-      // Check trial limit before adding
-      if (isTrialMode && !selectedProducts.includes(productId) && selectedProducts.length >= trialProductLimit) {
-        setNotification({
-          show: true,
-          message: `⚠️ Trial limit reached! You can only select up to ${trialProductLimit} products. Subscribe to select unlimited products.`,
-          error: false,
-          actionLabel: 'Subscribe',
-          onAction: handleSubscribeFromModal
-        });
+      // Check trial limit before adding (only for non-dev stores in trial)
+      if (shouldApplyTrialRestrictions && !selectedProducts.includes(productId) && selectedProducts.length >= trialProductLimit) {
+        setShowTrialLimitModal(true);
         return;
       }
       
@@ -440,15 +435,9 @@ export function ProductManagement({
       // Check if this would add a NEW product (not already selected)
       const isNewProduct = !selectedProducts.includes(productId);
       
-      // Check trial limit if adding a new product
-      if (isTrialMode && isNewProduct && selectedProducts.length >= trialProductLimit) {
-        setNotification({
-          show: true,
-          message: `⚠️ Trial limit reached! You can only select up to ${trialProductLimit} products. Subscribe to select unlimited products.`,
-          error: false,
-          actionLabel: 'Subscribe',
-          onAction: handleSubscribeFromModal
-        });
+      // Check trial limit if adding a new product (only for non-dev stores in trial)
+      if (shouldApplyTrialRestrictions && isNewProduct && selectedProducts.length >= trialProductLimit) {
+        setShowTrialLimitModal(true);
         return;
       }
       
@@ -2651,15 +2640,9 @@ export function ProductManagement({
               className={`${styles.stepCard} ${activeMainTab === 1 ? `${styles.active} ${styles.activeInfo}` : ''}`}
               onClick={() => {
                 if (selectedVariants.length === 0) return;
-                // Check trial limit before proceeding to Step 2
-                if (isTrialMode && selectedProducts.length > trialProductLimit) {
-                  setNotification({
-                    show: true,
-                    message: `⚠️ Please reduce your selection to ${trialProductLimit} products or fewer to continue. You have ${selectedProducts.length} selected.`,
-                    error: true,
-                    actionLabel: 'Subscribe for Unlimited',
-                    onAction: () => handleSubscribeFromModal('step2_blocked')
-                  });
+                // Check trial limit before proceeding to Step 2 (only for non-dev stores)
+                if (shouldApplyTrialRestrictions && selectedProducts.length > trialProductLimit) {
+                  setShowTrialLimitModal(true);
                   return;
                 }
                 setActiveMainTab(1);
@@ -3543,15 +3526,9 @@ export function ProductManagement({
                         onViewProduct={(product) => navigateToProduct(product, 'storefront')}
                         onEditProduct={(product) => navigateToProduct(product, 'admin')}
                         onContinueToBulkEdit={() => {
-                          // Check trial limit before proceeding to Step 2
-                          if (isTrialMode && selectedProducts.length > trialProductLimit) {
-                            setNotification({
-                              show: true,
-                              message: `⚠️ Please reduce your selection to ${trialProductLimit} products or fewer to continue. You have ${selectedProducts.length} selected.`,
-                              error: true,
-                              actionLabel: 'Subscribe for Unlimited',
-                              onAction: () => handleSubscribeFromModal('continue_button_blocked')
-                            });
+                          // Check trial limit before proceeding to Step 2 (only for non-dev stores)
+                          if (shouldApplyTrialRestrictions && selectedProducts.length > trialProductLimit) {
+                            setShowTrialLimitModal(true);
                             return;
                           }
                           setActiveMainTab(1);
@@ -4639,6 +4616,50 @@ export function ProductManagement({
           </div>
         </div>
       )}
+
+      {/* Trial Limit Modal */}
+      <Modal
+        open={showTrialLimitModal}
+        onClose={() => setShowTrialLimitModal(false)}
+        title="Trial Limit Reached"
+        primaryAction={{
+          content: 'Subscribe Now',
+          onAction: () => {
+            setShowTrialLimitModal(false);
+            handleSubscribeFromModal();
+          },
+        }}
+        secondaryActions={[
+          {
+            content: 'Cancel',
+            onAction: () => setShowTrialLimitModal(false),
+          },
+        ]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text as="p" variant="bodyMd">
+              You can only select up to <strong>{trialProductLimit} products</strong> during your free trial.
+            </Text>
+            <Text as="p" variant="bodyMd">
+              Subscribe to Spector Basic to unlock unlimited product selection and all premium features.
+            </Text>
+            <div style={{
+              backgroundColor: '#f0f9ff',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              border: '1px solid #bae6fd'
+            }}>
+              <InlineStack gap="200" blockAlign="center">
+                <Icon source={AlertCircleIcon} tone="info" />
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Your free trial includes full access to forecasting and analytics.
+                </Text>
+              </InlineStack>
+            </div>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
 
       {/* Bulk Operation Modal removed - changes now apply directly */}
     </BlockStack>

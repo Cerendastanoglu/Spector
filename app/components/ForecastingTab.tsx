@@ -25,7 +25,8 @@ import {
   ClockIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  LockIcon
 } from "@shopify/polaris-icons";
 
 
@@ -69,15 +70,27 @@ interface InventoryForecastingData {
 interface ForecastingTabProps {
   shopDomain?: string;
   initialForecastData?: InventoryForecastingData | null; // Add support for server-side loaded data
+  isTrialMode?: boolean; // True if user is on trial (no active subscription)
+  isDevelopmentStore?: boolean; // True if this is a dev/partner test store
+  managedPricingUrl?: string; // URL to subscription pricing page
 }
 
-export function ForecastingTab({ shopDomain, initialForecastData = null }: ForecastingTabProps) {
+export function ForecastingTab({ 
+  shopDomain, 
+  initialForecastData = null,
+  isTrialMode = false,
+  isDevelopmentStore = false,
+  managedPricingUrl
+}: ForecastingTabProps) {
   const [showAIMethodology, setShowAIMethodology] = useState(false);
   const [forecastData, setForecastData] = useState<InventoryForecastingData | null>(initialForecastData);
   const [loading, setLoading] = useState(!initialForecastData); // Don't show loading if we have initial data
   const [error, setError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState(0);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  
+  // Trial restrictions only apply to live stores, not dev stores
+  const shouldApplyTrialRestrictions = isTrialMode && !isDevelopmentStore;
   
   // Currency state
   const [currencySymbol, setCurrencySymbol] = useState<string>('$');
@@ -256,8 +269,12 @@ export function ForecastingTab({ shopDomain, initialForecastData = null }: Forec
       );
     }
 
+    // For trial mode, only show first product clearly, rest are blurred
+    const visibleItems = shouldApplyTrialRestrictions ? items.slice(0, 1) : items;
+    const hasHiddenItems = shouldApplyTrialRestrictions && items.length > 1;
+
     return (
-      <div style={{ overflowX: 'auto' }}>
+      <div style={{ overflowX: 'auto', position: 'relative' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ 
@@ -285,7 +302,7 @@ export function ForecastingTab({ shopDomain, initialForecastData = null }: Forec
             </tr>
           </thead>
           <tbody>
-            {items.map((item, index) => {
+            {visibleItems.map((item, index) => {
               const isExpanded = expandedRows.has(item.id);
               return (
                 <React.Fragment key={item.id}>
@@ -566,6 +583,99 @@ export function ForecastingTab({ shopDomain, initialForecastData = null }: Forec
             })}
           </tbody>
         </table>
+        
+        {/* Trial mode: Show blurred preview of remaining products with subscribe overlay */}
+        {hasHiddenItems && (
+          <div style={{ position: 'relative' }}>
+            {/* Blurred preview rows */}
+            <div style={{ 
+              filter: 'blur(6px)', 
+              opacity: 0.5,
+              pointerEvents: 'none',
+              userSelect: 'none'
+            }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <tbody>
+                  {items.slice(1, 4).map((item, index) => (
+                    <tr 
+                      key={item.id}
+                      style={{
+                        borderBottom: '1px solid #f1f3f4',
+                        backgroundColor: index % 2 === 0 ? '#ffffff' : '#fafbfc'
+                      }}
+                    >
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ height: '40px', background: '#e1e3e5', borderRadius: '4px', width: '150px' }} />
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'center' }}>
+                        <div style={{ height: '20px', background: '#e1e3e5', borderRadius: '4px', width: '40px', margin: '0 auto' }} />
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'center' }}>
+                        <div style={{ height: '20px', background: '#e1e3e5', borderRadius: '4px', width: '30px', margin: '0 auto' }} />
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'center' }}>
+                        <div style={{ height: '24px', background: '#e1e3e5', borderRadius: '12px', width: '60px', margin: '0 auto' }} />
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'center' }}>
+                        <div style={{ height: '24px', background: '#e1e3e5', borderRadius: '12px', width: '50px', margin: '0 auto' }} />
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'center' }}>
+                        <div style={{ height: '28px', background: '#e1e3e5', borderRadius: '4px', width: '80px', margin: '0 auto' }} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Subscribe overlay */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'linear-gradient(to bottom, rgba(255,255,255,0.8), rgba(255,255,255,0.95))',
+              borderRadius: '8px',
+              padding: '24px'
+            }}>
+              <div style={{
+                background: '#fff',
+                borderRadius: '12px',
+                padding: '24px 32px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                textAlign: 'center',
+                maxWidth: '400px'
+              }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <Icon source={LockIcon} tone="base" />
+                </div>
+                <Text as="h3" variant="headingMd" fontWeight="bold">
+                  Unlock Full Forecasting
+                </Text>
+                <Box paddingBlockStart="200" paddingBlockEnd="300">
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    Subscribe to view forecasting data for all {items.length} products
+                  </Text>
+                </Box>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    if (managedPricingUrl) {
+                      window.open(managedPricingUrl, '_top');
+                    }
+                  }}
+                >
+                  Subscribe Now
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };

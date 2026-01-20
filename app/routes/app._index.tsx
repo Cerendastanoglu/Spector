@@ -8,6 +8,7 @@ import {
   Text,
   Card,
   BlockStack,
+  Banner,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { AppHeader } from "../components/AppHeader";
@@ -31,7 +32,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     shop
   );
   
-  // Fetch shop information
+  // Fetch shop information including plan details for dev store detection
   try {
     const response = await admin.graphql(
       `#graphql
@@ -42,6 +43,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             myshopifyDomain
             primaryDomain {
               host
+            }
+            plan {
+              partnerDevelopment
+              displayName
+              shopifyPlus
             }
           }
         }`
@@ -129,12 +135,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       forecastingData = null;
     }
     
+    // Extract shop plan details for dev store detection
+    const shopData = data.data?.shop || null;
+    const isDevelopmentStore = shopData?.plan?.partnerDevelopment === true;
+    const shopPlanDisplayName = shopData?.plan?.displayName || 'Unknown';
+    const isShopifyPlus = shopData?.plan?.shopifyPlus === true;
+    
     return {
-      shop: data.data?.shop || null,
+      shop: shopData,
       hasSeenWelcomeModal: false, // Hardcoded since UserPreferences removed
       productAnalytics, // ← Pass analytics data directly
       initialProducts, // ← Pass products data directly
       forecastingData, // ← Pass forecasting data directly
+      // Store type info
+      storeType: {
+        isDevelopmentStore,
+        planDisplayName: shopPlanDisplayName,
+        isShopifyPlus,
+      },
       subscription: {
         status: shopifySubscription?.status || 'none',
         hasAccess,
@@ -155,6 +173,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           trialDays: fullSubscription.trialDays,
         } : null,
         hasActiveSubscription,
+        isDevelopmentStore, // ← Pass dev store flag to settings
+        shopPlanDisplayName, // ← Pass plan name to settings
         error,
         managedPricingUrl: getManagedPricingUrl(shop),
       },
@@ -167,6 +187,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       productAnalytics: null,
       initialProducts: null,
       forecastingData: null,
+      storeType: {
+        isDevelopmentStore: false,
+        planDisplayName: 'Unknown',
+        isShopifyPlus: false,
+      },
       subscription: {
         status: 'error',
         hasAccess: true, // Allow access on error
@@ -177,6 +202,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       settingsData: {
         subscription: null,
         hasActiveSubscription: false,
+        isDevelopmentStore: false,
+        shopPlanDisplayName: 'Unknown',
         error: 'Failed to load subscription data',
         managedPricingUrl: getManagedPricingUrl(shop),
       },
@@ -248,7 +275,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Index() {
-  const { shop, hasSeenWelcomeModal, subscription, settingsData, productAnalytics, initialProducts, forecastingData } = useLoaderData<typeof loader>();
+  const { shop, hasSeenWelcomeModal, subscription, settingsData, productAnalytics, initialProducts, forecastingData, storeType } = useLoaderData<typeof loader>();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [outOfStockCount] = useState(0);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
@@ -321,11 +348,20 @@ export default function Index() {
             initialProducts={initialProducts}
             subscriptionStatus={settingsData.hasActiveSubscription ? 'active' : (subscription.status === 'ACTIVE' ? 'active' : 'trialing')}
             hasActiveSubscription={settingsData.hasActiveSubscription}
+            isDevelopmentStore={storeType?.isDevelopmentStore || false}
           />
         );
 
       case "forecasting":
-        return <ForecastingTab shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} initialForecastData={forecastingData} />;
+        return (
+          <ForecastingTab 
+            shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} 
+            initialForecastData={forecastingData}
+            isTrialMode={!settingsData.hasActiveSubscription}
+            isDevelopmentStore={storeType?.isDevelopmentStore || false}
+            managedPricingUrl={settingsData?.managedPricingUrl}
+          />
+        );
 
       case "help":
         return <Help isVisible={true} />;
@@ -343,6 +379,9 @@ export default function Index() {
             subscription={settingsData.subscription}
             hasActiveSubscription={settingsData.hasActiveSubscription}
             error={settingsData.error}
+            isDevelopmentStore={storeType?.isDevelopmentStore || false}
+            shopPlanDisplayName={storeType?.planDisplayName || 'Unknown'}
+            managedPricingUrl={settingsData?.managedPricingUrl}
           />
         );
       default:
@@ -377,6 +416,26 @@ export default function Index() {
             }
           }}
         />
+        
+        {/* Trial/Dev Store Banner - Show relevant info based on store type */}
+        {!settingsData?.hasActiveSubscription && (
+          <Banner
+            title={storeType?.isDevelopmentStore 
+              ? "You're using a Development Store" 
+              : "You're on a 3-day free trial"}
+            tone={storeType?.isDevelopmentStore ? "info" : "warning"}
+            action={{
+              content: 'View Plans & Subscribe',
+              onAction: () => handleTabChange('settings'),
+            }}
+          >
+            <p>
+              {storeType?.isDevelopmentStore 
+                ? "Development stores have full access to all features for testing. Subscriptions are free on dev stores - test the billing flow before going live!"
+                : "During the trial, you can select up to 10 products for inventory forecasting. Subscribe to unlock unlimited product tracking and all premium features."}
+            </p>
+          </Banner>
+        )}
         
         <Layout>
           <Layout.Section>

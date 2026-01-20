@@ -353,7 +353,7 @@ export function WelcomeModal({
       ]}
     >
       <Modal.Section>
-        <BlockStack gap="300">
+        <BlockStack gap="200">
           {/* Icon/Logo and Title */}
           <BlockStack gap="200" align="center">
             {currentSlideData.isLogoSlide ? (

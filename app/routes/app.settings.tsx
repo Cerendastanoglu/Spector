@@ -34,6 +34,33 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     shop
   );
   
+  // Get shop plan info for store type detection
+  let isDevelopmentStore = false;
+  let shopPlanDisplayName = 'Unknown';
+  let isShopifyPlus = false;
+  
+  try {
+    const shopResponse = await admin.graphql(
+      `#graphql
+        query getShopPlan {
+          shop {
+            plan {
+              partnerDevelopment
+              displayName
+              shopifyPlus
+            }
+          }
+        }`
+    );
+    const shopData = await shopResponse.json();
+    isDevelopmentStore = shopData.data?.shop?.plan?.partnerDevelopment === true;
+    shopPlanDisplayName = shopData.data?.shop?.plan?.displayName || 'Unknown';
+    isShopifyPlus = shopData.data?.shop?.plan?.shopifyPlus === true;
+    logger.info('[Settings] Shop plan:', { isDevelopmentStore, shopPlanDisplayName, isShopifyPlus });
+  } catch (planError) {
+    logger.error('[Settings] Error fetching shop plan:', planError);
+  }
+  
   logger.info('[Settings] Subscription status:', { hasActiveSubscription, error });
 
   return json({
@@ -49,13 +76,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       trialDays: subscription.trialDays,
     } : null,
     hasActiveSubscription,
+    isDevelopmentStore,
+    shopPlanDisplayName,
+    isShopifyPlus,
     error,
     managedPricingUrl: getManagedPricingUrl(shop),
   });
 };
 
 export default function Settings() {
-  const { subscription, hasActiveSubscription, error, managedPricingUrl } = useLoaderData<typeof loader>();
+  const { subscription, hasActiveSubscription, isDevelopmentStore, shopPlanDisplayName, error, managedPricingUrl } = useLoaderData<typeof loader>();
 
   const handleManageSubscription = () => {
     if (managedPricingUrl) {
@@ -78,6 +108,13 @@ export default function Settings() {
       default:
         return <Badge tone="info">Free Trial</Badge>;
     }
+  };
+  
+  const getStoreTypeBadge = () => {
+    if (isDevelopmentStore) {
+      return <Badge tone="info">Development Store</Badge>;
+    }
+    return <Badge tone="success">{shopPlanDisplayName || 'Live Store'}</Badge>;
   };
 
   const formatDate = (dateString: string | undefined) => {
@@ -137,6 +174,14 @@ export default function Settings() {
                   <Divider />
 
                   <BlockStack gap="400">
+                    {/* Store Type */}
+                    <InlineStack align="space-between" blockAlign="center">
+                      <Text as="p" variant="bodyMd" tone="subdued">
+                        Store Type
+                      </Text>
+                      {getStoreTypeBadge()}
+                    </InlineStack>
+
                     {/* Plan Name */}
                     <InlineStack align="space-between" blockAlign="center">
                       <Text as="p" variant="bodyMd" tone="subdued">
@@ -200,16 +245,6 @@ export default function Settings() {
                           Trial Days Remaining
                         </Text>
                         <Badge tone="attention">{`${subscription.trialDays} days left`}</Badge>
-                      </InlineStack>
-                    )}
-
-                    {/* Test Mode Badge */}
-                    {subscription?.test && (
-                      <InlineStack align="space-between" blockAlign="center">
-                        <Text as="p" variant="bodyMd" tone="subdued">
-                          Environment
-                        </Text>
-                        <Badge tone="info">Development Store (Test Mode)</Badge>
                       </InlineStack>
                     )}
                   </BlockStack>

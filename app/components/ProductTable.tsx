@@ -314,7 +314,7 @@ export function ProductTable({
           </tr>
         </thead>
         <tbody>
-          {products.map((product) => {
+          {products.map((product, index) => {
             const isExpanded = expandedProducts.has(product.id);
             const hasMultipleVariants = product.variants?.edges?.length > 1;
             const selectionState = getProductSelectionState(product.id);

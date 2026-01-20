@@ -249,10 +249,13 @@ export async function checkAccess(
  * - View billing history
  * - Cancel subscription
  * 
- * Format: https://{shop}/admin/charges/{app_id}/pricing_plans
+ * Format: https://admin.shopify.com/store/{store_handle}/charges/{app_handle}/pricing_plans
+ * Note: store_handle is the shop name without .myshopify.com (e.g., "mystore" from "mystore.myshopify.com")
  */
 export function getManagedPricingUrl(shop: string): string {
-  // App ID from shopify.app.toml (client_id)
-  const appId = '035bb80387ae6ea29247c8d0b706f67a';
-  return `https://${shop}/admin/charges/${appId}/pricing_plans`;
+  // App handle from shopify.app.toml
+  const appHandle = 'spector';
+  // Extract store handle from shop domain (remove .myshopify.com)
+  const storeHandle = shop.replace('.myshopify.com', '');
+  return `https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`;
 }

@@ -16,11 +16,11 @@
   z-index: 1000 !important;
   pointer-events: auto !important;
   margin-top: 0 !important;
-  padding-top: 16px !important;
+  padding-top: 12px !important;
 }
 
 :global(.Polaris-Modal-Section) {
-  padding-bottom: 0 !important;
+  padding-bottom: 8px !important;
 }
 
 :global(.Polaris-Modal-Body) {

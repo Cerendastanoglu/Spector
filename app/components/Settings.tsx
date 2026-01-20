@@ -8,6 +8,7 @@ import {
   Divider,
   Banner,
   Icon,
+  Button,
 } from "@shopify/polaris";
 import { CreditCardIcon, CalendarIcon, CheckIcon } from "@shopify/polaris-icons";
 import styles from "../styles/settings.module.css";
@@ -27,13 +28,25 @@ interface SettingsProps {
   subscription: Subscription | null;
   hasActiveSubscription: boolean;
   error?: string;
+  isDevelopmentStore?: boolean;
+  shopPlanDisplayName?: string;
+  managedPricingUrl?: string;
 }
 
 export function Settings({
   subscription,
   hasActiveSubscription,
   error,
+  isDevelopmentStore = false,
+  shopPlanDisplayName = 'Unknown',
+  managedPricingUrl,
 }: SettingsProps) {
+  
+  const handleManageSubscription = () => {
+    if (managedPricingUrl) {
+      window.open(managedPricingUrl, '_top');
+    }
+  };
   const getStatusBadge = (status: string) => {
     switch (status?.toUpperCase()) {
       case 'ACTIVE':
@@ -49,6 +62,13 @@ export function Settings({
       default:
         return <Badge tone="info">Free Trial</Badge>;
     }
+  };
+  
+  const getStoreTypeBadge = () => {
+    if (isDevelopmentStore) {
+      return <Badge tone="info">Development Store</Badge>;
+    }
+    return <Badge tone="success">{shopPlanDisplayName || 'Live Store'}</Badge>;
   };
 
   const formatDate = (dateString: string | undefined) => {
@@ -104,6 +124,14 @@ export function Settings({
                 <Divider />
 
                 <BlockStack gap="400">
+                  {/* Store Type */}
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      Store Type
+                    </Text>
+                    {getStoreTypeBadge()}
+                  </InlineStack>
+
                   {/* Plan Name */}
                   <InlineStack align="space-between" blockAlign="center">
                     <Text as="p" variant="bodyMd" tone="subdued">
@@ -170,15 +198,18 @@ export function Settings({
                     </InlineStack>
                   )}
 
-                  {/* Test Mode Badge */}
-                  {subscription?.test && (
-                    <InlineStack align="space-between" blockAlign="center">
-                      <Text as="p" variant="bodyMd" tone="subdued">
-                        Environment
-                      </Text>
-                      <Badge tone="info">Development Store (Test Mode)</Badge>
-                    </InlineStack>
-                  )}
+                  {/* Subscribe/Manage Button */}
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      {hasActiveSubscription ? 'Manage Plan' : 'Subscribe'}
+                    </Text>
+                    <Button
+                      variant={hasActiveSubscription ? "secondary" : "primary"}
+                      onClick={handleManageSubscription}
+                    >
+                      {hasActiveSubscription ? 'Manage Subscription' : 'Subscribe Now'}
+                    </Button>
+                  </InlineStack>
                 </BlockStack>
               </BlockStack>
             </Card>
