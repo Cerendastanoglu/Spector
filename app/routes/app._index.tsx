@@ -2,6 +2,7 @@ import { logger } from "~/utils/logger";
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
+import { defer } from "@remix-run/node";
 import {
   Page,
   Layout,
@@ -12,6 +13,7 @@ import {
   Collapsible,
   Button,
   InlineStack,
+  SkeletonBodyText,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { AppHeader } from "../components/AppHeader";
@@ -20,24 +22,22 @@ import { Help } from "../components/Help";
 import { Settings } from "../components/Settings";
 import { ForecastingTab } from "../components/ForecastingTab";
 import { OptimizedComponents, useComponentPreloader } from "../utils/lazyLoader";
-import { checkAccess, checkSubscriptionStatus, getManagedPricingUrl } from "../services/billing.server";
+import { checkSubscriptionStatus, getManagedPricingUrl } from "../services/billing.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const startTime = Date.now();
+  logger.info("🔵 Main Loader: Starting...");
+  
   const { admin, session } = await authenticate.admin(request);
   const shop = session.shop;
+  logger.info(`🔵 Main Loader: Auth completed in ${Date.now() - startTime}ms`);
   
-  // Check subscription status from Shopify (Managed Pricing)
-  const { hasAccess, subscription: shopifySubscription } = await checkAccess(admin.graphql, shop);
-  
-  // Get full subscription details for settings page
-  const { hasActiveSubscription, subscription: fullSubscription, error } = await checkSubscriptionStatus(
-    admin.graphql,
-    shop
-  );
-  
-  // Fetch shop information including plan details for dev store detection
-  try {
-    const response = await admin.graphql(
+  // Run critical queries in PARALLEL for fast initial load
+  const [subscriptionResult, shopResponse] = await Promise.all([
+    // 1. Check subscription status (single call, not two!)
+    checkSubscriptionStatus(admin.graphql, shop),
+    // 2. Fetch shop info for dev store detection
+    admin.graphql(
       `#graphql
         query getShop {
           shop {
@@ -54,164 +54,63 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             }
           }
         }`
-    );
-    
-    const data = await response.json();
-    
-    // Load product analytics directly in loader
-    let productAnalytics = null;
-    try {
-      logger.info("🔵 Main Loader: Fetching product analytics...");
-      const analyticsModule = await import("./app.api.product-analytics");
-      // Call the loader function from product-analytics route
-      const analyticsResponse = await analyticsModule.loader({ request } as any);
-      
-      // Check if response is a redirect (session expired)
-      if (analyticsResponse.status === 302 || analyticsResponse.status === 301) {
-        logger.warn('🟡 Main Loader: Analytics request redirected (likely session expired), skipping...');
-        productAnalytics = null;
-      } else if (!analyticsResponse.ok) {
-        logger.error(`🔴 Main Loader: Analytics request failed with status ${analyticsResponse.status}`);
-        productAnalytics = null;
-      } else {
-        const analyticsJson = await analyticsResponse.json();
-        productAnalytics = analyticsJson.success ? analyticsJson.data : null;
-        logger.info("🔵 Main Loader: Product analytics loaded successfully");
-      }
-    } catch (err) {
-      logger.error('🔴 Main Loader: Error loading product analytics:', err instanceof Error ? err.message : 'Unknown error');
-      productAnalytics = null;
-    }
-    
-    // Load products directly in loader
-    let initialProducts = null;
-    try {
-      logger.info("🔵 Main Loader: Fetching products...");
-      const productsModule = await import("./app.api.products");
-      // Call the action function with get-all-products action
-      const formData = new FormData();
-      formData.append('action', 'get-all-products');
-      const productsRequest = new Request(request.url, {
-        method: 'POST',
-        body: formData,
-      });
-      const productsResponse = await productsModule.action({ request: productsRequest } as any);
-      
-      // Check if response is a redirect (session expired)
-      if (productsResponse.status === 302 || productsResponse.status === 301) {
-        logger.warn('🟡 Main Loader: Products request redirected (likely session expired), skipping...');
-        initialProducts = null;
-      } else if (!productsResponse.ok) {
-        logger.error(`🔴 Main Loader: Products request failed with status ${productsResponse.status}`);
-        initialProducts = null;
-      } else {
-        const productsJson = await productsResponse.json();
-        initialProducts = productsJson.products || null;
-        logger.info("🔵 Main Loader: Products loaded successfully");
-      }
-    } catch (err) {
-      logger.error('🔴 Main Loader: Error loading products:', err instanceof Error ? err.message : 'Unknown error');
-      initialProducts = null;
-    }
-    
-    // Load forecasting data directly in loader
-    let forecastingData = null;
-    try {
-      logger.info("🔵 Main Loader: Fetching forecasting data...");
-      const forecastingModule = await import("./app.api.inventory-forecasting");
-      const forecastingResponse = await forecastingModule.loader({ request } as any);
-      
-      // Check if response is a redirect (session expired)
-      if (forecastingResponse.status === 302 || forecastingResponse.status === 301) {
-        logger.warn('🟡 Main Loader: Forecasting request redirected (likely session expired), skipping...');
-        forecastingData = null;
-      } else if (!forecastingResponse.ok) {
-        logger.error(`🔴 Main Loader: Forecasting request failed with status ${forecastingResponse.status}`);
-        forecastingData = null;
-      } else {
-        const forecastingJson = await forecastingResponse.json();
-        forecastingData = (forecastingJson.success && 'data' in forecastingJson) ? forecastingJson.data : null;
-        logger.info("🔵 Main Loader: Forecasting data loaded successfully");
-      }
-    } catch (err) {
-      logger.error('🔴 Main Loader: Error loading forecasting data:', err instanceof Error ? err.message : 'Unknown error');
-      forecastingData = null;
-    }
-    
-    // Extract shop plan details for dev store detection
-    const shopData = data.data?.shop || null;
-    const isDevelopmentStore = shopData?.plan?.partnerDevelopment === true;
-    const shopPlanDisplayName = shopData?.plan?.displayName || 'Unknown';
-    const isShopifyPlus = shopData?.plan?.shopifyPlus === true;
-    
-    return {
-      shop: shopData,
-      hasSeenWelcomeModal: false, // Hardcoded since UserPreferences removed
-      productAnalytics, // ← Pass analytics data directly
-      initialProducts, // ← Pass products data directly
-      forecastingData, // ← Pass forecasting data directly
-      // Store type info
-      storeType: {
-        isDevelopmentStore,
-        planDisplayName: shopPlanDisplayName,
-        isShopifyPlus,
-      },
-      subscription: {
-        status: shopifySubscription?.status || 'none',
-        hasAccess,
-        planName: shopifySubscription?.name || 'Spector Basic',
-        price: shopifySubscription?.lineItems[0]?.plan?.pricingDetails?.price?.amount || '9.99',
-        currency: shopifySubscription?.lineItems[0]?.plan?.pricingDetails?.price?.currencyCode || 'USD',
-      },
-      // Settings data
-      settingsData: {
-        subscription: fullSubscription ? {
-          id: fullSubscription.id,
-          name: fullSubscription.name,
-          status: fullSubscription.status,
-          price: fullSubscription.lineItems[0]?.plan?.pricingDetails?.price?.amount,
-          currency: fullSubscription.lineItems[0]?.plan?.pricingDetails?.price?.currencyCode,
-          currentPeriodEnd: fullSubscription.currentPeriodEnd,
-          test: fullSubscription.test,
-          trialDays: fullSubscription.trialDays,
-        } : null,
-        hasActiveSubscription,
-        isDevelopmentStore, // ← Pass dev store flag to settings
-        shopPlanDisplayName, // ← Pass plan name to settings
-        error,
-        managedPricingUrl: getManagedPricingUrl(shop),
-      },
-    };
-  } catch (error) {
-    logger.error('Error fetching shop data:', error);
-    return { 
-      shop: null,
-      hasSeenWelcomeModal: false,
-      productAnalytics: null,
-      initialProducts: null,
-      forecastingData: null,
-      storeType: {
-        isDevelopmentStore: false,
-        planDisplayName: 'Unknown',
-        isShopifyPlus: false,
-      },
-      subscription: {
-        status: 'error',
-        hasAccess: true, // Allow access on error
-        planName: 'Spector Basic',
-        price: '9.99',
-        currency: 'USD',
-      },
-      settingsData: {
-        subscription: null,
-        hasActiveSubscription: false,
-        isDevelopmentStore: false,
-        shopPlanDisplayName: 'Unknown',
-        error: 'Failed to load subscription data',
-        managedPricingUrl: getManagedPricingUrl(shop),
-      },
-    };
-  }
+    ),
+  ]);
+  
+  logger.info(`🔵 Main Loader: Core queries completed in ${Date.now() - startTime}ms`);
+  
+  const { hasActiveSubscription, subscription: fullSubscription, error } = subscriptionResult;
+  const shopData = (await shopResponse.json()).data?.shop || null;
+  
+  // Extract shop plan details for dev store detection
+  const isDevelopmentStore = shopData?.plan?.partnerDevelopment === true;
+  const shopPlanDisplayName = shopData?.plan?.displayName || 'Unknown';
+  const isShopifyPlus = shopData?.plan?.shopifyPlus === true;
+  
+  // Determine access based on subscription or dev store
+  const hasAccess = hasActiveSubscription || isDevelopmentStore;
+  
+  // Return core data FAST - heavy data (products, analytics, forecasting) will be loaded client-side
+  // This dramatically improves initial page load time
+  const coreData = {
+    shop: shopData,
+    hasSeenWelcomeModal: false,
+    productAnalytics: null, // Loaded on-demand via fetcher
+    initialProducts: null,  // Loaded on-demand via fetcher
+    forecastingData: null,  // Loaded on-demand via fetcher
+    storeType: {
+      isDevelopmentStore,
+      planDisplayName: shopPlanDisplayName,
+      isShopifyPlus,
+    },
+    subscription: {
+      status: fullSubscription?.status || 'none',
+      hasAccess,
+      planName: fullSubscription?.name || 'Spector Basic',
+      price: fullSubscription?.lineItems[0]?.plan?.pricingDetails?.price?.amount || '9.99',
+      currency: fullSubscription?.lineItems[0]?.plan?.pricingDetails?.price?.currencyCode || 'USD',
+    },
+    settingsData: {
+      subscription: fullSubscription ? {
+        id: fullSubscription.id,
+        name: fullSubscription.name,
+        status: fullSubscription.status,
+        price: fullSubscription.lineItems[0]?.plan?.pricingDetails?.price?.amount,
+        currency: fullSubscription.lineItems[0]?.plan?.pricingDetails?.price?.currencyCode,
+        currentPeriodEnd: fullSubscription.currentPeriodEnd,
+        test: fullSubscription.test,
+        trialDays: fullSubscription.trialDays,
+      } : null,
+      hasActiveSubscription,
+      isDevelopmentStore,
+      shopPlanDisplayName,
+      error,
+      managedPricingUrl: getManagedPricingUrl(shop),
+    },
+  };
+  
+  logger.info(`🔵 Main Loader: TOTAL time ${Date.now() - startTime}ms (fast path - data loaded client-side)`);
+  return coreData;
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
