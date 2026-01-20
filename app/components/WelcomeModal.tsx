@@ -325,9 +325,9 @@ export function WelcomeModal({
             z-index: 10001 !important;
           }
           
-          /* Ensure modal content doesn't overlap footer */
+          /* Remove extra padding from modal section */
           .Polaris-Modal-Section {
-            padding-bottom: 80px !important;
+            padding-bottom: 16px !important;
           }
         `
       }} />

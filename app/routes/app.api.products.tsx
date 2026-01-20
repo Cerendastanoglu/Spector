@@ -2040,5 +2040,601 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
+  // Update shipping settings (weight, country of origin, HS code, physical product)
+  if (actionType === "update-shipping") {
+    try {
+      const {
+        variantIds,
+        requiresShipping,
+        weight,
+        weightUnit,
+        countryCodeOfOrigin,
+        harmonizedSystemCode
+      } = requestData;
+
+      console.log('📦 Shipping Update Request:', {
+        variantCount: variantIds?.length,
+        requiresShipping,
+        weight,
+        weightUnit,
+        countryCodeOfOrigin,
+        harmonizedSystemCode
+      });
+
+      if (!variantIds || !Array.isArray(variantIds) || variantIds.length === 0) {
+        return json({ error: "Variant IDs are required" }, { status: 400 });
+      }
+
+      // Check if there's anything to update
+      const hasWeightUpdate = weight !== null && weight !== undefined && weight > 0;
+      const hasPhysicalProductUpdate = requiresShipping !== null && requiresShipping !== undefined;
+      const hasCountryUpdate = countryCodeOfOrigin && countryCodeOfOrigin.length > 0;
+      const hasHsCodeUpdate = harmonizedSystemCode && harmonizedSystemCode.length > 0;
+
+      if (!hasWeightUpdate && !hasPhysicalProductUpdate && !hasCountryUpdate && !hasHsCodeUpdate) {
+        return json({ error: "No shipping fields to update" }, { status: 400 });
+      }
+
+      // Fetch inventory item IDs for all variants
+      const BATCH_SIZE = 50;
+      const allVariantsData: any[] = [];
+
+      for (let i = 0; i < variantIds.length; i += BATCH_SIZE) {
+        const batchIds = variantIds.slice(i, i + BATCH_SIZE);
+
+        const variantQueries = batchIds.map((id: string, index: number) => {
+          return `
+            variant${index}: productVariant(id: "${id}") {
+              id
+              title
+              inventoryItem {
+                id
+                requiresShipping
+                countryCodeOfOrigin
+                harmonizedSystemCode
+                measurement {
+                  weight {
+                    value
+                    unit
+                  }
+                }
+              }
+              product {
+                id
+                title
+              }
+            }
+          `;
+        }).join('\n');
+
+        const batchResponse = await admin.graphql(`#graphql
+          query getBatchVariantsShipping {
+            ${variantQueries}
+          }
+        `);
+
+        const batchJson: any = await batchResponse.json();
+
+        if (batchJson.errors) {
+          console.error('Error fetching variants for shipping:', batchJson.errors);
+          continue;
+        }
+
+        Object.values(batchJson.data || {}).forEach((variant: any) => {
+          if (variant) {
+            allVariantsData.push(variant);
+          }
+        });
+      }
+
+      console.log(`📊 Fetched ${allVariantsData.length} variants for shipping update`);
+
+      // Update each inventory item
+      const results: any[] = [];
+
+      for (const variant of allVariantsData) {
+        const inventoryItemId = variant.inventoryItem?.id;
+        if (!inventoryItemId) {
+          console.warn(`⚠️ No inventory item found for variant ${variant.id}`);
+          results.push({
+            variantId: variant.id,
+            success: false,
+            error: 'No inventory item found'
+          });
+          continue;
+        }
+
+        try {
+          // Build the input object only with fields that should be updated
+          const input: any = {};
+
+          if (hasPhysicalProductUpdate) {
+            input.requiresShipping = requiresShipping;
+          }
+
+          if (hasCountryUpdate) {
+            input.countryCodeOfOrigin = countryCodeOfOrigin;
+          }
+
+          if (hasHsCodeUpdate) {
+            input.harmonizedSystemCode = harmonizedSystemCode;
+          }
+
+          if (hasWeightUpdate) {
+            input.measurement = {
+              weight: {
+                value: weight,
+                unit: weightUnit || 'KILOGRAMS'
+              }
+            };
+          }
+
+          console.log(`📝 Updating inventory item ${inventoryItemId} with:`, input);
+
+          const updateResponse = await admin.graphql(
+            `#graphql
+              mutation inventoryItemUpdate($id: ID!, $input: InventoryItemInput!) {
+                inventoryItemUpdate(id: $id, input: $input) {
+                  inventoryItem {
+                    id
+                    requiresShipping
+                    countryCodeOfOrigin
+                    harmonizedSystemCode
+                    measurement {
+                      weight {
+                        value
+                        unit
+                      }
+                    }
+                  }
+                  userErrors {
+                    field
+                    message
+                  }
+                }
+              }`,
+            {
+              variables: {
+                id: inventoryItemId,
+                input
+              }
+            }
+          );
+
+          const updateJson: any = await updateResponse.json();
+
+          if (updateJson.errors) {
+            console.error(`❌ GraphQL errors for ${variant.id}:`, updateJson.errors);
+            results.push({
+              variantId: variant.id,
+              success: false,
+              error: updateJson.errors.map((e: any) => e.message).join(', ')
+            });
+          } else if (updateJson.data?.inventoryItemUpdate?.userErrors?.length > 0) {
+            const errors = updateJson.data.inventoryItemUpdate.userErrors;
+            console.warn(`⚠️ User errors for ${variant.id}:`, errors);
+            results.push({
+              variantId: variant.id,
+              success: false,
+              error: errors.map((e: any) => e.message).join(', ')
+            });
+          } else {
+            const updatedItem = updateJson.data?.inventoryItemUpdate?.inventoryItem;
+            console.log(`✅ Shipping updated for variant ${variant.id}`);
+            results.push({
+              variantId: variant.id,
+              success: true,
+              requiresShipping: updatedItem?.requiresShipping,
+              countryCodeOfOrigin: updatedItem?.countryCodeOfOrigin,
+              harmonizedSystemCode: updatedItem?.harmonizedSystemCode,
+              weight: updatedItem?.measurement?.weight
+            });
+          }
+        } catch (error) {
+          console.error(`❌ Error updating shipping for variant ${variant.id}:`, error);
+          results.push({
+            variantId: variant.id,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+
+      console.log(`✅ Shipping update completed: ${successful} successful, ${failed} failed`);
+
+      return json({
+        success: failed === 0,
+        results,
+        successful,
+        failed
+      });
+
+    } catch (error) {
+      console.error('Error updating shipping:', error);
+      return json({
+        error: `Failed to update shipping: ${error instanceof Error ? error.message : 'Unknown error'}`
+      }, { status: 500 });
+    }
+  }
+
+  // Duplicate a product with a new title
+  if (actionType === "duplicate-product") {
+    try {
+      const productId = requestData instanceof FormData 
+        ? requestData.get("productId")?.toString() 
+        : requestData.productId;
+      const newTitle = requestData instanceof FormData 
+        ? requestData.get("newTitle")?.toString() 
+        : requestData.newTitle;
+
+      if (!productId) {
+        return json({ error: "Product ID is required" }, { status: 400 });
+      }
+
+      logger.info(`🔵 Duplicating product ${productId} with title: ${newTitle}`);
+
+      // Use Shopify's productDuplicate mutation
+      const response = await admin.graphql(
+        `#graphql
+          mutation productDuplicate($productId: ID!, $newTitle: String!) {
+            productDuplicate(
+              productId: $productId,
+              newTitle: $newTitle
+            ) {
+              newProduct {
+                id
+                title
+                handle
+                status
+              }
+              userErrors {
+                field
+                message
+              }
+            }
+          }`,
+        {
+          variables: {
+            productId,
+            newTitle: newTitle || "Copy"
+          }
+        }
+      );
+
+      const responseJson: any = await response.json();
+      
+      if (responseJson.errors) {
+        logger.error("🔴 GraphQL Errors:", responseJson.errors);
+        return json({ error: "Failed to duplicate product", details: responseJson.errors }, { status: 500 });
+      }
+
+      const result = responseJson.data?.productDuplicate;
+      
+      if (result?.userErrors && result.userErrors.length > 0) {
+        logger.error("🔴 User Errors:", result.userErrors);
+        return json({ 
+          error: "Failed to duplicate product", 
+          details: result.userErrors.map((e: any) => e.message).join(', ')
+        }, { status: 400 });
+      }
+
+      logger.info(`✅ Product duplicated successfully: ${result?.newProduct?.title}`);
+      
+      return json({
+        success: true,
+        newProduct: result?.newProduct
+      });
+
+    } catch (error) {
+      logger.error('Error duplicating product:', error);
+      return json({ 
+        error: `Failed to duplicate product: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      }, { status: 500 });
+    }
+  }
+
+  // Add variants to products using productVariantsBulkCreate
+  if (actionType === "add-variants") {
+    try {
+      const { productIds, options } = requestData;
+
+      console.log('🎨 Add Variants Request:', {
+        productCount: productIds?.length,
+        options
+      });
+
+      if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
+        return json({ error: "Product IDs are required" }, { status: 400 });
+      }
+
+      if (!options || !Array.isArray(options) || options.length === 0) {
+        return json({ error: "At least one option is required" }, { status: 400 });
+      }
+
+      // Validate options structure and normalize option names
+      // Shopify recognizes standard option names: Color, Size, Material, Style, Title
+      const normalizeOptionName = (name: string): string => {
+        const trimmed = name.trim();
+        // Capitalize first letter of each word to match Shopify's standard format
+        return trimmed.split(' ').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        ).join(' ');
+      };
+
+      for (const opt of options) {
+        if (!opt.name || typeof opt.name !== 'string' || !opt.name.trim()) {
+          return json({ error: "Each option must have a name" }, { status: 400 });
+        }
+        if (!opt.values || !Array.isArray(opt.values) || opt.values.length === 0) {
+          return json({ error: `Option "${opt.name}" must have at least one value` }, { status: 400 });
+        }
+      }
+
+      // Normalize option names to match Shopify's expected format
+      const normalizedOptions = options.map(opt => ({
+        name: normalizeOptionName(opt.name),
+        values: opt.values.map((v: string) => v.trim()).filter((v: string) => v)
+      }));
+
+      // Generate all variant combinations from normalized options
+      const generateCombinations = (opts: Array<{name: string, values: string[]}>): Array<{[key: string]: string}> => {
+        if (opts.length === 0) return [{}];
+        
+        const [first, ...rest] = opts;
+        const subCombinations = generateCombinations(rest);
+        const combinations: Array<{[key: string]: string}> = [];
+        
+        for (const value of first.values) {
+          for (const subCombo of subCombinations) {
+            combinations.push({ [first.name]: value, ...subCombo });
+          }
+        }
+        
+        return combinations;
+      };
+
+      const variantCombinations = generateCombinations(normalizedOptions);
+      console.log(`📊 Generated ${variantCombinations.length} variant combinations`);
+
+      const results: Array<{productId: string, success: boolean, error?: string, variantsCreated?: number}> = [];
+      let totalVariantsCreated = 0;
+
+      for (const productId of productIds) {
+        try {
+          // First, get existing product options and variants
+          const productResponse = await admin.graphql(`#graphql
+            query getProduct($id: ID!) {
+              product(id: $id) {
+                id
+                title
+                options {
+                  id
+                  name
+                  position
+                  values
+                }
+                variants(first: 100) {
+                  edges {
+                    node {
+                      id
+                      title
+                      selectedOptions {
+                        name
+                        value
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          `, {
+            variables: { id: productId }
+          });
+
+          const productJson: any = await productResponse.json();
+          
+          if (productJson.errors) {
+            console.error(`❌ Error fetching product ${productId}:`, productJson.errors);
+            results.push({
+              productId,
+              success: false,
+              error: productJson.errors.map((e: any) => e.message).join(', ')
+            });
+            continue;
+          }
+
+          const product = productJson.data?.product;
+          if (!product) {
+            results.push({
+              productId,
+              success: false,
+              error: 'Product not found'
+            });
+            continue;
+          }
+
+          console.log(`📦 Processing product: ${product.title}`);
+          console.log(`📦 Existing options:`, product.options);
+
+          // Check existing options - Shopify allows max 3 options
+          const existingOptions = product.options || [];
+          
+          // For products with only "Title" option (default), we can replace it
+          const hasOnlyDefaultOption = existingOptions.length === 1 && 
+            existingOptions[0].name === 'Title' && 
+            existingOptions[0].values.length === 1 && 
+            existingOptions[0].values[0] === 'Default Title';
+
+          // Check if we're adding new options or just values to existing (use normalized names)
+          const newOptionsNeeded = normalizedOptions.filter(opt => 
+            !existingOptions.some((existing: any) => 
+              existing.name.toLowerCase() === opt.name.toLowerCase()
+            )
+          );
+
+          const totalOptionsNeeded = hasOnlyDefaultOption ? 
+            normalizedOptions.length : 
+            existingOptions.length + newOptionsNeeded.length;
+
+          if (totalOptionsNeeded > 3) {
+            results.push({
+              productId,
+              success: false,
+              error: `Would exceed maximum of 3 options. Product has ${existingOptions.length}, trying to add ${newOptionsNeeded.length} new options.`
+            });
+            continue;
+          }
+
+          // Build variants to create with selected options (use normalized options)
+          const variantsToCreate = variantCombinations.map(combo => {
+            // Build the options array in order
+            const variantOptions: string[] = [];
+            for (const opt of normalizedOptions) {
+              variantOptions.push(combo[opt.name]);
+            }
+            return variantOptions;
+          });
+
+          // Get existing variant option combinations to avoid duplicates
+          const existingVariantKeys = new Set(
+            product.variants.edges.map((v: any) => 
+              v.node.selectedOptions.map((o: any) => o.value).join('|')
+            )
+          );
+
+          // Filter out variants that already exist
+          const newVariants = variantsToCreate.filter(optionValues => {
+            const key = optionValues.join('|');
+            return !existingVariantKeys.has(key);
+          });
+
+          if (newVariants.length === 0) {
+            console.log(`ℹ️ All variants already exist for product ${productId}`);
+            results.push({
+              productId,
+              success: true,
+              variantsCreated: 0
+            });
+            continue;
+          }
+
+          console.log(`📝 Creating ${newVariants.length} new variants for product ${productId}`);
+
+          // Use productVariantsBulkCreate with strategy REMOVE_STANDALONE_VARIANT
+          // This will automatically update product options based on variant options
+          // Note: optionName should match Shopify's standard option names (Color, Size, Material, etc.)
+          const variantsInput = newVariants.map(optionValues => ({
+            optionValues: normalizedOptions.map((opt, idx) => ({
+              optionName: opt.name,  // e.g., "Color", "Size", "Material"
+              name: optionValues[idx]  // e.g., "Red", "Small", "Cotton"
+            }))
+          }));
+
+          console.log(`📝 Variants input:`, JSON.stringify(variantsInput, null, 2));
+          console.log(`📝 Using strategy: ${hasOnlyDefaultOption ? 'REMOVE_STANDALONE_VARIANT' : 'DEFAULT'}`);
+
+          const createVariantsResponse = await admin.graphql(`#graphql
+            mutation productVariantsBulkCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!, $strategy: ProductVariantsBulkCreateStrategy) {
+              productVariantsBulkCreate(productId: $productId, variants: $variants, strategy: $strategy) {
+                product {
+                  id
+                  options {
+                    id
+                    name
+                    values
+                  }
+                }
+                productVariants {
+                  id
+                  title
+                  selectedOptions {
+                    name
+                    value
+                  }
+                }
+                userErrors {
+                  field
+                  message
+                  code
+                }
+              }
+            }
+          `, {
+            variables: {
+              productId,
+              variants: variantsInput,
+              strategy: hasOnlyDefaultOption ? 'REMOVE_STANDALONE_VARIANT' : 'DEFAULT'
+            }
+          });
+
+          const createVariantsJson: any = await createVariantsResponse.json();
+
+          console.log(`📥 Create variants response:`, JSON.stringify(createVariantsJson, null, 2));
+
+          if (createVariantsJson.errors) {
+            console.error(`❌ GraphQL errors creating variants for ${productId}:`, createVariantsJson.errors);
+            results.push({
+              productId,
+              success: false,
+              error: createVariantsJson.errors.map((e: any) => e.message).join(', ')
+            });
+            continue;
+          }
+
+          if (createVariantsJson.data?.productVariantsBulkCreate?.userErrors?.length > 0) {
+            const errors = createVariantsJson.data.productVariantsBulkCreate.userErrors;
+            console.error(`❌ User errors creating variants for ${productId}:`, errors);
+            results.push({
+              productId,
+              success: false,
+              error: errors.map((e: any) => `${e.field}: ${e.message}`).join(', ')
+            });
+            continue;
+          }
+
+          const createdVariants = createVariantsJson.data?.productVariantsBulkCreate?.productVariants || [];
+          totalVariantsCreated += createdVariants.length;
+          
+          console.log(`✅ Created ${createdVariants.length} variants for product ${productId}`);
+          
+          results.push({
+            productId,
+            success: true,
+            variantsCreated: createdVariants.length
+          });
+
+        } catch (error) {
+          console.error(`❌ Error processing product ${productId}:`, error);
+          results.push({
+            productId,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      const successfulProducts = results.filter(r => r.success);
+      const failedProducts = results.filter(r => !r.success);
+
+      console.log(`✅ Add variants completed: ${successfulProducts.length} successful, ${failedProducts.length} failed, ${totalVariantsCreated} variants created`);
+
+      return json({
+        success: failedProducts.length === 0,
+        updatedProducts: successfulProducts,
+        failedProducts,
+        totalVariantsCreated
+      });
+
+    } catch (error) {
+      console.error('Error adding variants:', error);
+      return json({
+        error: `Failed to add variants: ${error instanceof Error ? error.message : 'Unknown error'}`
+      }, { status: 500 });
+    }
+  }
+
   return json({ error: "Invalid action" }, { status: 400 });
 };

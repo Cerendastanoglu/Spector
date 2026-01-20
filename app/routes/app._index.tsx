@@ -2,18 +2,15 @@ import { logger } from "~/utils/logger";
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
-import { defer } from "@remix-run/node";
 import {
   Page,
   Layout,
   Text,
   Card,
   BlockStack,
-  Banner,
   Collapsible,
   Button,
   InlineStack,
-  SkeletonBodyText,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { AppHeader } from "../components/AppHeader";
@@ -23,6 +20,7 @@ import { Settings } from "../components/Settings";
 import { ForecastingTab } from "../components/ForecastingTab";
 import { OptimizedComponents, useComponentPreloader } from "../utils/lazyLoader";
 import { checkSubscriptionStatus, getManagedPricingUrl } from "../services/billing.server";
+import prisma from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const startTime = Date.now();
@@ -33,7 +31,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   logger.info(`🔵 Main Loader: Auth completed in ${Date.now() - startTime}ms`);
   
   // Run critical queries in PARALLEL for fast initial load
-  const [subscriptionResult, shopResponse] = await Promise.all([
+  const [subscriptionResult, shopResponse, userPrefs] = await Promise.all([
     // 1. Check subscription status (single call, not two!)
     checkSubscriptionStatus(admin.graphql, shop),
     // 2. Fetch shop info for dev store detection
@@ -55,12 +53,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           }
         }`
     ),
+    // 3. Check if user has seen welcome modal
+    prisma.userPreferences.findUnique({
+      where: { shop },
+      select: { hasSeenWelcomeModal: true }
+    }).catch(() => null), // Gracefully handle if table doesn't exist yet
   ]);
   
   logger.info(`🔵 Main Loader: Core queries completed in ${Date.now() - startTime}ms`);
   
   const { hasActiveSubscription, subscription: fullSubscription, error } = subscriptionResult;
   const shopData = (await shopResponse.json()).data?.shop || null;
+  
+  // Check welcome modal status from database (default to false = show modal)
+  const hasSeenWelcomeModal = userPrefs?.hasSeenWelcomeModal ?? false;
   
   // Extract shop plan details for dev store detection
   const isDevelopmentStore = shopData?.plan?.partnerDevelopment === true;
@@ -74,7 +80,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // This dramatically improves initial page load time
   const coreData = {
     shop: shopData,
-    hasSeenWelcomeModal: false,
+    hasSeenWelcomeModal,
     productAnalytics: null, // Loaded on-demand via fetcher
     initialProducts: null,  // Loaded on-demand via fetcher
     forecastingData: null,  // Loaded on-demand via fetcher
@@ -121,13 +127,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   
   // Handle welcome modal dismissal
   if (actionType === 'dismissWelcome') {
-    const prisma = (await import("../db.server")).default;
     try {
       await prisma.userPreferences.upsert({
         where: { shop },
         update: { hasSeenWelcomeModal: true },
         create: { shop, hasSeenWelcomeModal: true },
       });
+      logger.info(`✅ Welcome modal dismissed for shop: ${shop}`);
       return { success: true };
     } catch (error) {
       logger.error('Error saving welcome preference:', error);

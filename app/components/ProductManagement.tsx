@@ -8,8 +8,6 @@ import { logger } from "~/utils/logger";
 import { BILLING_CONFIG } from "~/config/billing.config";
 import {
   BulkPriceEditor,
-  BulkTagEditor,
-  BulkCollectionEditor,
 } from "./ProductManagement/index";
 import {
   Card,
@@ -18,7 +16,6 @@ import {
   Button,
   InlineStack,
   BlockStack,
-  Checkbox,
   TextField,
   Select,
   Box,
@@ -36,11 +33,14 @@ import {
   ChevronDownIcon, 
   ChevronUpIcon,
   MoneyIcon,
-  CollectionIcon,
   InventoryIcon,
   SearchIcon,
-  HashtagIcon,
-  AlertCircleIcon
+  AlertCircleIcon,
+  DuplicateIcon,
+  DeliveryIcon,
+  ListBulletedIcon,
+  PlusCircleIcon,
+  DeleteIcon
 } from "@shopify/polaris-icons";
 
 interface Product {
@@ -239,10 +239,10 @@ export function ProductManagement({
   const [applyContinueSellingChanges, setApplyContinueSellingChanges] = useState(false);
   const [continueSellingWhenOutOfStock, setContinueSellingWhenOutOfStock] = useState<boolean | null>(null);
   
-  // Collection Management State
-  const [collectionOperation, setCollectionOperation] = useState<'add' | 'remove'>('add');
-  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
-  const [availableCollections, setAvailableCollections] = useState<{id: string, title: string}[]>([]);
+  // Product Duplication State
+  const [duplicateCount, setDuplicateCount] = useState<string>('1');
+  const [isDuplicating, setIsDuplicating] = useState(false);
+  const [duplicateProgress, setDuplicateProgress] = useState<{current: number; total: number; productName?: string} | null>(null);
   
   // Inventory management state for current inventory display
   const [showCurrentInventory, setShowCurrentInventory] = useState(false);
@@ -286,16 +286,30 @@ export function ProductManagement({
     onAction?: () => void;
   }>({ show: false, message: '' });
   
-  const [tagOperation, setTagOperation] = useState<'add' | 'remove'>('add');
-  const [tagValue, setTagValue] = useState('');
-  const [tagRemoveValue, setTagRemoveValue] = useState('');
-  
   // Content operation state
   const [contentOperation, setContentOperation] = useState<'title' | 'description'>('title');
   
   // Enhanced Inventory Management State
   const [stockUpdateMethod, setStockUpdateMethod] = useState<'set' | 'add' | 'subtract'>('set');
   const [stockQuantity, setStockQuantity] = useState('');
+  
+  // Shipping Management State
+  const [shippingIsPhysical, setShippingIsPhysical] = useState<boolean | null>(null); // null = don't change
+  const [shippingWeight, setShippingWeight] = useState('');
+  const [shippingWeightUnit, setShippingWeightUnit] = useState<'KILOGRAMS' | 'GRAMS' | 'POUNDS' | 'OUNCES'>('KILOGRAMS');
+  const [shippingCountryOfOrigin, setShippingCountryOfOrigin] = useState('');
+  const [shippingHsCode, setShippingHsCode] = useState('');
+  
+  // Variant Management State
+  interface VariantOption {
+    id: string;
+    name: string;
+    values: string[];
+  }
+  const [variantOptions, setVariantOptions] = useState<VariantOption[]>([
+    { id: '1', name: '', values: [''] }
+  ]);
+  const [isAddingVariants, setIsAddingVariants] = useState(false);
   
   // SEO & Metadata State
 
@@ -559,7 +573,6 @@ export function ProductManagement({
       
       const uniqueCollections = Array.from(collectionsMap.values()).sort((a, b) => a.title.localeCompare(b.title));
       setCollections(uniqueCollections);
-      setAvailableCollections(uniqueCollections);
     }
   }, [initialProducts]);
 
@@ -688,7 +701,6 @@ export function ProductManagement({
           // Update collections and tags
           const uniqueCollections = Array.from(collectionsMap.values()).sort((a, b) => a.title.localeCompare(b.title));
           setCollections(uniqueCollections);
-          setAvailableCollections(uniqueCollections);
           
           const sortedTags = Array.from(tagFrequency.entries())
             .sort((a, b) => {
@@ -724,7 +736,6 @@ export function ProductManagement({
           
           const uniqueCollections = Array.from(collectionsMap.values()).sort((a, b) => a.title.localeCompare(b.title));
           setCollections(uniqueCollections);
-          setAvailableCollections(uniqueCollections);
           
           const sortedTags = Array.from(tagFrequency.entries())
             .sort((a, b) => {
@@ -1496,275 +1507,8 @@ export function ProductManagement({
   };
 
 
-  // Enhanced Collection Management with Error Handling
-  const handleBulkCollections = async () => {
-    if (selectedProducts.length === 0) {
-      setError("Please select at least one product to update collections.");
-      return;
-    }
-    
-    // Check trial limit
-    if (!checkTrialLimit(selectedProducts.length)) {
-      return;
-    }
-    
-    if (selectedCollections.length === 0) {
-      setError("Please select at least one collection.");
-      return;
-    }
-    
-    setIsLoading(true);
-    setError(null);
-    
-    const failed: string[] = [];
-    const successful: string[] = [];
-    
-    try {
-      // Prepare updates for API call
-      const updates = selectedProducts.map(productId => ({
-        productId,
-        collectionIds: selectedCollections,
-        operation: collectionOperation
-      }));
-      
-      // Make API call to update collections
-      const formData = new FormData();
-      formData.append('action', 'update-collections');
-      formData.append('updates', JSON.stringify(updates));
-      
-      logger.info('🔄 Sending collection operation:', { updates, operation: collectionOperation });
-      
-      const response = await fetch('/app/api/products', {
-        method: 'POST',
-        body: formData
-      });
-      
-      const result = await response.json();
-      logger.info('📤 Collection API response:', result);
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update collections');
-      }
-      
-      // Handle results
-      const apiFailed = result.results.filter((r: any) => !r.success);
-      const apiSuccessful = result.results.filter((r: any) => r.success);
-      
-      if (apiFailed.length > 0) {
-        apiFailed.forEach((failure: any) => {
-          failed.push(`${failure.productId}: ${failure.error}`);
-        });
-      }
-      
-      if (apiSuccessful.length > 0) {
-        apiSuccessful.forEach((success: any) => {
-          const product = products.find(p => p.id === success.productId);
-          successful.push(product?.title || success.productId);
-        });
-      }
-      
-      // Update local state to reflect changes
-      if (result.success) {
-        // Fetch updated product data to refresh collections
-        await fetchAllProducts();
-      }
-      
-      const actionText = collectionOperation === 'add' ? 'added to' : 'removed from';
-      const collectionNames = selectedCollections.map(id => 
-        availableCollections.find(col => col.id === id)?.title
-      ).filter(Boolean).join(', ');
-      
-      if (successful.length > 0) {
-        setNotification({
-          show: true,
-          message: `Successfully ${actionText} ${collectionNames} for ${successful.length} product${successful.length > 1 ? 's' : ''}`,
-          error: false
-        });
-      }
-      
-      if (failed.length > 0) {
-        setNotification({
-          show: true,
-          message: `${successful.length} products updated, ${failed.length} failed. See console for details.`,
-          error: true
-        });
-        logger.info("Failed operations:", failed);
-      }
-      
-      // Reset collection selections only if completely successful
-      if (failed.length === 0) {
-        setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
-        setSelectedCollections([]);
-      }
-      
-    } catch (error) {
-      logger.error('Failed to update collections:', error);
-      setError(`Failed to update collections: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleBulkTags = async () => {
-    if (selectedProducts.length === 0) {
-      setError("Please select at least one product to update tags.");
-      return;
-    }
-    
-    // Check trial limit
-    if (!checkTrialLimit(selectedProducts.length)) {
-      return;
-    }
-    
-    if (tagOperation === 'add' && !tagValue) {
-      setError("Please provide tags to add.");
-      return;
-    }
-    
-    if (tagOperation === 'remove' && !tagRemoveValue) {
-      setError("Please provide tags to remove.");
-      return;
-    }
-    
-    setError("");
-    
-    // Store the pending operation
-    const operationData = {
-      productIds: selectedProducts,
-      tagOperation,
-      tagValue: tagOperation === 'add' ? tagValue : undefined,
-      tagRemoveValue: tagOperation === 'remove' ? tagRemoveValue : undefined,
-    };
-    
-    setPendingBulkOperation({
-      type: 'tags',
-      data: operationData
-    });
-    
-    // Apply changes immediately without showing modal
-    applyTagChanges(operationData);
-  };
-  
-  // This function is called after the modal confirmation for tag operations
-  const applyTagChanges = async (operationData?: any) => {
-    // Use passed data if available, otherwise fall back to state
-    const data = operationData || pendingBulkOperation?.data;
-    
-    const {
-      productIds,
-      tagOperation,
-      tagValue,
-      tagRemoveValue
-    } = data || {};
-    
-    if (!productIds || productIds.length === 0) {
-      return;
-    }
-    
-    setIsLoading(true);
-    
-    try {
-      const response = await fetch('/app/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'update-tags',
-          productIds,
-          tagOperation,
-          tagValue: tagOperation === 'add' ? tagValue : undefined,
-          tagRemoveValue: tagOperation === 'remove' ? tagRemoveValue : undefined,
-          operationName: `Tag Update ${new Date().toLocaleDateString()}`,
-          operationDescription: `${productIds.length} products affected`
-        }),
-      });
-
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update tags');
-      }
-
-      // Update local state with the new tags
-      setProducts(prevProducts => 
-        prevProducts.map(product => {
-          const updatedProduct = result.updatedProducts?.find((p: any) => p.id === product.id);
-          if (updatedProduct) {
-            return { ...product, tags: updatedProduct.tags };
-          }
-          return product;
-        })
-      );
-      
-      // Process results like the collections handler
-      const successful: string[] = [];
-      const failed: string[] = [];
-      
-      if (result.failedProducts && result.failedProducts.length > 0) {
-        result.failedProducts.forEach((failure: any) => {
-          failed.push(`${failure.productId}: ${failure.error}`);
-        });
-      }
-      
-      if (result.updatedProducts && result.updatedProducts.length > 0) {
-        result.updatedProducts.forEach((success: any) => {
-          const product = products.find(p => p.id === success.id);
-          successful.push(product?.title || success.id);
-        });
-      }
-      
-      // Update local state to reflect changes
-      if (result.success) {
-        // Fetch updated product data to refresh tags
-        await fetchAllProducts();
-      }
-      
-      const actionText = tagOperation === 'add' ? 'added tags to' : 
-                        tagOperation === 'remove' ? 'removed tags from' : 'updated tags for';
-      
-      // Process the operation result
-      if (result.bulkOperationId) {
-        // Show success notification
-        setNotification({
-          show: true,
-          message: `Successfully ${actionText} ${successful.length} products!`,
-          error: false
-        });
-      } else if (successful.length > 0) {
-        setNotification({
-          show: true,
-          message: `Successfully ${actionText} ${successful.length} products!`,
-          error: false
-        });
-      }
-      
-      if (failed.length > 0) {
-        logger.info(`⚠️ ${successful.length} products updated successfully. ${failed.length} failed.`);
-        logger.info("Failed operations:", failed);
-        
-        setNotification({
-          show: true,
-          message: `${successful.length} products updated, ${failed.length} failed. See console for details.`,
-          error: true
-        });
-      }
-      
-      // Clear form only if completely successful
-      if (failed.length === 0) {
-        setHasBulkOperationsCompleted(true); // Mark bulk operations as completed
-        setTagValue('');
-        setTagRemoveValue('');
-      }
-      
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update tags';
-      logger.error('Failed to update tags:', error);
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Note: handleBulkCollections and handleBulkTags removed - 
+  // These are now handled natively in Shopify Admin
 
   const handleBulkTitleUpdate = async () => {
     if (selectedProducts.length === 0) {
@@ -2237,6 +1981,207 @@ export function ProductManagement({
       setError(`Failed to update inventory: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Bulk Shipping Update Handler
+  const handleBulkShippingUpdate = async () => {
+    if (selectedVariants.length === 0) {
+      setError("Please select at least one variant to update shipping.");
+      return;
+    }
+    
+    // Check if any shipping field is being updated
+    const hasChanges = shippingIsPhysical !== null || 
+                       shippingWeight !== '' || 
+                       shippingCountryOfOrigin !== '' || 
+                       shippingHsCode !== '';
+    
+    if (!hasChanges) {
+      setError("Please specify at least one shipping field to update.");
+      return;
+    }
+    
+    // Check trial limit - count unique products from selected variants
+    const uniqueProductIds = new Set(
+      selectedVariants.map(variantId => {
+        const product = products.find(p => p.variants.edges.some(v => v.node.id === variantId));
+        return product?.id;
+      }).filter(Boolean)
+    );
+    if (!checkTrialLimit(uniqueProductIds.size)) {
+      return;
+    }
+    
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'update-shipping',
+          variantIds: selectedVariants,
+          requiresShipping: shippingIsPhysical,
+          weight: shippingWeight ? parseFloat(shippingWeight) : null,
+          weightUnit: shippingWeight ? shippingWeightUnit : null,
+          countryCodeOfOrigin: shippingCountryOfOrigin || null,
+          harmonizedSystemCode: shippingHsCode || null,
+        }),
+      });
+
+      const result = await response.json();
+      
+      logger.info('📥 Shipping update response:', { 
+        success: result.success, 
+        updatedCount: result.updatedVariants?.length || 0,
+        failedCount: result.failedVariants?.length || 0
+      });
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update shipping');
+      }
+
+      // Process results
+      const successful: string[] = result.updatedVariants || [];
+      const failed: string[] = result.failedVariants?.map((f: any) => `${f.variantId}: ${f.error}`) || [];
+      
+      if (successful.length > 0) {
+        const updateParts = [];
+        if (shippingIsPhysical !== null) updateParts.push(shippingIsPhysical ? 'physical product' : 'digital product');
+        if (shippingWeight) updateParts.push(`weight ${shippingWeight} ${shippingWeightUnit.toLowerCase()}`);
+        if (shippingCountryOfOrigin) updateParts.push(`origin ${shippingCountryOfOrigin}`);
+        if (shippingHsCode) updateParts.push(`HS code ${shippingHsCode}`);
+        
+        setNotification({
+          show: true,
+          message: `✅ Updated shipping for ${successful.length} variant${successful.length === 1 ? '' : 's'}!`,
+          error: false
+        });
+      }
+      
+      if (failed.length > 0) {
+        logger.info(`⚠️ ${successful.length} variants updated. ${failed.length} failed.`);
+        logger.info("Failed operations:", failed);
+        setNotification({
+          show: true,
+          message: `⚠️ ${successful.length} updated, ${failed.length} failed. Check console for details.`,
+          error: true
+        });
+      }
+      
+      // Clear form only if completely successful
+      if (failed.length === 0) {
+        setHasBulkOperationsCompleted(true);
+        setShippingWeight('');
+        setShippingHsCode('');
+        setShippingCountryOfOrigin('');
+        setShippingIsPhysical(null);
+      }
+      
+    } catch (error) {
+      logger.error('Failed to update shipping:', error);
+      setError(`Failed to update shipping: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle bulk add variants to selected products
+  const handleBulkAddVariants = async () => {
+    if (selectedProducts.length === 0) {
+      setError("Please select at least one product to add variants.");
+      return;
+    }
+    
+    // Validate options
+    const validOptions = variantOptions.filter(opt => 
+      opt.name.trim() && opt.values.some(v => v.trim())
+    );
+    
+    if (validOptions.length === 0) {
+      setError("Please add at least one option with a name and value.");
+      return;
+    }
+    
+    // Check trial limit
+    if (!checkTrialLimit(selectedProducts.length)) {
+      return;
+    }
+    
+    setIsAddingVariants(true);
+    setError("");
+    
+    try {
+      // Prepare options data - filter out empty values
+      const preparedOptions = validOptions.map(opt => ({
+        name: opt.name.trim(),
+        values: opt.values.filter(v => v.trim()).map(v => v.trim())
+      }));
+      
+      const response = await fetch('/app/api/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'add-variants',
+          productIds: selectedProducts,
+          options: preparedOptions,
+        }),
+      });
+
+      const result = await response.json();
+      
+      logger.info('📥 Add variants response:', { 
+        success: result.success, 
+        updatedCount: result.updatedProducts?.length || 0,
+        failedCount: result.failedProducts?.length || 0
+      });
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to add variants');
+      }
+
+      // Process results
+      const successful: number = result.updatedProducts?.length || 0;
+      const failed: Array<{productId: string, error: string}> = result.failedProducts || [];
+      const totalVariantsCreated: number = result.totalVariantsCreated || 0;
+      
+      if (successful > 0) {
+        setNotification({
+          show: true,
+          message: `✅ Added ${totalVariantsCreated} variant${totalVariantsCreated === 1 ? '' : 's'} to ${successful} product${successful === 1 ? '' : 's'}!`,
+          error: false
+        });
+      }
+      
+      if (failed.length > 0) {
+        logger.info(`⚠️ ${successful} products updated. ${failed.length} failed.`);
+        logger.info("Failed operations:", failed);
+        setNotification({
+          show: true,
+          message: `⚠️ ${successful} updated, ${failed.length} failed. Check console for details.`,
+          error: true
+        });
+      }
+      
+      // Clear form and refresh products only if completely successful
+      if (failed.length === 0 && successful > 0) {
+        setHasBulkOperationsCompleted(true);
+        setVariantOptions([{ id: '1', name: '', values: [''] }]);
+        // Refresh products to show new variants
+        fetchAllProducts();
+      }
+      
+    } catch (error) {
+      logger.error('Failed to add variants:', error);
+      setError(`Failed to add variants: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsAddingVariants(false);
     }
   };
 
@@ -2849,33 +2794,6 @@ export function ProductManagement({
           {/* Bulk Operation Categories - Only show in Step 2 */}
           {activeMainTab === 1 && (
             <>
-              {/* Trial Mode Warning Banner - only show for non-dev stores */}
-              {shouldApplyTrialRestrictions && (
-                <div style={{
-                  padding: '12px 16px',
-                  backgroundColor: '#FFF8E5',
-                  border: '1px solid #FFD79D',
-                  borderRadius: '8px',
-                  marginBottom: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '8px'
-                }}>
-                  <div>
-                    <Text as="p" variant="bodySm" fontWeight="semibold">
-                      🎯 Trial Mode: Edit up to {trialProductLimit} products at once
-                    </Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Subscribe to unlock unlimited bulk editing
-                    </Text>
-                  </div>
-                  <Button size="slim" onClick={handleSubscribeFromModal}>
-                    View Pricing Plans
-                  </Button>
-                </div>
-              )}
               <div style={{ 
                 display: 'grid', 
                 gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
@@ -2883,11 +2801,12 @@ export function ProductManagement({
                 width: '100%'
               }}>
               {[
-                { id: 0, label: 'Pricing', icon: MoneyIcon },
-                { id: 1, label: 'Collections', icon: CollectionIcon },
-                { id: 2, label: 'Tags', icon: HashtagIcon },
-                { id: 3, label: 'Content', icon: EditIcon },
-                { id: 4, label: 'Inventory', icon: InventoryIcon },
+                { id: 0, label: 'Product', icon: DuplicateIcon },
+                { id: 1, label: 'Pricing', icon: MoneyIcon },
+                { id: 2, label: 'Content', icon: EditIcon },
+                { id: 3, label: 'Inventory', icon: InventoryIcon },
+                { id: 4, label: 'Shipping', icon: DeliveryIcon },
+                { id: 5, label: 'Variants', icon: ListBulletedIcon },
               ].map(({ id, label, icon }) => (
                 <Button
                   key={id}
@@ -3593,8 +3512,231 @@ export function ProductManagement({
           ) : (
             <Card>
               <BlockStack gap="400">
-                {/* Pricing Tab */}
+                {/* Product Tab - Duplicate */}
                 {activeBulkTab === 0 && (() => {
+                  const selectedProductObjects = filteredProducts.filter(p => selectedProducts.includes(p.id));
+                  const count = parseInt(duplicateCount) || 1;
+                  
+                  // Handler for bulk duplication
+                  const handleBulkDuplicate = async () => {
+                    if (selectedProducts.length === 0) return;
+                    
+                    setIsDuplicating(true);
+                    const totalOperations = selectedProducts.length * count;
+                    let completed = 0;
+                    
+                    try {
+                      for (const productId of selectedProducts) {
+                        const product = selectedProductObjects.find(p => p.id === productId);
+                        if (!product) continue;
+                        
+                        for (let i = 1; i <= count; i++) {
+                          setDuplicateProgress({
+                            current: completed + 1,
+                            total: totalOperations,
+                            productName: `${product.title} - Copy ${i}`
+                          });
+                          
+                          const formData = new FormData();
+                          formData.append('action', 'duplicate-product');
+                          formData.append('productId', productId);
+                          formData.append('newTitle', `${product.title} - Copy ${i}`);
+                          
+                          const response = await fetch('/app/api/products', {
+                            method: 'POST',
+                            body: formData
+                          });
+                          
+                          if (!response.ok) {
+                            logger.error(`Failed to duplicate ${product.title} - Copy ${i}`);
+                          }
+                          
+                          completed++;
+                        }
+                      }
+                      
+                      // Refresh products list
+                      fetchAllProducts();
+                      setNotification({ show: true, message: `✅ Successfully created ${totalOperations} duplicate${totalOperations > 1 ? 's' : ''}!` });
+                    } catch (error) {
+                      logger.error('Bulk duplicate error:', error);
+                      setNotification({ show: true, message: '❌ Error during duplication' });
+                    } finally {
+                      setIsDuplicating(false);
+                      setDuplicateProgress(null);
+                    }
+                  };
+                  
+                  return (
+                    <BlockStack gap="400">
+                      <Text as="h3" variant="headingSm">Bulk Product Duplication</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Create copies of {selectedProducts.length} selected product{selectedProducts.length === 1 ? '' : 's'}. Each duplicate will have a numbered suffix (e.g., "Product - Copy 1", "Product - Copy 2").
+                      </Text>
+                      
+                      {/* Selected Products Preview */}
+                      <div style={{
+                        padding: '8px 12px',
+                        backgroundColor: '#ffffff',
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <button
+                            onClick={() => setShowSelectedProducts(!showSelectedProducts)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              color: '#202223'
+                            }}
+                          >
+                            <Icon source={showSelectedProducts ? ChevronUpIcon : ChevronDownIcon} tone="base" />
+                            <span>{selectedProducts.length} {selectedProducts.length === 1 ? 'product' : 'products'} selected</span>
+                          </button>
+                          <Button
+                            variant="plain"
+                            size="slim"
+                            tone="critical"
+                            onClick={() => {
+                              setSelectedVariants([]);
+                              setSelectedProducts([]);
+                            }}
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                        
+                        <Collapsible
+                          open={showSelectedProducts}
+                          id="selected-products-collapsible-duplicate"
+                          transition={{ duration: '150ms', timingFunction: 'ease-in-out' }}
+                        >
+                          <div style={{ marginTop: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+                            <BlockStack gap="100">
+                              {selectedProductObjects.map((product) => (
+                                <div
+                                  key={product.id}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '6px 8px',
+                                    backgroundColor: '#f9fafb',
+                                    borderRadius: '4px',
+                                    border: '1px solid #e5e7eb'
+                                  }}
+                                >
+                                  <div style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '4px',
+                                    overflow: 'hidden',
+                                    backgroundColor: '#f1f5f9',
+                                    border: '1px solid #d1d5db',
+                                    flexShrink: 0
+                                  }}>
+                                    {product.featuredMedia?.preview?.image?.url ? (
+                                      <img
+                                        src={product.featuredMedia.preview.image.url}
+                                        alt={product.title}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                      />
+                                    ) : (
+                                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Icon source={ProductIcon} tone="subdued" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <Text as="p" variant="bodySm" fontWeight="medium" truncate>{product.title}</Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                      Will create: {Array.from({length: count}, (_, i) => `Copy ${i + 1}`).join(', ')}
+                                    </Text>
+                                  </div>
+                                </div>
+                              ))}
+                            </BlockStack>
+                          </div>
+                        </Collapsible>
+                      </div>
+                      
+                      {/* Duplicate Count Input */}
+                      <div style={{ maxWidth: '200px' }}>
+                        <TextField
+                          label="Number of copies per product"
+                          type="number"
+                          value={duplicateCount}
+                          onChange={(value) => {
+                            const num = parseInt(value);
+                            if (num >= 1 && num <= 100) {
+                              setDuplicateCount(value);
+                            } else if (value === '') {
+                              setDuplicateCount('1');
+                            }
+                          }}
+                          min={1}
+                          max={100}
+                          autoComplete="off"
+                        />
+                      </div>
+                      
+                      {/* Summary */}
+                      <div style={{
+                        padding: '12px 16px',
+                        backgroundColor: '#f0f9ff',
+                        borderRadius: '8px',
+                        border: '1px solid #bae6fd'
+                      }}>
+                        <Text as="p" variant="bodySm">
+                          <strong>Summary:</strong> This will create <strong>{selectedProducts.length * count}</strong> new product{selectedProducts.length * count > 1 ? 's' : ''} ({selectedProducts.length} product{selectedProducts.length > 1 ? 's' : ''} × {count} {count > 1 ? 'copies' : 'copy'})
+                        </Text>
+                      </div>
+                      
+                      {/* Progress */}
+                      {duplicateProgress && (
+                        <div style={{
+                          padding: '12px 16px',
+                          backgroundColor: '#fffbeb',
+                          borderRadius: '8px',
+                          border: '1px solid #fcd34d'
+                        }}>
+                          <BlockStack gap="200">
+                            <Text as="p" variant="bodySm" fontWeight="semibold">
+                              Duplicating... {duplicateProgress.current} of {duplicateProgress.total}
+                            </Text>
+                            <ProgressBar progress={(duplicateProgress.current / duplicateProgress.total) * 100} size="small" />
+                            {duplicateProgress.productName && (
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                Creating: {duplicateProgress.productName}
+                              </Text>
+                            )}
+                          </BlockStack>
+                        </div>
+                      )}
+                      
+                      {/* Apply Button */}
+                      <Button
+                        variant="primary"
+                        onClick={handleBulkDuplicate}
+                        loading={isDuplicating}
+                        disabled={isDuplicating || selectedProducts.length === 0}
+                        fullWidth
+                      >
+                        {isDuplicating ? 'Duplicating...' : `Duplicate ${selectedProducts.length * count} Product${selectedProducts.length * count > 1 ? 's' : ''}`}
+                      </Button>
+                    </BlockStack>
+                  );
+                })()}
+                
+                {/* Pricing Tab */}
+                {activeBulkTab === 1 && (() => {
                   // Convert selectedProducts IDs to actual Product objects
                   const selectedProductObjects = filteredProducts.filter(p => selectedProducts.includes(p.id));
                   
@@ -3644,62 +3786,8 @@ export function ProductManagement({
                   );
                 })()}
 
-                {/* Collections Tab */}
-                {activeBulkTab === 1 && (() => {
-                  const selectedProductObjects = filteredProducts.filter(p => selectedProducts.includes(p.id));
-                  
-                  return (
-                    <BulkCollectionEditor
-                      availableCollections={availableCollections}
-                      selectedCollections={selectedCollections}
-                      onSelectedCollectionsChange={setSelectedCollections}
-                      collectionOperation={collectionOperation}
-                      onCollectionOperationChange={setCollectionOperation}
-                      onApply={handleBulkCollections}
-                      isLoading={isLoading}
-                      selectedProducts={selectedProductObjects}
-                      selectedVariants={selectedVariants}
-                      showSelectedProducts={showSelectedProducts}
-                      setShowSelectedProducts={setShowSelectedProducts}
-                      onClearAll={() => {
-                        setSelectedVariants([]);
-                        setSelectedProducts([]);
-                        setHasBulkOperationsCompleted(false);
-                      }}
-                    />
-                  );
-                })()}
-
-                {/* Tags Tab */}
-                {activeBulkTab === 2 && (() => {
-                  const selectedProductObjects = filteredProducts.filter(p => selectedProducts.includes(p.id));
-                  
-                  return (
-                    <BulkTagEditor
-                      tagOperation={tagOperation}
-                      setTagOperation={setTagOperation}
-                      tagValue={tagValue}
-                      setTagValue={setTagValue}
-                      tagRemoveValue={tagRemoveValue}
-                      setTagRemoveValue={setTagRemoveValue}
-                      selectedCount={selectedProducts.length}
-                      onApply={handleBulkTags}
-                      isLoading={isLoading}
-                      selectedProducts={selectedProductObjects}
-                      selectedVariants={selectedVariants}
-                      showSelectedProducts={showSelectedProducts}
-                      setShowSelectedProducts={setShowSelectedProducts}
-                      onClearAll={() => {
-                        setSelectedVariants([]);
-                        setSelectedProducts([]);
-                        setHasBulkOperationsCompleted(false);
-                      }}
-                    />
-                  );
-                })()}
-
                 {/* Content Tab */}
-                {activeBulkTab === 3 && (() => {
+                {activeBulkTab === 2 && (() => {
                   const selectedProductObjects = filteredProducts.filter(p => selectedProducts.includes(p.id));
                   
                   // Generate live preview for titles
@@ -4142,7 +4230,7 @@ export function ProductManagement({
                 })()}
 
                 {/* Inventory Tab */}
-                {activeBulkTab === 4 && (() => {
+                {activeBulkTab === 3 && (() => {
                   // Calculate current inventory summary
                   const selectedProductObjects = filteredProducts.filter(p => selectedProducts.includes(p.id));
                   
@@ -4506,6 +4594,579 @@ export function ProductManagement({
                   );
                 })()}
 
+                {/* Shipping Tab Content */}
+                {activeBulkTab === 4 && (
+                  <BlockStack gap="400">
+                    <Text as="h3" variant="headingSm">Shipping Settings</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Update shipping settings for {selectedVariants.length} selected variant{selectedVariants.length === 1 ? '' : 's'} across {selectedProducts.length} product{selectedProducts.length === 1 ? '' : 's'}.
+                    </Text>
+
+                {/* Selected Products Collapsible */}
+                {selectedVariants.length > 0 && (
+                  <div style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <button
+                        onClick={() => setShowSelectedProducts(!showSelectedProducts)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          fontSize: '13px',
+                          fontWeight: '500',
+                          color: '#202223'
+                        }}
+                      >
+                        <Icon source={showSelectedProducts ? ChevronUpIcon : ChevronDownIcon} tone="base" />
+                        <span>{selectedProducts.length} {selectedProducts.length === 1 ? 'product' : 'products'} • {selectedVariants.length} {selectedVariants.length === 1 ? 'variant' : 'variants'}</span>
+                      </button>
+                      <Button
+                        variant="plain"
+                        size="slim"
+                        tone="critical"
+                        onClick={() => {
+                          setSelectedVariants([]);
+                          setSelectedProducts([]);
+                          setHasBulkOperationsCompleted(false);
+                        }}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+
+                    <Collapsible
+                      open={showSelectedProducts}
+                      id="selected-products-collapsible-shipping"
+                      transition={{ duration: '150ms', timingFunction: 'ease-in-out' }}
+                    >
+                      <div style={{ 
+                        marginTop: '8px', 
+                        maxHeight: '200px', 
+                        overflowY: 'auto',
+                        scrollbarWidth: 'thin'
+                      }}>
+                        <BlockStack gap="100">
+                          {filteredProducts.filter(p => selectedProducts.includes(p.id)).map(product => {
+                            const productVariants = product.variants.edges
+                              .filter(edge => selectedVariants.includes(edge.node.id))
+                              .map(edge => edge.node.title);
+                            
+                            return (
+                              <div
+                                key={product.id}
+                                style={{
+                                  backgroundColor: '#f9fafb',
+                                  borderRadius: '4px',
+                                  padding: '6px 8px',
+                                  border: '1px solid #e5e7eb',
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: '4px',
+                                    overflow: 'hidden',
+                                    backgroundColor: '#f1f5f9',
+                                    border: '1px solid #d1d5db',
+                                    flexShrink: 0
+                                  }}>
+                                    {product.featuredMedia?.preview?.image?.url ? (
+                                      <img
+                                        src={product.featuredMedia.preview.image.url}
+                                        alt={product.title}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                      />
+                                    ) : (
+                                      <div style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backgroundColor: '#f3f4f6'
+                                      }}>
+                                        <Icon source={ProductIcon} tone="subdued" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <Text as="span" variant="bodyXs" fontWeight="medium">
+                                      <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {product.title}
+                                      </span>
+                                    </Text>
+                                    <Text as="p" variant="bodyXs" tone="subdued">
+                                      {productVariants.length} variant{productVariants.length === 1 ? '' : 's'}: {productVariants.join(', ')}
+                                    </Text>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </BlockStack>
+                      </div>
+                    </Collapsible>
+                  </div>
+                )}
+
+                {/* Physical Product Toggle */}
+                <div>
+                  <Text as="p" variant="bodyMd" fontWeight="medium" tone="base">
+                    Physical Product (requires shipping)
+                  </Text>
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(3, 1fr)', 
+                    gap: '8px', 
+                    marginTop: '8px' 
+                  }}>
+                    <Button
+                      variant={shippingIsPhysical === true ? 'primary' : 'secondary'}
+                      onClick={() => setShippingIsPhysical(true)}
+                      size="large"
+                    >
+                      Yes
+                    </Button>
+                    <Button
+                      variant={shippingIsPhysical === false ? 'primary' : 'secondary'}
+                      onClick={() => setShippingIsPhysical(false)}
+                      size="large"
+                    >
+                      No
+                    </Button>
+                    <Button
+                      variant={shippingIsPhysical === null ? 'primary' : 'secondary'}
+                      onClick={() => setShippingIsPhysical(null)}
+                      size="large"
+                    >
+                      Leave Unchanged
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Product Weight */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'end' }}>
+                  <TextField
+                    label="Product Weight"
+                    type="number"
+                    value={shippingWeight}
+                    onChange={setShippingWeight}
+                    autoComplete="off"
+                    placeholder="Leave empty to keep current"
+                    min={0}
+                    step={0.01}
+                  />
+                  <Select
+                    label="Unit"
+                    options={[
+                      { label: 'kg', value: 'KILOGRAMS' },
+                      { label: 'g', value: 'GRAMS' },
+                      { label: 'lb', value: 'POUNDS' },
+                      { label: 'oz', value: 'OUNCES' }
+                    ]}
+                    value={shippingWeightUnit}
+                    onChange={(value) => setShippingWeightUnit(value as 'KILOGRAMS' | 'GRAMS' | 'POUNDS' | 'OUNCES')}
+                  />
+                </div>
+
+                {/* Country/Region of Origin */}
+                <Select
+                  label="Country/Region of Origin"
+                  options={[
+                    { label: 'Leave unchanged', value: '' },
+                    { label: 'United States', value: 'US' },
+                    { label: 'United Kingdom', value: 'GB' },
+                    { label: 'Canada', value: 'CA' },
+                    { label: 'Australia', value: 'AU' },
+                    { label: 'Germany', value: 'DE' },
+                    { label: 'France', value: 'FR' },
+                    { label: 'Italy', value: 'IT' },
+                    { label: 'Spain', value: 'ES' },
+                    { label: 'Netherlands', value: 'NL' },
+                    { label: 'Belgium', value: 'BE' },
+                    { label: 'Sweden', value: 'SE' },
+                    { label: 'Norway', value: 'NO' },
+                    { label: 'Denmark', value: 'DK' },
+                    { label: 'Finland', value: 'FI' },
+                    { label: 'Ireland', value: 'IE' },
+                    { label: 'Austria', value: 'AT' },
+                    { label: 'Switzerland', value: 'CH' },
+                    { label: 'Poland', value: 'PL' },
+                    { label: 'Portugal', value: 'PT' },
+                    { label: 'Japan', value: 'JP' },
+                    { label: 'South Korea', value: 'KR' },
+                    { label: 'China', value: 'CN' },
+                    { label: 'Hong Kong', value: 'HK' },
+                    { label: 'Singapore', value: 'SG' },
+                    { label: 'India', value: 'IN' },
+                    { label: 'Brazil', value: 'BR' },
+                    { label: 'Mexico', value: 'MX' },
+                    { label: 'New Zealand', value: 'NZ' },
+                    { label: 'Turkey', value: 'TR' }
+                  ]}
+                  value={shippingCountryOfOrigin}
+                  onChange={setShippingCountryOfOrigin}
+                  helpText="Set the country where the product was manufactured"
+                />
+
+                {/* Harmonized System (HS) Code */}
+                <TextField
+                  label="Harmonized System (HS) Code"
+                  value={shippingHsCode}
+                  onChange={setShippingHsCode}
+                  autoComplete="off"
+                  placeholder="e.g., 6109.10 (leave empty to keep current)"
+                  helpText="Used for customs when shipping internationally. Usually 6-10 digits."
+                />
+
+                <Button
+                  variant="primary"
+                  onClick={handleBulkShippingUpdate}
+                  loading={isLoading}
+                  disabled={!shippingWeight && shippingIsPhysical === null && !shippingCountryOfOrigin && !shippingHsCode}
+                  size="large"
+                >
+                  Update Shipping for {String(selectedVariants.length)} Variant{selectedVariants.length !== 1 ? 's' : ''}
+                </Button>
+              </BlockStack>
+                )}
+
+                {/* Variants Tab Content */}
+                {activeBulkTab === 5 && (
+                  <BlockStack gap="400">
+                    <Text as="h3" variant="headingSm">Add Variants</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Add new variant options to {selectedProducts.length} selected product{selectedProducts.length === 1 ? '' : 's'}. Each option creates new variants with all value combinations.
+                    </Text>
+
+                    {/* Selected Products Collapsible */}
+                    {selectedVariants.length > 0 && (
+                      <div style={{
+                        padding: '8px 12px',
+                        backgroundColor: '#ffffff',
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <button
+                            onClick={() => setShowSelectedProducts(!showSelectedProducts)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              color: '#202223'
+                            }}
+                          >
+                            <Icon source={showSelectedProducts ? ChevronUpIcon : ChevronDownIcon} tone="base" />
+                            <span>{selectedProducts.length} {selectedProducts.length === 1 ? 'product' : 'products'} selected</span>
+                          </button>
+                          <Button
+                            variant="plain"
+                            size="slim"
+                            tone="critical"
+                            onClick={() => {
+                              setSelectedVariants([]);
+                              setSelectedProducts([]);
+                              setHasBulkOperationsCompleted(false);
+                            }}
+                          >
+                            Clear
+                          </Button>
+                        </div>
+
+                        <Collapsible
+                          open={showSelectedProducts}
+                          id="selected-products-collapsible-variants"
+                          transition={{ duration: '150ms', timingFunction: 'ease-in-out' }}
+                        >
+                          <div style={{ 
+                            marginTop: '8px', 
+                            maxHeight: '150px', 
+                            overflowY: 'auto',
+                            scrollbarWidth: 'thin'
+                          }}>
+                            <BlockStack gap="100">
+                              {filteredProducts.filter(p => selectedProducts.includes(p.id)).map(product => (
+                                <div
+                                  key={product.id}
+                                  style={{
+                                    backgroundColor: '#f9fafb',
+                                    borderRadius: '4px',
+                                    padding: '6px 8px',
+                                    border: '1px solid #e5e7eb',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px'
+                                  }}
+                                >
+                                  <div style={{
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: '4px',
+                                    overflow: 'hidden',
+                                    backgroundColor: '#f1f5f9',
+                                    border: '1px solid #d1d5db',
+                                    flexShrink: 0
+                                  }}>
+                                    {product.featuredMedia?.preview?.image?.url ? (
+                                      <img
+                                        src={product.featuredMedia.preview.image.url}
+                                        alt={product.title}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                      />
+                                    ) : (
+                                      <div style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backgroundColor: '#f3f4f6'
+                                      }}>
+                                        <Icon source={ProductIcon} tone="subdued" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <Text as="span" variant="bodyXs" fontWeight="medium">
+                                      <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {product.title}
+                                      </span>
+                                    </Text>
+                                    <Text as="p" variant="bodyXs" tone="subdued">
+                                      {product.variants.edges.length} existing variant{product.variants.edges.length === 1 ? '' : 's'}
+                                    </Text>
+                                  </div>
+                                </div>
+                              ))}
+                            </BlockStack>
+                          </div>
+                        </Collapsible>
+                      </div>
+                    )}
+
+                    {/* Variant Options Builder */}
+                    <div style={{
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <BlockStack gap="400">
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">Option Configuration</Text>
+                        
+                        {variantOptions.map((option, optionIndex) => (
+                          <div 
+                            key={option.id}
+                            style={{
+                              backgroundColor: 'white',
+                              borderRadius: '8px',
+                              padding: '12px',
+                              border: '1px solid #e5e7eb'
+                            }}
+                          >
+                            <BlockStack gap="300">
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Text as="p" variant="bodySm" fontWeight="medium">Option {optionIndex + 1}</Text>
+                                {variantOptions.length > 1 && (
+                                  <Button
+                                    variant="plain"
+                                    tone="critical"
+                                    size="slim"
+                                    icon={DeleteIcon}
+                                    onClick={() => {
+                                      setVariantOptions(prev => prev.filter((_, i) => i !== optionIndex));
+                                    }}
+                                  >
+                                    Remove
+                                  </Button>
+                                )}
+                              </div>
+                              
+                              <TextField
+                                label="Option name"
+                                value={option.name}
+                                onChange={(value) => {
+                                  // Auto-capitalize to match Shopify's standard format
+                                  // Capitalize first letter of each word
+                                  const formatted = value.split(' ')
+                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                                    .join(' ');
+                                  setVariantOptions(prev => prev.map((opt, i) => 
+                                    i === optionIndex ? { ...opt, name: formatted } : opt
+                                  ));
+                                }}
+                                placeholder="Size, Color, Material..."
+                                autoComplete="off"
+                                helpText="Standard options: Size, Color, Material, Style"
+                              />
+                              
+                              <div>
+                                <Text as="p" variant="bodySm" fontWeight="medium" tone="subdued">Option values</Text>
+                                <div style={{ marginTop: '8px' }}>
+                                  <BlockStack gap="200">
+                                    {option.values.map((value, valueIndex) => (
+                                      <div key={valueIndex} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <div style={{ flex: 1 }}>
+                                          <TextField
+                                            label=""
+                                            labelHidden
+                                            value={value}
+                                            onChange={(newValue) => {
+                                              setVariantOptions(prev => prev.map((opt, i) => {
+                                                if (i === optionIndex) {
+                                                  const newValues = [...opt.values];
+                                                  newValues[valueIndex] = newValue;
+                                                  return { ...opt, values: newValues };
+                                                }
+                                                return opt;
+                                              }));
+                                            }}
+                                            placeholder={`Value ${valueIndex + 1} (e.g., Small, Red)`}
+                                            autoComplete="off"
+                                          />
+                                        </div>
+                                        {option.values.length > 1 && (
+                                          <Button
+                                            variant="plain"
+                                            tone="critical"
+                                            size="slim"
+                                            icon={DeleteIcon}
+                                            onClick={() => {
+                                              setVariantOptions(prev => prev.map((opt, i) => {
+                                                if (i === optionIndex) {
+                                                  return { ...opt, values: opt.values.filter((_, vi) => vi !== valueIndex) };
+                                                }
+                                                return opt;
+                                              }));
+                                            }}
+                                          />
+                                        )}
+                                      </div>
+                                    ))}
+                                    <Button
+                                      variant="plain"
+                                      size="slim"
+                                      icon={PlusCircleIcon}
+                                      onClick={() => {
+                                        setVariantOptions(prev => prev.map((opt, i) => {
+                                          if (i === optionIndex) {
+                                            return { ...opt, values: [...opt.values, ''] };
+                                          }
+                                          return opt;
+                                        }));
+                                      }}
+                                    >
+                                      Add another value
+                                    </Button>
+                                  </BlockStack>
+                                </div>
+                              </div>
+                            </BlockStack>
+                          </div>
+                        ))}
+
+                        {variantOptions.length < 3 && (
+                          <Button
+                            variant="secondary"
+                            icon={PlusCircleIcon}
+                            onClick={() => {
+                              setVariantOptions(prev => [
+                                ...prev,
+                                { id: String(Date.now()), name: '', values: [''] }
+                              ]);
+                            }}
+                          >
+                            Add another option
+                          </Button>
+                        )}
+                      </BlockStack>
+                    </div>
+
+                    {/* Preview of variants to be created */}
+                    {(() => {
+                      const validOptions = variantOptions.filter(opt => opt.name.trim() && opt.values.some(v => v.trim()));
+                      if (validOptions.length === 0) return null;
+                      
+                      // Calculate all combinations
+                      const combinations: string[][] = [];
+                      const generateCombinations = (current: string[], depth: number) => {
+                        if (depth === validOptions.length) {
+                          combinations.push([...current]);
+                          return;
+                        }
+                        const validValues = validOptions[depth].values.filter(v => v.trim());
+                        for (const value of validValues) {
+                          current.push(value);
+                          generateCombinations(current, depth + 1);
+                          current.pop();
+                        }
+                      };
+                      generateCombinations([], 0);
+                      
+                      const totalNewVariants = combinations.length * selectedProducts.length;
+                      
+                      return (
+                        <div style={{
+                          padding: '12px 16px',
+                          backgroundColor: '#f0f9ff',
+                          borderRadius: '8px',
+                          border: '1px solid #bae6fd'
+                        }}>
+                          <BlockStack gap="200">
+                            <Text as="p" variant="bodySm" fontWeight="semibold">
+                              Preview: {combinations.length} variant{combinations.length === 1 ? '' : 's'} per product × {selectedProducts.length} product{selectedProducts.length === 1 ? '' : 's'} = {totalNewVariants} new variant{totalNewVariants === 1 ? '' : 's'}
+                            </Text>
+                            <div style={{ maxHeight: '100px', overflowY: 'auto' }}>
+                              <Text as="p" variant="bodyXs" tone="subdued">
+                                {combinations.slice(0, 10).map((combo, i) => (
+                                  <span key={i} style={{ display: 'block' }}>
+                                    • {combo.join(' / ')}
+                                  </span>
+                                ))}
+                                {combinations.length > 10 && (
+                                  <span style={{ display: 'block', fontStyle: 'italic' }}>
+                                    ...and {combinations.length - 10} more
+                                  </span>
+                                )}
+                              </Text>
+                            </div>
+                          </BlockStack>
+                        </div>
+                      );
+                    })()}
+
+                    <Button
+                      variant="primary"
+                      onClick={handleBulkAddVariants}
+                      loading={isAddingVariants}
+                      disabled={
+                        selectedProducts.length === 0 || 
+                        !variantOptions.some(opt => opt.name.trim() && opt.values.some(v => v.trim()))
+                      }
+                      size="large"
+                    >
+                      Add Variants to {String(selectedProducts.length)} Product{selectedProducts.length !== 1 ? 's' : ''}
+                    </Button>
+                  </BlockStack>
+                )}
+
               </BlockStack>
             </Card>
           )}
@@ -4653,7 +5314,7 @@ export function ProductManagement({
               <InlineStack gap="200" blockAlign="center">
                 <Icon source={AlertCircleIcon} tone="info" />
                 <Text as="p" variant="bodySm" tone="subdued">
-                  Your free trial includes full access to forecasting and analytics.
+                  Check your subscription status in Settings to see available features.
                 </Text>
               </InlineStack>
             </div>
