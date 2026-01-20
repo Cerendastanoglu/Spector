@@ -2608,23 +2608,23 @@ export function ProductManagement({
                   
                   {selectedProducts.length > 0 && (
                     <div className={styles.stepSuccess} style={{
-                      backgroundColor: isTrialMode && selectedProducts.length >= trialProductLimit ? '#FFF8E5' : undefined,
-                      border: isTrialMode && selectedProducts.length >= trialProductLimit ? '1px solid #FFD79D' : undefined,
-                      padding: isTrialMode && selectedProducts.length >= trialProductLimit ? '8px 12px' : undefined,
+                      backgroundColor: shouldApplyTrialRestrictions && selectedProducts.length >= trialProductLimit ? '#FFF8E5' : undefined,
+                      border: shouldApplyTrialRestrictions && selectedProducts.length >= trialProductLimit ? '1px solid #FFD79D' : undefined,
+                      padding: shouldApplyTrialRestrictions && selectedProducts.length >= trialProductLimit ? '8px 12px' : undefined,
                       borderRadius: '6px'
                     }}>
                       <Text as="p" variant="bodySm" tone="base" fontWeight="medium">
-                        {isTrialMode 
+                        {shouldApplyTrialRestrictions 
                           ? `${selectedProducts.length}/${trialProductLimit} products selected`
                           : `${selectedProducts.length} product${selectedProducts.length !== 1 ? 's' : ''} selected`
                         }
-                        {isTrialMode && selectedProducts.length >= trialProductLimit && (
+                        {shouldApplyTrialRestrictions && selectedProducts.length >= trialProductLimit && (
                           <span style={{ color: '#B98900', marginLeft: '8px' }}>
                             — Trial limit reached
                           </span>
                         )}
                       </Text>
-                      {isTrialMode && selectedProducts.length >= trialProductLimit && (
+                      {shouldApplyTrialRestrictions && selectedProducts.length >= trialProductLimit && (
                         <Text as="p" variant="bodySm" tone="caution">
                           Subscribe to unlock unlimited product selection
                         </Text>
@@ -2849,8 +2849,8 @@ export function ProductManagement({
           {/* Bulk Operation Categories - Only show in Step 2 */}
           {activeMainTab === 1 && (
             <>
-              {/* Trial Mode Warning Banner */}
-              {isTrialMode && (
+              {/* Trial Mode Warning Banner - only show for non-dev stores */}
+              {shouldApplyTrialRestrictions && (
                 <div style={{
                   padding: '12px 16px',
                   backgroundColor: '#FFF8E5',
@@ -3329,7 +3329,7 @@ export function ProductManagement({
                           const allProductIds = products.map(p => p.id);
                           
                           // Check trial limit
-                          if (isTrialMode && allProductIds.length > trialProductLimit) {
+                          if (shouldApplyTrialRestrictions && allProductIds.length > trialProductLimit) {
                             const limitedProductIds = allProductIds.slice(0, trialProductLimit);
                             const limitedProducts = products.filter(p => limitedProductIds.includes(p.id));
                             const limitedVariants = limitedProducts.flatMap(p => 
@@ -3355,7 +3355,7 @@ export function ProductManagement({
                         }}
                         disabled={products.length === 0}
                       >
-                        {isTrialMode ? `Select All (max ${trialProductLimit})` : 'Select All'}
+                        {shouldApplyTrialRestrictions ? `Select All (max ${trialProductLimit})` : 'Select All'}
                       </Button>
                       <Button
                         variant="secondary"
@@ -3363,7 +3363,7 @@ export function ProductManagement({
                         onClick={handleSelectAllFiltered}
                         disabled={!hasFiltersApplied() || filteredProducts.length === 0}
                       >
-                        {isTrialMode 
+                        {shouldApplyTrialRestrictions 
                           ? `Select Filtered (max ${Math.min(filteredProducts.length, trialProductLimit)})`
                           : `Select All Filtered (${filteredProducts.length})`
                         }
@@ -3375,7 +3375,7 @@ export function ProductManagement({
                           const outOfStockProducts = filteredProducts.filter(p => p.totalInventory === 0);
                           
                           // Check trial limit
-                          if (isTrialMode && outOfStockProducts.length > trialProductLimit) {
+                          if (shouldApplyTrialRestrictions && outOfStockProducts.length > trialProductLimit) {
                             const limitedProducts = outOfStockProducts.slice(0, trialProductLimit);
                             const limitedVariants = limitedProducts.flatMap(p => 
                               p.variants.edges.map(v => v.node.id)
