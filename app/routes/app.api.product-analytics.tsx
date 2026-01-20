@@ -169,8 +169,12 @@ async function getProductAnalytics(request: Request) {
                   node {
                     id
                     title
+                    sku
                     price
                     inventoryQuantity
+                    inventoryItem {
+                      tracked
+                    }
                   }
                 }
               }
@@ -333,11 +337,20 @@ async function getProductAnalytics(request: Request) {
         let maxPrice = 0;
         let totalInventory = 0;
         let validVariants = 0;
+        let hasTrackedInventory = false;
 
         variants.forEach(({ node: variant }: any) => {
           try {
             const price = parseFloat(variant.price || "0");
-            const inventory = parseInt(variant.inventoryQuantity) || 0;
+            // Handle null/undefined inventory - treat as 0 for OOS detection
+            const inventory = variant.inventoryQuantity !== null && variant.inventoryQuantity !== undefined 
+              ? parseInt(variant.inventoryQuantity) 
+              : 0;
+            const isTracked = variant.inventoryItem?.tracked === true;
+            
+            if (isTracked) {
+              hasTrackedInventory = true;
+            }
             
             if (price > 0 && !isNaN(price)) {
               validVariants++;
@@ -359,9 +372,11 @@ async function getProductAnalytics(request: Request) {
         });
 
         // Only process products with valid variants
+        // Consider product OOS if total inventory is 0 OR if inventory is not tracked
         if (validVariants > 0) {
           // Inventory status
           let inventoryStatus = 'Well Stocked';
+          // Product is OOS if inventory is 0 (regardless of tracking status for display purposes)
           if (totalInventory === 0) {
             inventoryStatus = 'Out of Stock';
             outOfStock++;
