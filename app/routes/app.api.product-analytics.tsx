@@ -360,16 +360,19 @@ async function getProductAnalytics(request: Request) {
               hasTrackedInventory = true;
             }
             
+            // Always count inventory for OOS detection, even for free products
+            validVariants++;
+            variantCount++;
+            totalInventory += inventory;
+            
+            // Only track pricing for products with prices > 0
             if (price > 0 && !isNaN(price)) {
-              validVariants++;
-              variantCount++;
               productValue += price;
               totalPrice += price;
               totalCatalogValue += price;
               
               minPrice = Math.min(minPrice, price);
               maxPrice = Math.max(maxPrice, price);
-              totalInventory += inventory;
               
               // Collect prices for dynamic range calculation
               allPrices.push(price);
