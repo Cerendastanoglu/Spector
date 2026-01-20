@@ -875,7 +875,6 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                         <Text as="h4" variant="headingMd" fontWeight="semibold">
                           Active Products Out of Stock ({productAnalyticsData.inventoryDistribution.outOfStock})
                         </Text>
-                        <Badge tone="success">Live products only</Badge>
                       </BlockStack>
                       <InlineStack gap="300">
                         <Button
@@ -915,9 +914,10 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                     
                     <Divider />
                     
-                    {/* OOS Product List */}
+                    {/* OOS Product List - Show max 5 with scroll */}
+                    <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
                     <BlockStack gap="300">
-                      {productAnalyticsData.outOfStockProducts?.map((product) => {
+                      {productAnalyticsData.outOfStockProducts?.slice(0, 5).map((product) => {
                         const currentBuffer = safetyStockBuffers[product.id] || 0;
                         const baseUnits = product.recommendedReorder || 10;
                         const bufferUnits = Math.ceil(baseUnits * (currentBuffer / 100));
@@ -989,7 +989,17 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                           </Text>
                         </Box>
                       )}
+                      
+                      {/* Show more indicator if more than 5 products */}
+                      {productAnalyticsData.outOfStockProducts && productAnalyticsData.outOfStockProducts.length > 5 && (
+                        <Box padding="200">
+                          <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+                            Showing 5 of {productAnalyticsData.outOfStockProducts.length} products • Scroll to see more in Forecast tab
+                          </Text>
+                        </Box>
+                      )}
                     </BlockStack>
+                    </div>
                   </BlockStack>
                 </Box>
               </Collapsible>
