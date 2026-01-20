@@ -332,7 +332,7 @@ export function ProductManagement({
   // Development stores get full access without restrictions
   const isTrialMode = !hasActiveSubscription && subscriptionStatus !== 'active';
   const shouldApplyTrialRestrictions = isTrialMode && !isDevelopmentStore;
-  const trialProductLimit = shouldApplyTrialRestrictions ? BILLING_CONFIG.TRIAL_PRODUCT_LIMIT : Infinity;
+  const trialProductLimit = BILLING_CONFIG.TRIAL_PRODUCT_LIMIT; // Always 10
   const checkTrialLimit = useCallback((productCount: number): boolean => {
     if (!shouldApplyTrialRestrictions) return true;
     return productCount <= trialProductLimit;
