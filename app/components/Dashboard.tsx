@@ -11,6 +11,11 @@ import {
   Spinner,
   Badge,
   Divider,
+  Collapsible,
+  Tooltip,
+  ButtonGroup,
+  Modal,
+  Banner,
 } from "@shopify/polaris";
 import {
   CashDollarIcon,
@@ -21,6 +26,8 @@ import {
   XIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from "@shopify/polaris-icons";
 import { logger } from "~/utils/logger";
 
@@ -51,6 +58,18 @@ interface ProductAnalyticsData {
     lowStock: number;
     outOfStock: number;
   };
+  outOfStockProducts: Array<{
+    id: string;
+    title: string;
+    handle: string;
+    sku: string | null;
+    price: number;
+    vendor: string | null;
+    variantIds: string[];
+    avgDailySales: number;
+    daysSinceLastSale: number | null;
+    recommendedReorder: number;
+  }>;
   priceAnalysis: {
     avgPrice: number;
     minPrice: number;
@@ -85,7 +104,7 @@ interface InventoryData {
   }>;
 }
 
-export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavigate: _onNavigate, shopDomain: _shopDomain, productAnalytics }: DashboardProps) {
+export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavigate, shopDomain: _shopDomain, productAnalytics }: DashboardProps) {
 
   // Core state
   const [timePeriod] = useState('30'); // Fixed at 30 days
@@ -102,7 +121,27 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
   
   // Price distribution slider
   const [priceDistributionIndex, setPriceDistributionIndex] = useState(0);
+  
+  // Out of Stock accordion state
+  const [isOosAccordionOpen, setIsOosAccordionOpen] = useState(false);
+  const [safetyStockBuffers, setSafetyStockBuffers] = useState<{ [productId: string]: number }>({});
+  
+  // Safety Stock Buffer confirmation modal state
+  const [bufferModalOpen, setBufferModalOpen] = useState(false);
+  const [bufferUpdateLoading, setBufferUpdateLoading] = useState(false);
+  const [bufferSuccessMessage, setBufferSuccessMessage] = useState<string | null>(null);
+  const [bufferErrorMessage, setBufferErrorMessage] = useState<string | null>(null);
+  const [pendingBufferAction, setPendingBufferAction] = useState<{
+    productId: string;
+    productTitle: string;
+    bufferPercent: number;
+    recommendedReorder: number;
+    totalUnits: number;
+    variantIds: string[];
+  } | null>(null);
 
+  // Inventory update fetcher for safety stock buffer
+  const inventoryUpdateFetcher = useFetcher<{ success?: boolean; error?: string }>();
 
   // Top Products Slider State
   
@@ -714,7 +753,37 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                   </Box>
                 </div>
                 
-                <div className="stock-card-wrapper">
+                {/* Out of Stock Card - Clickable */}
+                <div 
+                  className="stock-card-wrapper"
+                  onClick={() => productAnalyticsData.inventoryDistribution.outOfStock > 0 && setIsOosAccordionOpen(!isOosAccordionOpen)}
+                  style={{ 
+                    cursor: productAnalyticsData.inventoryDistribution.outOfStock > 0 ? 'pointer' : 'default',
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                    animation: productAnalyticsData.inventoryDistribution.outOfStock > 0 && !isOosAccordionOpen ? 'subtle-pulse 2s ease-in-out infinite' : 'none',
+                    borderRadius: '8px',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (productAnalyticsData.inventoryDistribution.outOfStock > 0) {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
+                  <style>{`
+                    @keyframes subtle-pulse {
+                      0%, 100% { 
+                        box-shadow: 0 0 0 0 rgba(228, 25, 59, 0); 
+                      }
+                      50% { 
+                        box-shadow: 0 0 0 3px rgba(228, 25, 59, 0.15); 
+                      }
+                    }
+                  `}</style>
                   <Box 
                     padding="300" 
                     background="bg-surface" 
@@ -733,12 +802,24 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                         </Box>
                         <BlockStack gap="050">
                           <Text as="p" variant="bodyMd" fontWeight="semibold">Out of Stock</Text>
-                          <Text as="p" variant="bodyXs" tone="subdued">Action needed</Text>
+                          <Text as="p" variant="bodyXs" tone="subdued">
+                            {productAnalyticsData.inventoryDistribution.outOfStock > 0 
+                              ? (isOosAccordionOpen ? 'Click to collapse' : 'Active products only →') 
+                              : 'All stocked ✓'}
+                          </Text>
                         </BlockStack>
                       </InlineStack>
-                      <Text as="p" variant="heading2xl" fontWeight="bold" tone="critical">
-                        {productAnalyticsData.inventoryDistribution.outOfStock}
-                      </Text>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Text as="p" variant="heading2xl" fontWeight="bold" tone="critical">
+                          {productAnalyticsData.inventoryDistribution.outOfStock}
+                        </Text>
+                        {productAnalyticsData.inventoryDistribution.outOfStock > 0 && (
+                          <Icon 
+                            source={isOosAccordionOpen ? ChevronUpIcon : ChevronDownIcon} 
+                            tone="subdued" 
+                          />
+                        )}
+                      </InlineStack>
                     </InlineStack>
                   </Box>
                 </div>
@@ -751,6 +832,167 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                   <Text as="p" variant="bodyMd" tone="subdued">Loading stock data...</Text>
                 </BlockStack>
               </Box>
+            )}
+
+            {/* Out of Stock Products Accordion */}
+            {productAnalyticsData?.inventoryDistribution?.outOfStock > 0 && (
+              <Collapsible
+                open={isOosAccordionOpen}
+                id="oos-accordion"
+                transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
+              >
+                <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                  <BlockStack gap="400">
+                    {/* Success/Error Banners */}
+                    {bufferSuccessMessage && (
+                      <Banner tone="success" onDismiss={() => setBufferSuccessMessage(null)}>
+                        {bufferSuccessMessage}
+                      </Banner>
+                    )}
+                    {bufferErrorMessage && (
+                      <Banner tone="critical" onDismiss={() => setBufferErrorMessage(null)}>
+                        {bufferErrorMessage}
+                      </Banner>
+                    )}
+                    
+                    {/* Explanation Banner */}
+                    <Box padding="300" background="bg-surface-info" borderRadius="200">
+                      <InlineStack gap="200" blockAlign="center">
+                        <Icon source={AlertCircleIcon} tone="info" />
+                        <BlockStack gap="100">
+                          <Text as="p" variant="bodySm">
+                            Set a safety stock buffer to order extra inventory and prevent future stockouts. Buffers are calculated from recommended reorder quantities.
+                          </Text>
+                          <Text as="p" variant="bodyXs" tone="subdued">
+                            Only showing <strong>Active</strong> (live) products that are out of stock. Draft and archived products are excluded.
+                          </Text>
+                        </BlockStack>
+                      </InlineStack>
+                    </Box>
+                    
+                    <InlineStack align="space-between" blockAlign="center">
+                      <BlockStack gap="100">
+                        <Text as="h4" variant="headingMd" fontWeight="semibold">
+                          Active Products Out of Stock ({productAnalyticsData.inventoryDistribution.outOfStock})
+                        </Text>
+                        <Badge tone="success">Live products only</Badge>
+                      </BlockStack>
+                      <InlineStack gap="300">
+                        <Button
+                          variant="primary"
+                          tone="success"
+                          onClick={() => onNavigate('forecasting')}
+                          icon={ChartVerticalIcon}
+                        >
+                          View Forecast
+                        </Button>
+                        <ButtonGroup>
+                          <Tooltip content="Add 10% extra inventory to ALL out of stock products below">
+                            <Button
+                              size="slim"
+                              onClick={() => {
+                                // TODO: Apply 10% buffer to all OOS products
+                                console.log('Apply 10% buffer');
+                              }}
+                            >
+                              +10% All
+                            </Button>
+                          </Tooltip>
+                          <Tooltip content="Add 20% extra inventory to ALL out of stock products below">
+                            <Button
+                              size="slim"
+                              onClick={() => {
+                                // TODO: Apply 20% buffer to all OOS products
+                                console.log('Apply 20% buffer');
+                              }}
+                            >
+                              +20% All
+                            </Button>
+                          </Tooltip>
+                        </ButtonGroup>
+                      </InlineStack>
+                    </InlineStack>
+                    
+                    <Divider />
+                    
+                    {/* OOS Product List */}
+                    <BlockStack gap="300">
+                      {productAnalyticsData.outOfStockProducts?.map((product) => {
+                        const currentBuffer = safetyStockBuffers[product.id] || 0;
+                        const baseUnits = product.recommendedReorder || 10;
+                        const bufferUnits = Math.ceil(baseUnits * (currentBuffer / 100));
+                        const totalUnits = baseUnits + bufferUnits;
+                        
+                        return (
+                          <Box key={product.id} padding="300" background="bg-surface" borderRadius="200" borderWidth="025" borderColor="border">
+                            <BlockStack gap="200">
+                              <InlineStack align="space-between" blockAlign="start" wrap={false}>
+                                <BlockStack gap="100">
+                                  <Text as="p" variant="bodyMd" fontWeight="semibold">{product.title}</Text>
+                                  <InlineStack gap="200">
+                                    {product.sku && <Text as="span" variant="bodySm" tone="subdued">SKU: {product.sku}</Text>}
+                                    <Text as="span" variant="bodySm" tone="subdued">{currencySymbol}{product.price.toFixed(2)}</Text>
+                                  </InlineStack>
+                                </BlockStack>
+                                <BlockStack gap="100" inlineAlign="end">
+                                  <Text as="p" variant="bodySm" tone="subdued">Recommended: {baseUnits} units</Text>
+                                  {currentBuffer > 0 && (
+                                    <Badge tone="info">+{currentBuffer}% buffer ({bufferUnits} extra)</Badge>
+                                  )}
+                                </BlockStack>
+                              </InlineStack>
+                              
+                              <InlineStack align="space-between" blockAlign="center">
+                                <ButtonGroup>
+                                  {[10, 20, 30].map((percent) => (
+                                    <Button
+                                      key={percent}
+                                      size="slim"
+                                      variant={currentBuffer === percent ? 'primary' : 'secondary'}
+                                      onClick={() => {
+                                        const newBuffer = currentBuffer === percent ? 0 : percent;
+                                        const newBufferUnits = Math.ceil(baseUnits * (newBuffer / 100));
+                                        const newTotal = baseUnits + newBufferUnits;
+                                        setPendingBufferAction({
+                                          productId: product.id,
+                                          productTitle: product.title,
+                                          bufferPercent: newBuffer,
+                                          recommendedReorder: baseUnits,
+                                          totalUnits: newTotal,
+                                          variantIds: product.variantIds || [],
+                                        });
+                                        setBufferModalOpen(true);
+                                      }}
+                                    >
+                                      +{percent}%
+                                    </Button>
+                                  ))}
+                                </ButtonGroup>
+                                <BlockStack gap="050" inlineAlign="end">
+                                  <Text as="p" variant="bodyMd" fontWeight="semibold" tone="success">
+                                    Order: {totalUnits} units
+                                  </Text>
+                                  <Text as="p" variant="bodyXs" tone="subdued">
+                                    {currentBuffer > 0 ? `(${baseUnits} + ${bufferUnits} buffer)` : 'No buffer added'}
+                                  </Text>
+                                </BlockStack>
+                              </InlineStack>
+                            </BlockStack>
+                          </Box>
+                        );
+                      })}
+                      
+                      {(!productAnalyticsData.outOfStockProducts || productAnalyticsData.outOfStockProducts.length === 0) && (
+                        <Box padding="400" background="bg-surface" borderRadius="200">
+                          <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
+                            No out of stock products found
+                          </Text>
+                        </Box>
+                      )}
+                    </BlockStack>
+                  </BlockStack>
+                </Box>
+              </Collapsible>
             )}
             
             {/* Stock Definition Note */}
@@ -1305,6 +1547,143 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
 
       
       </BlockStack>
+
+      {/* Safety Stock Buffer Confirmation Modal */}
+      <Modal
+        open={bufferModalOpen}
+        onClose={() => {
+          if (!bufferUpdateLoading) {
+            setBufferModalOpen(false);
+            setPendingBufferAction(null);
+          }
+        }}
+        title="Confirm Safety Stock Buffer"
+        primaryAction={{
+          content: bufferUpdateLoading ? 'Updating...' : (pendingBufferAction?.bufferPercent === 0 ? 'Remove Buffer' : 'Add Inventory'),
+          loading: bufferUpdateLoading,
+          onAction: async () => {
+            if (pendingBufferAction && pendingBufferAction.variantIds.length > 0) {
+              setBufferUpdateLoading(true);
+              
+              try {
+                // Call the inventory update API
+                const response = await fetch('/app/api/products', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    action: 'update-inventory',
+                    variantIds: pendingBufferAction.variantIds,
+                    stockQuantity: pendingBufferAction.totalUnits.toString(),
+                    stockUpdateMethod: 'set', // Set to exact quantity
+                  }),
+                });
+                
+                const result = await response.json();
+                
+                if (result.error) {
+                  console.error('Inventory update failed:', result.error);
+                  setBufferErrorMessage(`Failed to update inventory: ${result.error}`);
+                  setTimeout(() => setBufferErrorMessage(null), 5000);
+                  setBufferUpdateLoading(false);
+                  setBufferModalOpen(false);
+                  setPendingBufferAction(null);
+                  return;
+                }
+                
+                // Success - update local state and remove from OOS list
+                setSafetyStockBuffers(prev => ({
+                  ...prev,
+                  [pendingBufferAction.productId]: pendingBufferAction.bufferPercent,
+                }));
+                
+                // Remove the product from OOS list by refetching data
+                // The product should no longer be OOS after inventory update
+                setProductAnalyticsData(prev => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    outOfStockProducts: prev.outOfStockProducts.filter(p => p.id !== pendingBufferAction.productId),
+                    inventoryDistribution: {
+                      ...prev.inventoryDistribution,
+                      outOfStock: Math.max(0, prev.inventoryDistribution.outOfStock - 1),
+                      wellStocked: prev.inventoryDistribution.wellStocked + 1,
+                    }
+                  };
+                });
+                
+                // Show success message
+                setBufferSuccessMessage(`✓ Added ${pendingBufferAction.totalUnits} units to "${pendingBufferAction.productTitle}"`);
+                setTimeout(() => setBufferSuccessMessage(null), 5000);
+                
+                setBufferModalOpen(false);
+                setPendingBufferAction(null);
+              } catch (error) {
+                console.error('Error updating inventory:', error);
+                setBufferErrorMessage('Failed to update inventory. Please try again.');
+                setTimeout(() => setBufferErrorMessage(null), 5000);
+              } finally {
+                setBufferUpdateLoading(false);
+              }
+            } else {
+              // No variant IDs - show error
+              setBufferErrorMessage('Cannot update inventory: No variant IDs available');
+              setTimeout(() => setBufferErrorMessage(null), 5000);
+              setBufferModalOpen(false);
+              setPendingBufferAction(null);
+            }
+          },
+          tone: pendingBufferAction?.bufferPercent === 0 ? 'critical' : undefined,
+        }}
+        secondaryActions={[
+          {
+            content: 'Cancel',
+            disabled: bufferUpdateLoading,
+            onAction: () => {
+              setBufferModalOpen(false);
+              setPendingBufferAction(null);
+            },
+          },
+        ]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            {pendingBufferAction && (
+              <>
+                <Text as="p" variant="bodyMd">
+                  {pendingBufferAction.bufferPercent === 0 
+                    ? `Are you sure you want to remove the safety stock buffer from "${pendingBufferAction.productTitle}"?`
+                    : `Are you sure you want to add ${pendingBufferAction.totalUnits} units of inventory to "${pendingBufferAction.productTitle}"?`
+                  }
+                </Text>
+                <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                  <BlockStack gap="200">
+                    <InlineStack align="space-between">
+                      <Text as="span" variant="bodySm" tone="subdued">Recommended reorder:</Text>
+                      <Text as="span" variant="bodySm" fontWeight="semibold">{pendingBufferAction.recommendedReorder} units</Text>
+                    </InlineStack>
+                    {pendingBufferAction.bufferPercent > 0 && (
+                      <>
+                        <InlineStack align="space-between">
+                          <Text as="span" variant="bodySm" tone="subdued">Buffer ({pendingBufferAction.bufferPercent}%):</Text>
+                          <Text as="span" variant="bodySm" fontWeight="semibold">+{Math.ceil(pendingBufferAction.recommendedReorder * (pendingBufferAction.bufferPercent / 100))} units</Text>
+                        </InlineStack>
+                        <Divider />
+                        <InlineStack align="space-between">
+                          <Text as="span" variant="bodyMd" fontWeight="semibold">Total to order:</Text>
+                          <Text as="span" variant="bodyMd" fontWeight="bold" tone="success">{pendingBufferAction.totalUnits} units</Text>
+                        </InlineStack>
+                      </>
+                    )}
+                  </BlockStack>
+                </Box>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  This buffer helps prevent future stockouts by ordering extra inventory above the minimum recommended amount.
+                </Text>
+              </>
+            )}
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
     </>
   );
 }

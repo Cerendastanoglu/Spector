@@ -5,6 +5,23 @@ import { applyRateLimit } from "~/utils/rateLimit";
 import { RATE_LIMITS } from "~/utils/security";
 import { logger } from "~/utils/logger";
 
+interface OutOfStockProduct {
+  id: string;
+  title: string;
+  handle: string;
+  sku: string;
+  price: number;
+  vendor: string;
+  productType: string;
+  totalVariants: number;
+  outOfStockVariants: number;
+  variantIds: string[];  // All variant IDs for inventory updates
+  avgDailySales: number;  // From order history
+  daysSinceLastSale: number;
+  recommendedReorder: number;
+  safetyStockBuffer: number | null;  // User-set buffer percentage
+}
+
 interface ProductAnalyticsData {
   totalProducts: number;
   activeProducts: number;
@@ -24,6 +41,8 @@ interface ProductAnalyticsData {
     lowStock: number;
     outOfStock: number;
   };
+  outOfStockProducts: OutOfStockProduct[];  // Detailed list of OOS products
+  lowStockProducts: OutOfStockProduct[];     // Detailed list of low stock products
   priceAnalysis: {
     avgPrice: number;
     minPrice: number;
@@ -257,6 +276,10 @@ async function getProductAnalytics(request: Request) {
       priceRange: string;
     }> = [];
 
+    // Lists for out-of-stock and low-stock products
+    const outOfStockProducts: OutOfStockProduct[] = [];
+    const lowStockProducts: OutOfStockProduct[] = [];
+
     // Dynamic price ranges that will be calculated based on actual data
     const allPrices: number[] = [];
     
@@ -342,9 +365,49 @@ async function getProductAnalytics(request: Request) {
           if (totalInventory === 0) {
             inventoryStatus = 'Out of Stock';
             outOfStock++;
+            
+            // Add to out-of-stock products list
+            const firstVariant = variants[0]?.node;
+            const variantIds = variants.map((v: any) => v.node?.id).filter(Boolean);
+            outOfStockProducts.push({
+              id: product.id,
+              title: product.title || 'Unnamed Product',
+              handle: product.handle || '',
+              sku: firstVariant?.sku || '',
+              price: minPrice !== Infinity ? minPrice : 0,
+              vendor: product.vendor || '',
+              productType: product.productType || '',
+              totalVariants: validVariants,
+              outOfStockVariants: validVariants, // All variants are OOS
+              variantIds: variantIds,
+              avgDailySales: 0, // Will be calculated from orders
+              daysSinceLastSale: 0, // Will be calculated from orders
+              recommendedReorder: 10, // Default recommendation
+              safetyStockBuffer: null
+            });
           } else if (totalInventory <= 10) {
             inventoryStatus = 'Low Stock';
             lowStock++;
+            
+            // Add to low-stock products list
+            const firstVariant = variants[0]?.node;
+            const lowStockVariantIds = variants.map((v: any) => v.node?.id).filter(Boolean);
+            lowStockProducts.push({
+              id: product.id,
+              title: product.title || 'Unnamed Product',
+              handle: product.handle || '',
+              sku: firstVariant?.sku || '',
+              price: minPrice !== Infinity ? minPrice : 0,
+              vendor: product.vendor || '',
+              productType: product.productType || '',
+              totalVariants: validVariants,
+              outOfStockVariants: variants.filter((v: any) => (parseInt(v.node.inventoryQuantity) || 0) === 0).length,
+              variantIds: lowStockVariantIds,
+              avgDailySales: 0,
+              daysSinceLastSale: 0,
+              recommendedReorder: Math.max(10, 20 - totalInventory), // Suggest bringing to 20 units
+              safetyStockBuffer: null
+            });
           } else {
             wellStocked++;
           }
@@ -362,6 +425,57 @@ async function getProductAnalytics(request: Request) {
             priceRange
           });
         }
+      }
+    });
+
+    // Calculate sales data for OOS and low-stock products from orders
+    const productSalesData: { [productId: string]: { totalSold: number; lastSaleDate: string | null } } = {};
+    
+    orders.forEach(({ node: order }: any) => {
+      const lineItems = order.lineItems?.edges || [];
+      const orderDate = order.createdAt;
+      
+      lineItems.forEach(({ node: lineItem }: any) => {
+        const productId = lineItem.variant?.product?.id;
+        if (productId) {
+          if (!productSalesData[productId]) {
+            productSalesData[productId] = { totalSold: 0, lastSaleDate: null };
+          }
+          productSalesData[productId].totalSold += parseInt(lineItem.quantity) || 1;
+          if (!productSalesData[productId].lastSaleDate || orderDate > productSalesData[productId].lastSaleDate) {
+            productSalesData[productId].lastSaleDate = orderDate;
+          }
+        }
+      });
+    });
+
+    // Update OOS products with sales data
+    const now = new Date();
+    const daysInPeriod = 60; // Orders are from last 60 days
+    
+    outOfStockProducts.forEach(product => {
+      const salesData = productSalesData[product.id];
+      if (salesData) {
+        product.avgDailySales = Math.round((salesData.totalSold / daysInPeriod) * 100) / 100;
+        if (salesData.lastSaleDate) {
+          const lastSale = new Date(salesData.lastSaleDate);
+          product.daysSinceLastSale = Math.floor((now.getTime() - lastSale.getTime()) / (1000 * 60 * 60 * 24));
+        }
+        // Recommended reorder: 7 days coverage + safety buffer
+        product.recommendedReorder = Math.max(10, Math.ceil(product.avgDailySales * 7));
+      }
+    });
+
+    lowStockProducts.forEach(product => {
+      const salesData = productSalesData[product.id];
+      if (salesData) {
+        product.avgDailySales = Math.round((salesData.totalSold / daysInPeriod) * 100) / 100;
+        if (salesData.lastSaleDate) {
+          const lastSale = new Date(salesData.lastSaleDate);
+          product.daysSinceLastSale = Math.floor((now.getTime() - lastSale.getTime()) / (1000 * 60 * 60 * 24));
+        }
+        // Recommended reorder to bring to 7 days coverage
+        product.recommendedReorder = Math.max(10, Math.ceil(product.avgDailySales * 7));
       }
     });
 
@@ -389,6 +503,8 @@ async function getProductAnalytics(request: Request) {
         lowStock,
         outOfStock
       },
+      outOfStockProducts,
+      lowStockProducts,
       priceAnalysis: {
         avgPrice: avgProductPrice,
         minPrice: allPrices.length > 0 ? Math.min(...allPrices) : 0,
