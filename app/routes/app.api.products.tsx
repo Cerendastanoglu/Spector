@@ -2462,13 +2462,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           // Check existing options - Shopify allows max 3 options
           const existingOptions = product.options || [];
           
-          // For products with only "Title" option (default), we can replace it
+          // For products with only "Title" option (default), we need to replace it
           const hasOnlyDefaultOption = existingOptions.length === 1 && 
             existingOptions[0].name === 'Title' && 
             existingOptions[0].values.length === 1 && 
             existingOptions[0].values[0] === 'Default Title';
 
-          // Check if we're adding new options or just values to existing (use normalized names)
+          // Check if we would exceed 3 options
           const newOptionsNeeded = normalizedOptions.filter(opt => 
             !existingOptions.some((existing: any) => 
               existing.name.toLowerCase() === opt.name.toLowerCase()
@@ -2488,53 +2488,83 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             continue;
           }
 
-          // Build variants to create with selected options (use normalized options)
-          const variantsToCreate = variantCombinations.map(combo => {
-            // Build the options array in order
-            const variantOptions: string[] = [];
-            for (const opt of normalizedOptions) {
-              variantOptions.push(combo[opt.name]);
-            }
-            return variantOptions;
-          });
+          // STEP 1: If product has only default option or needs new options, use productOptionsCreate first
+          if (hasOnlyDefaultOption || newOptionsNeeded.length > 0) {
+            console.log(`📝 Creating/updating options for product ${productId}`);
+            
+            // Prepare options for creation
+            const optionsToCreate = normalizedOptions.map((opt, idx) => ({
+              name: opt.name,
+              position: idx + 1,
+              values: opt.values.map(v => ({ name: v }))
+            }));
 
-          // Get existing variant option combinations to avoid duplicates
-          const existingVariantKeys = new Set(
-            product.variants.edges.map((v: any) => 
-              v.node.selectedOptions.map((o: any) => o.value).join('|')
-            )
-          );
+            console.log(`📝 Options to create:`, JSON.stringify(optionsToCreate, null, 2));
 
-          // Filter out variants that already exist
-          const newVariants = variantsToCreate.filter(optionValues => {
-            const key = optionValues.join('|');
-            return !existingVariantKeys.has(key);
-          });
-
-          if (newVariants.length === 0) {
-            console.log(`ℹ️ All variants already exist for product ${productId}`);
-            results.push({
-              productId,
-              success: true,
-              variantsCreated: 0
+            const createOptionsResponse = await admin.graphql(`#graphql
+              mutation productOptionsCreate($productId: ID!, $options: [OptionCreateInput!]!) {
+                productOptionsCreate(productId: $productId, options: $options) {
+                  product {
+                    id
+                    options {
+                      id
+                      name
+                      position
+                      values
+                    }
+                  }
+                  userErrors {
+                    field
+                    message
+                    code
+                  }
+                }
+              }
+            `, {
+              variables: {
+                productId,
+                options: optionsToCreate
+              }
             });
-            continue;
+
+            const createOptionsJson: any = await createOptionsResponse.json();
+            console.log(`📥 Create options response:`, JSON.stringify(createOptionsJson, null, 2));
+
+            if (createOptionsJson.errors) {
+              console.error(`❌ GraphQL errors creating options for ${productId}:`, createOptionsJson.errors);
+              results.push({
+                productId,
+                success: false,
+                error: createOptionsJson.errors.map((e: any) => e.message).join(', ')
+              });
+              continue;
+            }
+
+            if (createOptionsJson.data?.productOptionsCreate?.userErrors?.length > 0) {
+              const errors = createOptionsJson.data.productOptionsCreate.userErrors;
+              console.error(`❌ User errors creating options for ${productId}:`, errors);
+              results.push({
+                productId,
+                success: false,
+                error: errors.map((e: any) => `${e.field || 'Error'}: ${e.message}`).join(', ')
+              });
+              continue;
+            }
+
+            console.log(`✅ Options created for product ${productId}`);
           }
 
-          console.log(`📝 Creating ${newVariants.length} new variants for product ${productId}`);
-
-          // Use productVariantsBulkCreate with strategy REMOVE_STANDALONE_VARIANT
-          // This will automatically update product options based on variant options
-          // Note: optionName should match Shopify's standard option names (Color, Size, Material, etc.)
-          const variantsInput = newVariants.map(optionValues => ({
-            optionValues: normalizedOptions.map((opt, idx) => ({
-              optionName: opt.name,  // e.g., "Color", "Size", "Material"
-              name: optionValues[idx]  // e.g., "Red", "Small", "Cotton"
+          // STEP 2: Now create the variants
+          // Build variants input - each variant needs option values
+          const variantsInput = variantCombinations.map(combo => ({
+            optionValues: normalizedOptions.map(opt => ({
+              optionName: opt.name,
+              name: combo[opt.name]
             }))
           }));
 
-          console.log(`📝 Variants input:`, JSON.stringify(variantsInput, null, 2));
-          console.log(`📝 Using strategy: ${hasOnlyDefaultOption ? 'REMOVE_STANDALONE_VARIANT' : 'DEFAULT'}`);
+          console.log(`📝 Creating ${variantsInput.length} variants for product ${productId}`);
+          console.log(`📝 Variants input:`, JSON.stringify(variantsInput.slice(0, 3), null, 2));
 
           const createVariantsResponse = await admin.graphql(`#graphql
             mutation productVariantsBulkCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!, $strategy: ProductVariantsBulkCreateStrategy) {
@@ -2590,7 +2620,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             results.push({
               productId,
               success: false,
-              error: errors.map((e: any) => `${e.field}: ${e.message}`).join(', ')
+              error: errors.map((e: any) => `${e.field || 'Error'}: ${e.message}`).join(', ')
             });
             continue;
           }
