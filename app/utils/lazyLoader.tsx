@@ -2,6 +2,8 @@
  * Lazy component loader for bundle size optimization
  * Components are loaded only when their tabs are expanded/clicked
  * Maintains exact same UI and functionality while reducing initial bundle size
+ * 
+ * NOTE: Dashboard is NOT lazy loaded - it's the default view and affects LCP
  */
 
 import { lazy, Suspense } from 'react';
@@ -20,11 +22,9 @@ const LazyProductManagement = lazy(() =>
   }))
 );
 
-const LazyDashboard = lazy(() => 
-  import('../components/Dashboard').then(module => ({ 
-    default: module.Dashboard 
-  }))
-);
+// Dashboard is imported directly (not lazy) to improve LCP
+// It's the default view that users see first
+import { Dashboard } from '../components/Dashboard';
 
 /**
  * Enhanced loading fallback component with better UX
@@ -84,11 +84,8 @@ export const OptimizedComponents = {
     </Suspense>
   ),
   
-  Dashboard: (props: any) => (
-    <Suspense fallback={<ComponentLoader componentName="Dashboard" />}>
-      <LazyDashboard {...props} />
-    </Suspense>
-  ),
+  // Dashboard is NOT lazy loaded - direct render for better LCP
+  Dashboard: Dashboard,
 };
 
 /**
@@ -101,9 +98,7 @@ export const useComponentPreloader = () => {
       case 'ProductManagement':
         import('../components/ProductManagement');
         break;
-      case 'Dashboard':
-        import('../components/Dashboard');
-        break;
+      // Dashboard is already loaded (not lazy), no preload needed
     }
   };
 

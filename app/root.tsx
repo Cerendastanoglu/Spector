@@ -14,9 +14,6 @@ export default function App() {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         
-        {/* Shopify App Bridge - Required for embedded apps */}
-        <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js" defer></script>
-        
         {/* Performance optimizations */}
         <link rel="preconnect" href="https://cdn.shopify.com/" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://cdn.shopify.com/" />
