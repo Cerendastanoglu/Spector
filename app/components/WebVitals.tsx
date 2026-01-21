@@ -22,7 +22,14 @@ const THRESHOLDS = {
 };
 
 function sendToAnalytics(metric: Metric) {
-  // Only log in development mode, silent in production
+  // Always log LCP to console so we can measure it for Built for Shopify
+  // LCP needs to be < 2500ms (2.5 seconds) for good rating
+  if (metric.name === 'LCP') {
+    const statusEmoji = metric.value <= 2500 ? '✅' : metric.value <= 4000 ? '⚠️' : '❌';
+    console.log(`${statusEmoji} LCP: ${metric.value.toFixed(0)}ms (${metric.rating}) - Target: <2500ms`);
+  }
+  
+  // Log all vitals in development mode
   if (process.env.NODE_ENV === 'development') {
     logger.info('📊 Web Vital:', {
       name: metric.name,
