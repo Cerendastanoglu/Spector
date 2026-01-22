@@ -1,13 +1,15 @@
 /**
  * Rate Limiting Middleware for API Routes
- * Use this to protect API endpoints from abuse
+ * Uses Redis for distributed rate limiting across Cloud Run instances
+ * Falls back to in-memory if Redis is unavailable
  */
 
 import { json } from "@remix-run/node";
-import { checkRateLimit, getRateLimitIdentifier, RATE_LIMITS, type RateLimitConfig } from "./security";
+import { getRateLimitIdentifier, RATE_LIMITS, type RateLimitConfig } from "./security";
+import { redisRateLimit } from "./redis.server";
 
 /**
- * Apply rate limiting to a request
+ * Apply rate limiting to a request (async - uses Redis)
  * Returns null if allowed, or a Response object with 429 status if rate limited
  */
 export async function applyRateLimit(
@@ -15,7 +17,9 @@ export async function applyRateLimit(
   config: RateLimitConfig = RATE_LIMITS.API_DEFAULT
 ): Promise<Response | null> {
   const identifier = getRateLimitIdentifier(request);
-  const { allowed, resetTime } = checkRateLimit(identifier, config);
+  
+  // Use Redis-backed rate limiting (falls back to in-memory automatically)
+  const { allowed, resetTime } = await redisRateLimit(identifier, config);
   
   if (!allowed) {
     const resetDate = new Date(resetTime);
@@ -45,14 +49,14 @@ export async function applyRateLimit(
 }
 
 /**
- * Get rate limit headers for successful responses
+ * Get rate limit headers for successful responses (async - uses Redis)
  */
-export function getRateLimitHeaders(
+export async function getRateLimitHeaders(
   request: Request,
   config: RateLimitConfig = RATE_LIMITS.API_DEFAULT
-): Record<string, string> {
+): Promise<Record<string, string>> {
   const identifier = getRateLimitIdentifier(request);
-  const { remaining, resetTime } = checkRateLimit(identifier, config);
+  const { remaining, resetTime } = await redisRateLimit(identifier, config);
   
   return {
     'X-RateLimit-Limit': String(config.maxRequests),
