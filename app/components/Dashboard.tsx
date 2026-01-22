@@ -139,6 +139,20 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     totalUnits: number;
     variantIds: string[];
   } | null>(null);
+  
+  // Bulk buffer action state (for "Apply to All" buttons)
+  const [pendingBulkBufferAction, setPendingBulkBufferAction] = useState<{
+    products: Array<{
+      productId: string;
+      productTitle: string;
+      recommendedReorder: number;
+      totalUnits: number;
+      variantIds: string[];
+    }>;
+    bufferPercent: number;
+    totalProducts: number;
+    totalUnits: number;
+  } | null>(null);
 
   // Inventory update fetcher for safety stock buffer
   const inventoryUpdateFetcher = useFetcher<{ success?: boolean; error?: string }>();
@@ -889,9 +903,32 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                           <Tooltip content="Add 10% extra inventory to ALL out of stock products below">
                             <Button
                               size="slim"
+                              disabled={!productAnalyticsData?.outOfStockProducts?.length}
                               onClick={() => {
-                                // TODO: Apply 10% buffer to all OOS products
-                                console.log('Apply 10% buffer');
+                                const oosProducts = productAnalyticsData?.outOfStockProducts || [];
+                                if (oosProducts.length === 0) return;
+                                
+                                const bufferPercent = 10;
+                                const bulkProducts = oosProducts.map(product => {
+                                  const baseUnits = product.recommendedReorder || 10;
+                                  const bufferUnits = Math.ceil(baseUnits * (bufferPercent / 100));
+                                  const totalUnits = baseUnits + bufferUnits;
+                                  return {
+                                    productId: product.id,
+                                    productTitle: product.title,
+                                    recommendedReorder: baseUnits,
+                                    totalUnits,
+                                    variantIds: product.variantIds || [],
+                                  };
+                                });
+                                
+                                setPendingBulkBufferAction({
+                                  products: bulkProducts,
+                                  bufferPercent,
+                                  totalProducts: bulkProducts.length,
+                                  totalUnits: bulkProducts.reduce((sum, p) => sum + p.totalUnits, 0),
+                                });
+                                setBufferModalOpen(true);
                               }}
                             >
                               +10% All
@@ -900,9 +937,32 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                           <Tooltip content="Add 20% extra inventory to ALL out of stock products below">
                             <Button
                               size="slim"
+                              disabled={!productAnalyticsData?.outOfStockProducts?.length}
                               onClick={() => {
-                                // TODO: Apply 20% buffer to all OOS products
-                                console.log('Apply 20% buffer');
+                                const oosProducts = productAnalyticsData?.outOfStockProducts || [];
+                                if (oosProducts.length === 0) return;
+                                
+                                const bufferPercent = 20;
+                                const bulkProducts = oosProducts.map(product => {
+                                  const baseUnits = product.recommendedReorder || 10;
+                                  const bufferUnits = Math.ceil(baseUnits * (bufferPercent / 100));
+                                  const totalUnits = baseUnits + bufferUnits;
+                                  return {
+                                    productId: product.id,
+                                    productTitle: product.title,
+                                    recommendedReorder: baseUnits,
+                                    totalUnits,
+                                    variantIds: product.variantIds || [],
+                                  };
+                                });
+                                
+                                setPendingBulkBufferAction({
+                                  products: bulkProducts,
+                                  bufferPercent,
+                                  totalProducts: bulkProducts.length,
+                                  totalUnits: bulkProducts.reduce((sum, p) => sum + p.totalUnits, 0),
+                                });
+                                setBufferModalOpen(true);
                               }}
                             >
                               +20% All
@@ -1558,21 +1618,110 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
       
       </BlockStack>
 
-      {/* Safety Stock Buffer Confirmation Modal */}
+      {/* Safety Stock Buffer Confirmation Modal - Supports both single and bulk operations */}
       <Modal
         open={bufferModalOpen}
         onClose={() => {
           if (!bufferUpdateLoading) {
             setBufferModalOpen(false);
             setPendingBufferAction(null);
+            setPendingBulkBufferAction(null);
           }
         }}
-        title="Confirm Safety Stock Buffer"
+        title={pendingBulkBufferAction ? `Apply ${pendingBulkBufferAction.bufferPercent}% Buffer to All Products` : "Confirm Safety Stock Buffer"}
         primaryAction={{
-          content: bufferUpdateLoading ? 'Updating...' : (pendingBufferAction?.bufferPercent === 0 ? 'Remove Buffer' : 'Add Inventory'),
+          content: bufferUpdateLoading ? 'Updating...' : (pendingBulkBufferAction ? `Add Inventory to ${pendingBulkBufferAction.totalProducts} Products` : (pendingBufferAction?.bufferPercent === 0 ? 'Remove Buffer' : 'Add Inventory')),
           loading: bufferUpdateLoading,
           onAction: async () => {
-            if (pendingBufferAction && pendingBufferAction.variantIds.length > 0) {
+            // Handle BULK buffer action
+            if (pendingBulkBufferAction && pendingBulkBufferAction.products.length > 0) {
+              setBufferUpdateLoading(true);
+              let successCount = 0;
+              let failCount = 0;
+              const updatedProductIds: string[] = [];
+              
+              try {
+                // Process each product sequentially to avoid overwhelming the API
+                for (const product of pendingBulkBufferAction.products) {
+                  if (product.variantIds.length === 0) {
+                    failCount++;
+                    continue;
+                  }
+                  
+                  try {
+                    const response = await fetch('/app/api/products', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        action: 'update-inventory',
+                        variantIds: product.variantIds,
+                        stockQuantity: product.totalUnits.toString(),
+                        stockUpdateMethod: 'set',
+                      }),
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.error) {
+                      console.error(`Failed to update ${product.productTitle}:`, result.error);
+                      failCount++;
+                    } else {
+                      successCount++;
+                      updatedProductIds.push(product.productId);
+                      
+                      // Update local buffer state
+                      setSafetyStockBuffers(prev => ({
+                        ...prev,
+                        [product.productId]: pendingBulkBufferAction.bufferPercent,
+                      }));
+                    }
+                  } catch (err) {
+                    console.error(`Error updating ${product.productTitle}:`, err);
+                    failCount++;
+                  }
+                }
+                
+                // Update the OOS products list - remove successfully updated products
+                if (successCount > 0) {
+                  setProductAnalyticsData(prev => {
+                    if (!prev) return prev;
+                    return {
+                      ...prev,
+                      outOfStockProducts: prev.outOfStockProducts.filter(p => !updatedProductIds.includes(p.id)),
+                      inventoryDistribution: {
+                        ...prev.inventoryDistribution,
+                        outOfStock: Math.max(0, prev.inventoryDistribution.outOfStock - successCount),
+                        wellStocked: prev.inventoryDistribution.wellStocked + successCount,
+                      }
+                    };
+                  });
+                }
+                
+                // Show appropriate message
+                if (failCount === 0) {
+                  setBufferSuccessMessage(`✓ Added inventory to ${successCount} products with +${pendingBulkBufferAction.bufferPercent}% buffer`);
+                } else if (successCount > 0) {
+                  setBufferSuccessMessage(`✓ Updated ${successCount} products. ${failCount} failed.`);
+                } else {
+                  setBufferErrorMessage(`Failed to update all ${failCount} products. Please try again.`);
+                }
+                setTimeout(() => {
+                  setBufferSuccessMessage(null);
+                  setBufferErrorMessage(null);
+                }, 5000);
+                
+              } catch (error) {
+                console.error('Error in bulk inventory update:', error);
+                setBufferErrorMessage('Failed to update inventory. Please try again.');
+                setTimeout(() => setBufferErrorMessage(null), 5000);
+              } finally {
+                setBufferUpdateLoading(false);
+                setBufferModalOpen(false);
+                setPendingBulkBufferAction(null);
+              }
+            }
+            // Handle SINGLE product buffer action
+            else if (pendingBufferAction && pendingBufferAction.variantIds.length > 0) {
               setBufferUpdateLoading(true);
               
               try {
@@ -1640,6 +1789,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
               setTimeout(() => setBufferErrorMessage(null), 5000);
               setBufferModalOpen(false);
               setPendingBufferAction(null);
+              setPendingBulkBufferAction(null);
             }
           },
           tone: pendingBufferAction?.bufferPercent === 0 ? 'critical' : undefined,
@@ -1651,13 +1801,54 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
             onAction: () => {
               setBufferModalOpen(false);
               setPendingBufferAction(null);
+              setPendingBulkBufferAction(null);
             },
           },
         ]}
       >
         <Modal.Section>
           <BlockStack gap="400">
-            {pendingBufferAction && (
+            {/* BULK action modal content */}
+            {pendingBulkBufferAction && (
+              <>
+                <Text as="p" variant="bodyMd">
+                  Are you sure you want to add a <strong>+{pendingBulkBufferAction.bufferPercent}% buffer</strong> to all <strong>{pendingBulkBufferAction.totalProducts}</strong> out of stock products?
+                </Text>
+                <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                  <BlockStack gap="200">
+                    <InlineStack align="space-between">
+                      <Text as="span" variant="bodySm" tone="subdued">Products to update:</Text>
+                      <Text as="span" variant="bodySm" fontWeight="semibold">{pendingBulkBufferAction.totalProducts}</Text>
+                    </InlineStack>
+                    <InlineStack align="space-between">
+                      <Text as="span" variant="bodySm" tone="subdued">Buffer percentage:</Text>
+                      <Text as="span" variant="bodySm" fontWeight="semibold">+{pendingBulkBufferAction.bufferPercent}%</Text>
+                    </InlineStack>
+                    <Divider />
+                    <InlineStack align="space-between">
+                      <Text as="span" variant="bodyMd" fontWeight="semibold">Total units to add:</Text>
+                      <Text as="span" variant="bodyMd" fontWeight="bold" tone="success">{pendingBulkBufferAction.totalUnits} units</Text>
+                    </InlineStack>
+                  </BlockStack>
+                </Box>
+                {pendingBulkBufferAction.totalProducts > 5 && (
+                  <Box padding="200" background="bg-surface-warning" borderRadius="200">
+                    <InlineStack gap="200" blockAlign="center">
+                      <Icon source={AlertCircleIcon} tone="warning" />
+                      <Text as="p" variant="bodySm">
+                        This will update {pendingBulkBufferAction.totalProducts} products. This may take a moment.
+                      </Text>
+                    </InlineStack>
+                  </Box>
+                )}
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Each product's inventory will be set to its recommended reorder quantity plus the {pendingBulkBufferAction.bufferPercent}% buffer.
+                </Text>
+              </>
+            )}
+            
+            {/* SINGLE product action modal content */}
+            {pendingBufferAction && !pendingBulkBufferAction && (
               <>
                 <Text as="p" variant="bodyMd">
                   {pendingBufferAction.bufferPercent === 0 
