@@ -17,6 +17,9 @@ import {
   ChartPopularIcon,
   LightbulbIcon,
   StarFilledIcon,
+  AutomationIcon,
+  CollectionIcon,
+  HashtagIcon,
 } from "@shopify/polaris-icons";
 import styles from "./WelcomeModal.module.css";
 
@@ -206,7 +209,69 @@ export function WelcomeModal({
       )
     },
     
-    // Slide 3: Forecasting
+    // Slide 3: Automation
+    {
+      icon: AutomationIcon,
+      iconClass: `${styles.iconWrapperStatic} ${styles.iconWrapperSlide3}`,
+      title: "Automation Rules",
+      subtitle: "Let rules do the work while you focus on growth",
+      content: (
+        <BlockStack gap="400">
+          <div className={styles.insightCard}>
+            <div className={styles.insightGlow}></div>
+            <div className={styles.insightContent}>
+              <Text as="p" variant="bodyMd" alignment="center">
+                Set up rules once and let Spector automatically organize your products based on your criteria
+              </Text>
+            </div>
+          </div>
+          
+          <BlockStack gap="300">
+            <div className={`${styles.benefitCard} ${styles.float1}`}>
+              <div className={styles.benefitBadge}>
+                <Icon source={CollectionIcon} />
+              </div>
+              <div className={styles.benefitText}>
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  Collection Rules
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Auto-add products to collections based on title, price, or inventory
+                </Text>
+              </div>
+            </div>
+
+            <div className={`${styles.benefitCard} ${styles.float2}`}>
+              <div className={styles.benefitBadge}>
+                <Icon source={HashtagIcon} />
+              </div>
+              <div className={styles.benefitText}>
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  Tag Automation
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Automatically tag products matching your conditions
+                </Text>
+              </div>
+            </div>
+          </BlockStack>
+
+          <div className={styles.ctaCard}>
+            <Text as="p" variant="bodyMd" alignment="center">
+              <span className={styles.ctaIcon}>
+                <Icon source={AutomationIcon} />
+              </span>
+              <strong> Save hours every week</strong>
+            </Text>
+            <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+              Rules run automatically so you never have to manually organize again
+            </Text>
+          </div>
+        </BlockStack>
+      )
+    },
+    
+    // Slide 4: Forecasting
     {
       icon: ChartVerticalIcon,
       iconClass: `${styles.iconWrapperStatic} ${styles.iconWrapperSlide3}`,

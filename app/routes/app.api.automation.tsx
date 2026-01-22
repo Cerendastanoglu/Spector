@@ -512,23 +512,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       preorderLimit?: number;
     }};
     
+    console.log('🔵 Running schedule:', schedule.name, 'for product:', schedule.productTitle, 'ID:', schedule.productId);
+    
     try {
-      // First find the product by title
-      const productsResponse = await admin.graphql(`
-        query FindProduct($query: String!) {
-          products(first: 1, query: $query) {
-            edges {
-              node {
-                id
-                title
-                variants(first: 10) {
-                  edges {
-                    node {
-                      id
-                      inventoryItem {
-                        id
-                      }
-                    }
+      // Use the stored product ID to get the product directly
+      const productId = schedule.productId;
+      
+      // Get the product with its variants
+      const productResponse = await admin.graphql(`
+        query GetProduct($id: ID!) {
+          product(id: $id) {
+            id
+            title
+            variants(first: 10) {
+              edges {
+                node {
+                  id
+                  inventoryItem {
+                    id
                   }
                 }
               }
@@ -536,16 +537,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           }
         }
       `, {
-        variables: { query: `title:${schedule.productTitle}` }
+        variables: { id: productId }
       });
       
-      const productsData = await productsResponse.json();
-      const product = productsData.data?.products?.edges?.[0]?.node;
+      const productData = await productResponse.json();
+      console.log('🔵 Product lookup result:', JSON.stringify(productData, null, 2));
+      
+      const product = productData.data?.product;
       
       if (!product) {
         return json({ 
           success: false, 
-          error: `Product "${schedule.productTitle}" not found` 
+          error: `Product "${schedule.productTitle}" not found (ID: ${productId})` 
         });
       }
 
@@ -558,6 +561,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           error: 'Could not find inventory item for product' 
         });
       }
+      
+      console.log('🔵 Found inventory item:', inventoryItemId);
 
       // Get the location ID
       const locationsResponse = await admin.graphql(`
@@ -575,6 +580,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       
       const locationsData = await locationsResponse.json();
       const locationId = locationsData.data?.locations?.edges?.[0]?.node?.id;
+      const locationName = locationsData.data?.locations?.edges?.[0]?.node?.name;
+      
+      console.log('🔵 Using location:', locationName, locationId);
       
       if (!locationId) {
         return json({ 
@@ -583,10 +591,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
       }
 
-      // Set the inventory quantity
-      const quantity = schedule.scheduleType === 'daily_reset' 
-        ? schedule.dailyQuantity || 10
-        : schedule.preorderLimit || 50;
+      // Set the inventory quantity based on schedule type
+      let quantity: number;
+      if (schedule.scheduleType === 'daily_reset' || schedule.scheduleType === 'recurring') {
+        quantity = schedule.dailyQuantity || 10;
+      } else if (schedule.scheduleType === 'preorder') {
+        quantity = schedule.preorderLimit || 50;
+      } else {
+        quantity = schedule.dailyQuantity || 10;
+      }
+      
+      console.log('🔵 Setting inventory quantity to:', quantity);
       
       const setQuantityResponse = await admin.graphql(`
         mutation SetInventoryQuantity($input: InventorySetQuantitiesInput!) {
@@ -616,6 +631,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
       
       const setQuantityData = await setQuantityResponse.json();
+      console.log('🔵 Inventory update result:', JSON.stringify(setQuantityData, null, 2));
       
       if (setQuantityData.data?.inventorySetQuantities?.userErrors?.length > 0) {
         return json({ 
@@ -626,7 +642,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       return json({ 
         success: true, 
-        message: `Set ${product.title} inventory to ${quantity} units`
+        message: `Set "${product.title}" inventory to ${quantity} units`
       });
 
     } catch (error) {

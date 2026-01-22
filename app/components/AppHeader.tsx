@@ -142,7 +142,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
               fontWeight: 'medium',
               fontFamily: 'inherit' // Easy to change font family later
             }}>
-              Bulk Edit Suite
+              Product Management Suite
             </span>
           </Text>
         </BlockStack>

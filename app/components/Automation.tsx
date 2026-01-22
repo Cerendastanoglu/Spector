@@ -284,13 +284,14 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
       marginBottom: '16px'
     }}>
       {[
-        { id: 'collections', label: 'Collections', icon: CollectionIcon },
-        { id: 'tags', label: 'Tags', icon: HashtagIcon },
-        { id: 'scheduling', label: 'Scheduling', icon: CalendarIcon }
+        { id: 'collections', label: 'Collections', icon: CollectionIcon, locked: false },
+        { id: 'tags', label: 'Tags', icon: HashtagIcon, locked: false },
+        { id: 'scheduling', label: 'Scheduling', icon: CalendarIcon, locked: true }
       ].map(tab => (
         <button
           key={tab.id}
-          onClick={() => setActiveSubTab(tab.id as typeof activeSubTab)}
+          onClick={() => !tab.locked && setActiveSubTab(tab.id as typeof activeSubTab)}
+          title={tab.locked ? "Coming soon" : undefined}
           style={{
             flex: 1,
             display: 'flex',
@@ -302,17 +303,18 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
             borderRadius: '8px',
             background: activeSubTab === tab.id ? 'white' : 'transparent',
             boxShadow: activeSubTab === tab.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-            color: activeSubTab === tab.id ? '#2c2c2c' : '#6d6d6d',
+            color: tab.locked ? '#b5b5b5' : (activeSubTab === tab.id ? '#2c2c2c' : '#6d6d6d'),
             fontWeight: activeSubTab === tab.id ? '600' : '500',
             fontSize: '13px',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
+            cursor: tab.locked ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s ease',
+            opacity: tab.locked ? 0.6 : 1
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
             <Icon source={tab.icon} />
             <span>{tab.label}</span>
-          </div>
+          </span>
         </button>
       ))}
     </div>
@@ -813,10 +815,10 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
               background: schedule.enabled ? '#008060' : '#8c8c8c'
             }} />
             <BlockStack gap="100">
-              <InlineStack gap="200" blockAlign="center">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Text as="p" variant="bodyMd" fontWeight="semibold">{schedule.name}</Text>
                 <Badge tone="info">{typeLabels[schedule.scheduleType]}</Badge>
-              </InlineStack>
+              </div>
               <Text as="p" variant="bodySm" tone="subdued">
                 {schedule.productTitle} • {getScheduleDescription()}
               </Text>
@@ -906,14 +908,14 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
           )}
           {newScheduleProductId && (
             <Box padding="200" background="bg-surface-success" borderRadius="200">
-              <InlineStack gap="200" blockAlign="center">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-start' }}>
                 <Icon source={ProductIcon} tone="success" />
                 <Text as="span" variant="bodySm" fontWeight="semibold">{newScheduleProduct}</Text>
                 <Button size="slim" variant="plain" onClick={() => {
                   setNewScheduleProductId('');
                   setNewScheduleProduct('');
                 }}>Change</Button>
-              </InlineStack>
+              </div>
             </Box>
           )}
         </BlockStack>
@@ -1185,10 +1187,10 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
         <BlockStack gap="400">
           <InlineStack align="space-between" blockAlign="center">
             <BlockStack gap="100">
-              <InlineStack gap="100" blockAlign="center">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Text as="h2" variant="headingLg">Automation</Text>
                 <Badge tone="success">Beta</Badge>
-              </InlineStack>
+              </div>
               <Text as="p" variant="bodySm" tone="subdued">
                 Set up rules to automatically organize and tag your products
               </Text>
