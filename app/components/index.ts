@@ -6,5 +6,6 @@ export { PerformanceDashboard } from "./PerformanceDashboard";
 export { WelcomeModal } from "./WelcomeModal";
 export { ProductTable } from "./ProductTable";
 export { Settings } from "./Settings";
+export { Automation } from "./Automation";
 // BulkEditHistory export removed - functionality disabled
 // IntelligenceDashboard export removed - module not found

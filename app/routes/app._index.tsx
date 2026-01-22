@@ -18,6 +18,7 @@ import { WelcomeModal } from "../components/WelcomeModal";
 import { Help } from "../components/Help";
 import { Settings } from "../components/Settings";
 import { ForecastingTab } from "../components/ForecastingTab";
+import { Automation } from "../components/Automation";
 import { OptimizedComponents, useComponentPreloader } from "../utils/lazyLoader";
 import { checkSubscriptionStatus, getManagedPricingUrl } from "../services/billing.server";
 import prisma from "../db.server";
@@ -269,6 +270,15 @@ export default function Index() {
             isTrialMode={!settingsData.hasActiveSubscription}
             isDevelopmentStore={storeType?.isDevelopmentStore || false}
             managedPricingUrl={settingsData?.managedPricingUrl}
+          />
+        );
+
+      case "automation":
+        return (
+          <Automation 
+            shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain}
+            isTrialMode={!settingsData.hasActiveSubscription}
+            isDevelopmentStore={storeType?.isDevelopmentStore || false}
           />
         );
 

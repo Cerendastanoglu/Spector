@@ -9,6 +9,7 @@ import {
 import {
   SettingsIcon,
   QuestionCircleIcon,
+  AutomationIcon,
 } from "@shopify/polaris-icons";
 import { useTheme } from "../contexts/ThemeContext";
 
@@ -24,51 +25,19 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
 
 
 
-  // Mobile-friendly settings button - icon only
-  const mobileSettingsButton = (
-    <div className={activeTab === "settings" ? "nav-button-active" : "nav-button-inactive"} style={{
-      background: activeTab === "settings" 
-        ? (theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'white')
-        : 'transparent',
-      borderRadius: '12px',
-      padding: '2px',
-      border: activeTab === "settings" ? '2px solid #FF204E' : '1px solid transparent',
-      boxShadow: activeTab === "settings" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-    }}>
-      <Tooltip content="Settings">
-        <Button 
-          onClick={() => onTabChange("settings")}
-          icon={SettingsIcon} 
-          variant="tertiary"
-          size="medium"
-        />
-      </Tooltip>
-    </div>
-  );
-
-  // Desktop settings button with text
-  const desktopSettingsButton = (
-    <div className={activeTab === "settings" ? "nav-button-active" : "nav-button-inactive"} style={{
-      background: activeTab === "settings" 
-        ? (theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'white')
-        : 'transparent',
-      borderRadius: '12px',
-      padding: '2px',
-      border: activeTab === "settings" ? '2px solid #FF204E' : '1px solid transparent',
-      boxShadow: activeTab === "settings" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-    }}>
+  // Settings button - icon only (same style as help button)
+  const settingsIconButton = (
+    <Tooltip content="Settings">
       <Button 
         onClick={() => onTabChange("settings")}
         icon={SettingsIcon} 
         variant="tertiary"
         size="medium"
-      >
-        Settings
-      </Button>
-    </div>
+      />
+    </Tooltip>
   );
+
+
 
   // Help button - appears in pink header background
   const helpButton = (
@@ -272,6 +241,27 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
           Forecast
         </Button>
       </div>
+      
+      {/* Automation Button */}
+      <div className={activeTab === "automation" ? "nav-button-active" : "nav-button-inactive"} style={{
+        background: activeTab === "automation" 
+          ? (theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'white')
+          : 'transparent',
+        borderRadius: '12px',
+        padding: '2px',
+        border: activeTab === "automation" ? '2px solid #FF204E' : '1px solid transparent',
+        boxShadow: activeTab === "automation" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none',
+        flexShrink: 0
+      }}>
+        <Button
+          onClick={() => onTabChange("automation")}
+          onMouseEnter={() => onPreloadComponent?.('Automation')}
+          variant="tertiary"
+          size="slim"
+        >
+          Auto
+        </Button>
+      </div>
 
     </div>
   );
@@ -363,6 +353,27 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
           size="medium"
         >
           Forecast
+        </Button>
+      </div>
+      
+      {/* Automation Button */}
+      <div className={activeTab === "automation" ? "nav-button-active" : "nav-button-inactive"} style={{
+        background: activeTab === "automation" 
+          ? (theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'white')
+          : 'transparent',
+        borderRadius: '12px',
+        padding: '2px',
+        border: activeTab === "automation" ? '2px solid #FF204E' : '1px solid transparent',
+        boxShadow: activeTab === "automation" ? '0 2px 8px rgba(255, 32, 78, 0.3)' : 'none',
+        flexShrink: 0
+      }}>
+        <Button
+          onClick={() => onTabChange("automation")}
+          onMouseEnter={() => onPreloadComponent?.('Automation')}
+          variant="tertiary"
+          size="medium"
+        >
+          Automation
         </Button>
       </div>
 
@@ -638,7 +649,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
             
             <div className="mobile-actions">
               {helpButton}
-              {mobileSettingsButton}
+              {settingsIconButton}
             </div>
           </div>
 
@@ -669,10 +680,10 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
                   gap: '8px'
                 }}>
                   {navigationMarkup}
-                  {desktopSettingsButton}
                 </div>
-                {/* Help button outside white section, in pink header */}
+                {/* Help and Settings icons outside nav box, in pink header */}
                 {helpButton}
+                {settingsIconButton}
               </InlineStack>
             </InlineStack>
           </div>
