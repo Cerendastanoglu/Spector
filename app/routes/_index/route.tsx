@@ -45,7 +45,7 @@ export default function App() {
             <strong>Smart Inventory Tracking</strong>. Real-time monitoring of stock levels with intelligent alerts when products run low.
           </li>
           <li>
-            <strong>Bulk Product Management</strong>. Edit prices, collections, and inventory for multiple products simultaneously to save time.
+            <strong>Bulk Edit</strong>. Edit prices, collections, and inventory for multiple products simultaneously to save time.
           </li>
           <li>
             <strong>Advanced Analytics</strong>. Get insights into your inventory performance with detailed reports and forecasting.

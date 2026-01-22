@@ -28,7 +28,8 @@ function buildQueryFromConditions(conditions: AutomationCondition[]): string {
     switch (cond.field) {
       case 'title':
         if (cond.operator === 'contains') {
-          queryParts.push(`title:*${cond.value}*`);
+          // Shopify doesn't support leading wildcards, use plain search for contains
+          queryParts.push(`title:${cond.value}*`);
         } else if (cond.operator === 'equals') {
           queryParts.push(`title:"${cond.value}"`);
         }
@@ -69,15 +70,227 @@ function buildQueryFromConditions(conditions: AutomationCondition[]): string {
   return queryParts.join(' AND ');
 }
 
+// Build query from a single condition (for preview)
+function buildQueryFromSingleCondition(condition: AutomationCondition): string {
+  const { field, operator, value } = condition;
+  
+  switch (field) {
+    case 'title':
+      if (operator === 'contains') {
+        return `title:${value}*`;
+      } else if (operator === 'equals') {
+        return `title:"${value}"`;
+      } else if (operator === 'starts_with') {
+        return `title:${value}*`;
+      }
+      return `title:${value}*`;
+    case 'product_type':
+      return `product_type:"${value}"`;
+    case 'vendor':
+      return `vendor:"${value}"`;
+    case 'tags':
+      if (operator === 'contains') {
+        return `tag:${value}`;
+      } else if (operator === 'not_contains') {
+        return `-tag:${value}`;
+      }
+      return `tag:${value}`;
+    case 'inventory':
+      if (operator === 'less_than') {
+        return `inventory_total:<${value}`;
+      } else if (operator === 'greater_than') {
+        return `inventory_total:>${value}`;
+      }
+      return '';
+    case 'price':
+      if (operator === 'less_than') {
+        return `price:<${value}`;
+      } else if (operator === 'greater_than') {
+        return `price:>${value}`;
+      }
+      return '';
+    case 'status':
+      return `status:${value}`;
+    default:
+      return '';
+  }
+}
+
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
   const formData = await request.json();
-  const { action: actionType, rule } = formData as { action: string; rule: AutomationRule };
+  const { action: actionType } = formData as { action: string };
+
+  // Preview action - test conditions against real products
+  if (actionType === 'preview') {
+    const { condition } = formData as { condition: AutomationCondition };
+    
+    try {
+      const query = buildQueryFromSingleCondition(condition);
+      console.log('[Automation Preview] Query:', query);
+      
+      const productsResponse = await admin.graphql(`
+        query GetProducts($query: String!) {
+          products(first: 50, query: $query) {
+            edges {
+              node {
+                id
+                title
+              }
+            }
+          }
+        }
+      `, {
+        variables: { query: query || '' }
+      });
+      
+      const productsData = await productsResponse.json();
+      const products = productsData.data?.products?.edges?.map((e: any) => ({
+        id: e.node.id,
+        title: e.node.title
+      })) || [];
+      
+      console.log('[Automation Preview] Found', products.length, 'products');
+      
+      return json({
+        success: true,
+        count: products.length,
+        products
+      });
+    } catch (error) {
+      console.error('[Automation Preview] Error:', error);
+      return json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to preview products'
+      }, { status: 500 });
+    }
+  }
+
+  // Quick action - direct add/remove without a rule
+  if (actionType === 'quickAction') {
+    const { actionType: quickType, value, productIds } = formData as { 
+      actionType: 'add_collection' | 'remove_collection' | 'add_tag' | 'remove_tag';
+      value: string;
+      productIds: string[];
+    };
+    
+    console.log('[Quick Action] Type:', quickType, 'Value:', value, 'Products:', productIds.length);
+    
+    try {
+      let updatedCount = 0;
+      
+      if (quickType === 'add_tag' || quickType === 'remove_tag') {
+        for (const productId of productIds) {
+          // Get current tags
+          const productResponse = await admin.graphql(`
+            query GetProduct($id: ID!) {
+              product(id: $id) {
+                id
+                tags
+              }
+            }
+          `, { variables: { id: productId } });
+          
+          const productData = await productResponse.json();
+          const currentTags = productData.data?.product?.tags || [];
+          
+          let newTags: string[];
+          if (quickType === 'add_tag') {
+            if (currentTags.includes(value)) continue;
+            newTags = [...currentTags, value];
+          } else {
+            if (!currentTags.includes(value)) continue;
+            newTags = currentTags.filter((t: string) => t !== value);
+          }
+          
+          await admin.graphql(`
+            mutation UpdateProductTags($input: ProductInput!) {
+              productUpdate(input: $input) {
+                product { id tags }
+                userErrors { field message }
+              }
+            }
+          `, {
+            variables: { input: { id: productId, tags: newTags } }
+          });
+          updatedCount++;
+        }
+      } else if (quickType === 'add_collection' || quickType === 'remove_collection') {
+        // Find the collection
+        const collectionsResponse = await admin.graphql(`
+          query FindCollection($query: String!) {
+            collections(first: 1, query: $query) {
+              edges { node { id title } }
+            }
+          }
+        `, { variables: { query: `title:"${value}"` } });
+        
+        const collectionsData = await collectionsResponse.json();
+        let collectionId = collectionsData.data?.collections?.edges?.[0]?.node?.id;
+        
+        if (!collectionId && quickType === 'add_collection') {
+          // Create collection
+          const createResponse = await admin.graphql(`
+            mutation CreateCollection($input: CollectionInput!) {
+              collectionCreate(input: $input) {
+                collection { id }
+                userErrors { field message }
+              }
+            }
+          `, { variables: { input: { title: value } } });
+          
+          const createData = await createResponse.json();
+          collectionId = createData.data?.collectionCreate?.collection?.id;
+        }
+        
+        if (!collectionId) {
+          return json({ success: false, error: 'Collection not found' });
+        }
+        
+        if (quickType === 'add_collection') {
+          await admin.graphql(`
+            mutation collectionAddProductsV2($id: ID!, $productIds: [ID!]!) {
+              collectionAddProductsV2(id: $id, productIds: $productIds) {
+                job { id done }
+                userErrors { field message }
+              }
+            }
+          `, { variables: { id: collectionId, productIds } });
+        } else {
+          await admin.graphql(`
+            mutation collectionRemoveProducts($id: ID!, $productIds: [ID!]!) {
+              collectionRemoveProducts(id: $id, productIds: $productIds) {
+                job { id done }
+                userErrors { field message }
+              }
+            }
+          `, { variables: { id: collectionId, productIds } });
+        }
+        updatedCount = productIds.length;
+      }
+      
+      return json({
+        success: true,
+        message: `Successfully updated ${updatedCount} products`,
+        updatedCount
+      });
+    } catch (error) {
+      console.error('[Quick Action] Error:', error);
+      return json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to perform action'
+      }, { status: 500 });
+    }
+  }
+
+  const { rule } = formData as { rule: AutomationRule };
 
   if (actionType === 'run') {
     try {
       // Build query from rule conditions
       const query = buildQueryFromConditions(rule.conditions);
+      console.log('[Automation] Running rule:', rule.name);
+      console.log('[Automation] Query string:', query);
       
       // Fetch matching products
       const productsResponse = await admin.graphql(`
@@ -97,6 +310,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
       
       const productsData = await productsResponse.json();
+      console.log('[Automation] Products response:', JSON.stringify(productsData, null, 2));
       const products = productsData.data?.products?.edges || [];
       
       if (products.length === 0) {
@@ -158,8 +372,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       } else if (rule.action.type === 'add_to_collection') {
         // First, find or create the collection
         const collectionsResponse = await admin.graphql(`
-          query FindCollection($title: String!) {
-            collections(first: 1, query: $title) {
+          query FindCollection($query: String!) {
+            collections(first: 1, query: $query) {
               edges {
                 node {
                   id
@@ -169,19 +383,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
           }
         `, {
-          variables: { title: `title:"${rule.action.value}"` }
+          variables: { query: `title:"${rule.action.value}"` }
         });
         
         const collectionsData = await collectionsResponse.json();
+        console.log('[Automation] Collections search result:', JSON.stringify(collectionsData, null, 2));
         let collectionId = collectionsData.data?.collections?.edges?.[0]?.node?.id;
         
         if (!collectionId) {
-          // Create the collection
+          // Create the collection as a manual collection
+          console.log('[Automation] Creating new collection:', rule.action.value);
           const createResponse = await admin.graphql(`
             mutation CreateCollection($input: CollectionInput!) {
               collectionCreate(input: $input) {
                 collection {
                   id
+                  title
                 }
                 userErrors {
                   field
@@ -199,6 +416,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           });
           
           const createData = await createResponse.json();
+          console.log('[Automation] Collection create result:', JSON.stringify(createData, null, 2));
+          
+          if (createData.data?.collectionCreate?.userErrors?.length > 0) {
+            return json({ 
+              success: false, 
+              error: `Failed to create collection: ${createData.data.collectionCreate.userErrors[0].message}`,
+              matchCount: products.length 
+            });
+          }
+          
           collectionId = createData.data?.collectionCreate?.collection?.id;
           
           if (!collectionId) {
@@ -210,16 +437,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           }
         }
 
-        // Add products to collection
+        // Add products to collection one by one using collectionAddProductsV2
+        console.log('[Automation] Adding', products.length, 'products to collection:', collectionId);
         const productIds = products.map(({ node }: { node: { id: string } }) => node.id);
         
         try {
-          await admin.graphql(`
-            mutation AddProductsToCollection($id: ID!, $productIds: [ID!]!) {
-              collectionAddProducts(id: $id, productIds: $productIds) {
-                collection {
+          const addResponse = await admin.graphql(`
+            mutation collectionAddProductsV2($id: ID!, $productIds: [ID!]!) {
+              collectionAddProductsV2(id: $id, productIds: $productIds) {
+                job {
                   id
-                  productsCount
+                  done
                 }
                 userErrors {
                   field
@@ -233,11 +461,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               productIds
             }
           });
+          
+          const addData = await addResponse.json();
+          console.log('[Automation] Add products result:', JSON.stringify(addData, null, 2));
+          
+          if (addData.data?.collectionAddProductsV2?.userErrors?.length > 0) {
+            return json({ 
+              success: false, 
+              error: `Failed to add products: ${addData.data.collectionAddProductsV2.userErrors[0].message}`,
+              matchCount: products.length 
+            });
+          }
+          
           updatedCount = products.length;
         } catch (err) {
+          console.error('[Automation] Error adding products:', err);
           return json({ 
             success: false, 
-            error: 'Failed to add products to collection',
+            error: 'Failed to add products to collection: ' + (err instanceof Error ? err.message : 'Unknown error'),
             matchCount: products.length 
           });
         }

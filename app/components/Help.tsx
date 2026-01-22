@@ -178,7 +178,7 @@ export function Help({ isVisible: _isVisible, onNavigateToDashboard: _onNavigate
                       <Text as="p" variant="bodySm" tone="subdued">
                         This table shows your most valuable products (price × quantity in stock).<br/>
                         <br/>
-                        <strong>Action:</strong> These are your highest-value assets. Make sure they never go out of stock! Click on any product to see more details or click the checkboxes to bulk edit them in Product Management.
+                        <strong>Action:</strong> These are your highest-value assets. Make sure they never go out of stock! Click on any product to see more details or click the checkboxes to bulk edit them in Bulk Edit.
                       </Text>
                     </div>
                   </BlockStack>
@@ -193,7 +193,7 @@ export function Help({ isVisible: _isVisible, onNavigateToDashboard: _onNavigate
                       Quick Action Example:
                     </Text>
                     <Text as="p" variant="bodySm">
-                      You see "12 products need attention" → Check the chart and notice red bars → Scroll to the table → See "Premium Sneakers" is out of stock → Click "Product Management" tab → Filter or select that product → Bulk edit to update inventory or pricing.
+                      You see "12 products need attention" → Check the chart and notice red bars → Scroll to the table → See "Premium Sneakers" is out of stock → Click "Bulk Edit" tab → Filter or select that product → Bulk edit to update inventory or pricing.
                     </Text>
                   </div>
 
@@ -212,7 +212,7 @@ export function Help({ isVisible: _isVisible, onNavigateToDashboard: _onNavigate
             </Collapsible>
           </div>
 
-          {/* Product Management Section */}
+          {/* Bulk Edit Section */}
           <div style={{ 
             borderLeft: `4px solid ${brandColor}`, 
             paddingLeft: '16px',
@@ -240,7 +240,7 @@ export function Help({ isVisible: _isVisible, onNavigateToDashboard: _onNavigate
                 </div>
                 <InlineStack gap="200" blockAlign="center" wrap={false}>
                   <Text as="span" variant="headingMd" fontWeight="semibold">
-                    Product Management
+                    Bulk Edit
                   </Text>
                   <Text as="span" variant="bodySm" tone="subdued">
                     - Edit multiple products at once with bulk operations
@@ -257,7 +257,7 @@ export function Help({ isVisible: _isVisible, onNavigateToDashboard: _onNavigate
               <div style={{ paddingTop: '16px', paddingBottom: '16px' }}>
                 <BlockStack gap="400">
                   <Text as="p" variant="bodyMd">
-                    <strong style={{ color: brandColor }}>Product Management</strong> lets you edit hundreds of products in seconds instead of one-by-one. Save hours of manual work with powerful bulk operations.
+                    <strong style={{ color: brandColor }}>Bulk Edit</strong> lets you edit hundreds of products in seconds instead of one-by-one. Save hours of manual work with powerful bulk operations.
                   </Text>
                   
                   <BlockStack gap="300">

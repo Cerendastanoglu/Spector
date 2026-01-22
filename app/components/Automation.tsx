@@ -12,7 +12,6 @@ import {
   Banner,
   Tooltip,
   Icon,
-  ChoiceList,
 } from "@shopify/polaris";
 import {
   HashtagIcon,
@@ -20,11 +19,8 @@ import {
   CalendarIcon,
   PlusIcon,
   DeleteIcon,
-  PlayIcon,
-  PageIcon,
   EditIcon,
   ClockIcon,
-  RefreshIcon,
   ProductIcon,
 } from "@shopify/polaris-icons";
 import { useState, useCallback } from "react";
@@ -97,7 +93,12 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
   const [newConditionValue, setNewConditionValue] = useState('');
   const [newActionValue, setNewActionValue] = useState('');
   const [savingRule, setSavingRule] = useState(false);
-  const [runningRule, setRunningRule] = useState<string | null>(null);
+  
+  // Preview state for rule creation
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewProducts, setPreviewProducts] = useState<Array<{id: string; title: string}>>([]);
+  const [previewCount, setPreviewCount] = useState<number | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const shouldApplyTrialRestrictions = isTrialMode && !isDevelopmentStore;
 
@@ -124,54 +125,23 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
     { label: 'Ends with', value: 'ends_with' },
   ];
 
-  const handleToggleRule = useCallback((ruleId: string) => {
-    setRules(prev => prev.map(rule => 
-      rule.id === ruleId ? { ...rule, enabled: !rule.enabled } : rule
-    ));
-  }, []);
-
   const handleDeleteRule = useCallback((ruleId: string) => {
     setRules(prev => prev.filter(rule => rule.id !== ruleId));
   }, []);
 
   const [runResult, setRunResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  const handleRunRule = useCallback(async (ruleId: string) => {
-    const rule = rules.find(r => r.id === ruleId);
-    if (!rule) return;
-    
-    setRunningRule(ruleId);
-    setRunResult(null);
-    
-    try {
-      const response = await fetch('/app/api/automation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'run', rule })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setRules(prev => prev.map(r => 
-          r.id === ruleId ? { ...r, lastRun: 'Just now', matchCount: data.matchCount || 0 } : r
-        ));
-        setRunResult({ success: true, message: data.message || `Updated ${data.updatedCount || 0} products` });
-      } else {
-        setRunResult({ success: false, message: data.error || 'Failed to run rule' });
-      }
-    } catch (error) {
-      setRunResult({ success: false, message: 'Network error - please try again' });
-    }
-    
-    setRunningRule(null);
-  }, [rules]);
-
   const handleCreateRule = useCallback(async () => {
     if (!newRuleName || !newConditionValue || !newActionValue) return;
     
+    // First preview to validate the rule works
+    if (previewCount === null) {
+      // Force a preview first
+      setPreviewError('Please click "Preview Matches" to test your rule first');
+      return;
+    }
+    
     setSavingRule(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
     
     const newRule: AutomationRule = {
       id: Date.now().toString(),
@@ -185,16 +155,91 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
         type: newRuleType === 'tag' ? 'add_tag' : 'add_to_collection', 
         value: newActionValue 
       },
-      matchCount: 0
+      matchCount: previewCount
     };
     
-    setRules(prev => [...prev, newRule]);
+    // Actually run the rule to apply it immediately
+    try {
+      const response = await fetch('/app/api/automation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'run', rule: newRule })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Mark as applied with lastRun
+        const appliedRule = { 
+          ...newRule, 
+          lastRun: 'Just now', 
+          matchCount: data.matchCount || previewCount 
+        };
+        setRules(prev => [...prev, appliedRule]);
+        setRunResult({ success: true, message: data.message || `Applied to ${data.updatedCount || previewCount} products` });
+      } else {
+        setRunResult({ success: false, message: data.error || 'Failed to apply rule' });
+        // Still save the rule but without lastRun
+        setRules(prev => [...prev, newRule]);
+      }
+    } catch (error) {
+      setRunResult({ success: false, message: 'Network error - rule saved but not applied' });
+      setRules(prev => [...prev, newRule]);
+    }
+    
     setIsCreating(false);
     setNewRuleName('');
     setNewConditionValue('');
     setNewActionValue('');
+    setPreviewProducts([]);
+    setPreviewCount(null);
+    setPreviewError(null);
     setSavingRule(false);
-  }, [newRuleName, newRuleType, newConditionField, newConditionOperator, newConditionValue, newActionValue]);
+  }, [newRuleName, newRuleType, newConditionField, newConditionOperator, newConditionValue, newActionValue, previewCount]);
+
+  // Preview matching products for rule creation
+  const handlePreviewRule = useCallback(async () => {
+    if (!newConditionValue) {
+      setPreviewError('Please enter a condition value');
+      return;
+    }
+    
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setPreviewProducts([]);
+    setPreviewCount(null);
+    
+    try {
+      const response = await fetch('/app/api/automation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'preview',
+          condition: {
+            field: newConditionField,
+            operator: newConditionOperator,
+            value: newConditionValue
+          }
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setPreviewProducts(data.products || []);
+        setPreviewCount(data.count);
+        if (data.count === 0) {
+          setPreviewError('No products match this condition. Try different criteria.');
+        }
+      } else {
+        setPreviewError(data.error || 'Failed to preview products');
+      }
+    } catch (error) {
+      setPreviewError('Network error - please try again');
+    }
+    
+    setPreviewLoading(false);
+  }, [newConditionField, newConditionOperator, newConditionValue]);
 
   // Product search for scheduling
   const handleProductSearch = useCallback(async (query: string) => {
@@ -300,9 +345,9 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
             <BlockStack gap="050">
               <Text as="p" variant="bodyMd" fontWeight="semibold">{rule.name}</Text>
               <InlineStack gap="200">
-                <Badge tone={rule.enabled ? 'success' : 'new'}>
-                  {rule.enabled ? 'Active' : 'Paused'}
-                </Badge>
+                {rule.lastRun && (
+                  <Badge tone="success">Applied</Badge>
+                )}
                 {rule.matchCount !== undefined && (
                   <Text as="span" variant="bodySm" tone="subdued">
                     {rule.matchCount} products matched
@@ -344,22 +389,6 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
         <InlineStack align="end" gap="200">
           <Button
             size="slim"
-            icon={runningRule === rule.id ? undefined : PlayIcon}
-            onClick={() => handleRunRule(rule.id)}
-            loading={runningRule === rule.id}
-            disabled={!rule.enabled || runningRule !== null}
-          >
-            {runningRule === rule.id ? 'Running...' : 'Run Now'}
-          </Button>
-          <Button
-            size="slim"
-            icon={rule.enabled ? PageIcon : PlayIcon}
-            onClick={() => handleToggleRule(rule.id)}
-          >
-            {rule.enabled ? 'Pause' : 'Enable'}
-          </Button>
-          <Button
-            size="slim"
             icon={EditIcon}
             onClick={() => {/* TODO: Edit rule */}}
           >
@@ -385,7 +414,12 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
           <Text as="h3" variant="headingMd">
             {newRuleType === 'tag' ? 'Create Tag Rule' : 'Create Collection Rule'}
           </Text>
-          <Button variant="plain" onClick={() => setIsCreating(false)}>Cancel</Button>
+          <Button variant="plain" onClick={() => {
+            setIsCreating(false);
+            setPreviewProducts([]);
+            setPreviewCount(null);
+            setPreviewError(null);
+          }}>Cancel</Button>
         </InlineStack>
         
         <Divider />
@@ -400,14 +434,18 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
         
         <BlockStack gap="200">
           <Text as="p" variant="bodyMd" fontWeight="semibold">When product matches:</Text>
-          <InlineStack gap="200" wrap>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'flex-start' }}>
             <div style={{ minWidth: '150px' }}>
               <Select
                 label="Field"
                 labelHidden
                 options={conditionFieldOptions}
                 value={newConditionField}
-                onChange={setNewConditionField}
+                onChange={(val) => {
+                  setNewConditionField(val);
+                  setPreviewCount(null);
+                  setPreviewProducts([]);
+                }}
               />
             </div>
             <div style={{ minWidth: '150px' }}>
@@ -416,7 +454,11 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
                 labelHidden
                 options={conditionOperatorOptions}
                 value={newConditionOperator}
-                onChange={setNewConditionOperator}
+                onChange={(val) => {
+                  setNewConditionOperator(val);
+                  setPreviewCount(null);
+                  setPreviewProducts([]);
+                }}
               />
             </div>
             <div style={{ minWidth: '150px', flex: 1 }}>
@@ -424,13 +466,75 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
                 label="Value"
                 labelHidden
                 value={newConditionValue}
-                onChange={setNewConditionValue}
+                onChange={(val) => {
+                  setNewConditionValue(val);
+                  setPreviewCount(null);
+                  setPreviewProducts([]);
+                }}
                 placeholder="Enter value..."
                 autoComplete="off"
               />
             </div>
-          </InlineStack>
+            <Button
+              onClick={handlePreviewRule}
+              loading={previewLoading}
+              disabled={!newConditionValue}
+            >
+              Preview Matches
+            </Button>
+          </div>
         </BlockStack>
+        
+        {/* Preview Results */}
+        {previewError && (
+          <Banner tone="warning" onDismiss={() => setPreviewError(null)}>
+            <p>{previewError}</p>
+          </Banner>
+        )}
+        
+        {previewCount !== null && previewCount > 0 && (
+          <Box padding="300" background="bg-surface-success" borderRadius="200">
+            <BlockStack gap="200">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-start' }}>
+                <Badge tone="success">{`${previewCount} products found`}</Badge>
+                <Text as="span" variant="bodySm" tone="success">
+                  These products will be affected by this rule
+                </Text>
+              </div>
+              {previewProducts.length > 0 && (
+                <div style={{ 
+                  maxHeight: '150px', 
+                  overflowY: 'auto',
+                  background: 'white',
+                  borderRadius: '8px',
+                  padding: '12px'
+                }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <tbody>
+                      {previewProducts.slice(0, 10).map(p => (
+                        <tr key={p.id}>
+                          <td style={{ width: '24px', padding: '4px 8px 4px 0', verticalAlign: 'middle' }}>
+                            <Icon source={ProductIcon} tone="subdued" />
+                          </td>
+                          <td style={{ padding: '4px 0', verticalAlign: 'middle', textAlign: 'left' }}>
+                            <Text as="span" variant="bodySm">{p.title}</Text>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {previewProducts.length > 10 && (
+                    <div style={{ marginTop: '8px' }}>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        +{previewProducts.length - 10} more products...
+                      </Text>
+                    </div>
+                  )}
+                </div>
+              )}
+            </BlockStack>
+          </Box>
+        )}
         
         <TextField
           label={newRuleType === 'tag' ? 'Tag to Apply' : 'Collection Name'}
@@ -438,17 +542,31 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
           onChange={setNewActionValue}
           placeholder={newRuleType === 'tag' ? 'e.g., Sale, New Arrival' : 'e.g., Low Stock Items'}
           autoComplete="off"
+          helpText={newRuleType === 'tag'
+            ? 'This tag will be added to all matching products' 
+            : 'Products will be added to this collection (will be created if it doesn\'t exist)'
+          }
         />
         
         <InlineStack align="end" gap="200">
-          <Button onClick={() => setIsCreating(false)}>Cancel</Button>
+          <Button onClick={() => {
+            setIsCreating(false);
+            setPreviewProducts([]);
+            setPreviewCount(null);
+            setPreviewError(null);
+          }}>Cancel</Button>
           <Button
             variant="primary"
             onClick={handleCreateRule}
             loading={savingRule}
-            disabled={!newRuleName || !newConditionValue || !newActionValue}
+            disabled={!newRuleName || !newConditionValue || !newActionValue || previewCount === null || previewCount === 0}
           >
-            Create Rule
+            {savingRule 
+              ? 'Applying...'
+              : previewCount !== null && previewCount > 0 
+                ? `Apply to ${previewCount} Products` 
+                : 'Create Rule'
+            }
           </Button>
         </InlineStack>
       </BlockStack>
@@ -654,17 +772,27 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
 
   const renderScheduleCard = (schedule: ScheduleRule) => {
     const typeLabels: Record<ScheduleRule['scheduleType'], string> = {
-      'daily_reset': 'Daily Reset',
-      'date_specific': 'Date Specific',
-      'recurring': 'Recurring',
+      'daily_reset': 'Daily',
+      'date_specific': 'One-time',
+      'recurring': 'Weekly',
       'preorder': 'Pre-order'
     };
-    
-    const typeColors: Record<ScheduleRule['scheduleType'], { bg: string; color: string }> = {
-      'daily_reset': { bg: '#E3F4EE', color: '#008060' },
-      'date_specific': { bg: '#EBF0FF', color: '#5C6AC4' },
-      'recurring': { bg: '#FFF8E6', color: '#B98900' },
-      'preorder': { bg: '#FFF4F4', color: '#D82C0D' }
+
+    const getScheduleDescription = () => {
+      switch (schedule.scheduleType) {
+        case 'daily_reset':
+          return `${schedule.dailyQuantity} units at ${schedule.resetTime}`;
+        case 'recurring': {
+          const days = schedule.recurringDays?.map(d => d.slice(0, 3).charAt(0).toUpperCase() + d.slice(1, 3)).join(', ');
+          return `${schedule.dailyQuantity} units on ${days}`;
+        }
+        case 'preorder':
+          return `Available ${schedule.preorderDate}, max ${schedule.preorderLimit}`;
+        case 'date_specific':
+          return `Available on ${schedule.preorderDate}`;
+        default:
+          return '';
+      }
     };
 
     return (
@@ -676,96 +804,48 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
         borderWidth="025"
         borderColor="border"
       >
-        <BlockStack gap="300">
-          <InlineStack align="space-between" blockAlign="start">
-            <InlineStack gap="300" blockAlign="center">
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                background: typeColors[schedule.scheduleType].bg,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: typeColors[schedule.scheduleType].color
-              }}>
-                <Icon source={schedule.scheduleType === 'daily_reset' ? RefreshIcon : CalendarIcon} />
-              </div>
-              <BlockStack gap="050">
+        <InlineStack align="space-between" blockAlign="center">
+          <InlineStack gap="400" blockAlign="center">
+            <div style={{
+              width: '8px',
+              height: '40px',
+              borderRadius: '4px',
+              background: schedule.enabled ? '#008060' : '#8c8c8c'
+            }} />
+            <BlockStack gap="100">
+              <InlineStack gap="200" blockAlign="center">
                 <Text as="p" variant="bodyMd" fontWeight="semibold">{schedule.name}</Text>
-                <InlineStack gap="200">
-                  <Badge tone={schedule.enabled ? 'success' : 'new'}>
-                    {schedule.enabled ? 'Active' : 'Paused'}
-                  </Badge>
-                  <Badge>{typeLabels[schedule.scheduleType]}</Badge>
-                </InlineStack>
-              </BlockStack>
-            </InlineStack>
+                <Badge tone="info">{typeLabels[schedule.scheduleType]}</Badge>
+              </InlineStack>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {schedule.productTitle} • {getScheduleDescription()}
+              </Text>
+            </BlockStack>
           </InlineStack>
           
-          {/* Schedule details */}
-          <Box padding="200" background="bg-surface-secondary" borderRadius="100">
-            <InlineStack gap="400" wrap>
-              <InlineStack gap="100">
-                <Icon source={ProductIcon} tone="subdued" />
-                <Text as="span" variant="bodySm">{schedule.productTitle}</Text>
-              </InlineStack>
-              {schedule.scheduleType === 'daily_reset' && (
-                <>
-                  <Text as="span" variant="bodySm">
-                    <strong>{schedule.dailyQuantity}</strong> units/day
-                  </Text>
-                  <Text as="span" variant="bodySm">
-                    Resets at <strong>{schedule.resetTime}</strong>
-                  </Text>
-                </>
-              )}
-              {schedule.scheduleType === 'recurring' && (
-                <Text as="span" variant="bodySm">
-                  {schedule.recurringDays?.map(d => d.charAt(0).toUpperCase() + d.slice(1, 3)).join(', ')}
-                </Text>
-              )}
-              {schedule.scheduleType === 'preorder' && (
-                <>
-                  <Text as="span" variant="bodySm">
-                    Available: <strong>{schedule.preorderDate}</strong>
-                  </Text>
-                  <Text as="span" variant="bodySm">
-                    Limit: <strong>{schedule.preorderLimit}</strong>
-                  </Text>
-                </>
-              )}
-            </InlineStack>
-          </Box>
-          
-          {/* Actions */}
-          <InlineStack align="end" gap="200">
+          <InlineStack gap="200">
             <Button
               size="slim"
-              icon={runningSchedule === schedule.id ? undefined : PlayIcon}
               onClick={() => handleRunSchedule(schedule.id)}
               loading={runningSchedule === schedule.id}
-              disabled={!schedule.enabled || runningSchedule !== null}
+              disabled={runningSchedule !== null}
             >
-              {runningSchedule === schedule.id ? 'Running...' : 'Run Now'}
+              {runningSchedule === schedule.id ? 'Updating...' : 'Update Now'}
             </Button>
             <Button
               size="slim"
-              icon={schedule.enabled ? PageIcon : PlayIcon}
               onClick={() => handleToggleSchedule(schedule.id)}
             >
-              {schedule.enabled ? 'Pause' : 'Enable'}
+              {schedule.enabled ? 'Pause' : 'Activate'}
             </Button>
             <Button
               size="slim"
               icon={DeleteIcon}
               tone="critical"
               onClick={() => handleDeleteSchedule(schedule.id)}
-            >
-              Delete
-            </Button>
+            />
           </InlineStack>
-        </BlockStack>
+        </InlineStack>
       </Box>
     );
   };
@@ -774,37 +854,28 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
     <Card>
       <BlockStack gap="400">
         <InlineStack align="space-between" blockAlign="center">
-          <Text as="h3" variant="headingMd">Create Inventory Schedule</Text>
+          <Text as="h3" variant="headingMd">New Inventory Schedule</Text>
           <Button variant="plain" onClick={() => setIsCreatingSchedule(false)}>Cancel</Button>
         </InlineStack>
         
         <Divider />
         
-        <TextField
-          label="Schedule Name"
-          value={newScheduleName}
-          onChange={setNewScheduleName}
-          placeholder="e.g., Fresh Bread Daily Limit"
-          autoComplete="off"
-        />
-        
-        <BlockStack gap="100">
+        {/* Step 1: Select Product */}
+        <BlockStack gap="200">
+          <Text as="p" variant="bodyMd" fontWeight="semibold">1. Select Product</Text>
           <TextField
-            label="Product"
+            label=""
             value={newScheduleProduct}
             onChange={handleProductSearch}
-            placeholder="Start typing to search products..."
+            placeholder="Search products..."
             autoComplete="off"
-            helpText={newScheduleProductId ? `Selected: ${newScheduleProduct}` : "Search and select a product"}
             loading={searchingProducts}
           />
           {productSearchResults.length > 0 && !newScheduleProductId && (
             <Box 
               padding="200" 
-              background="bg-surface" 
-              borderRadius="100"
-              borderWidth="025"
-              borderColor="border"
+              background="bg-surface-secondary" 
+              borderRadius="200"
             >
               <BlockStack gap="100">
                 {productSearchResults.map(product => (
@@ -813,17 +884,17 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
                     onClick={() => handleSelectProduct(product)}
                     style={{
                       width: '100%',
-                      padding: '8px 12px',
+                      padding: '10px 12px',
                       border: 'none',
                       background: 'transparent',
                       textAlign: 'left',
                       cursor: 'pointer',
-                      borderRadius: '4px',
+                      borderRadius: '6px',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center'
                     }}
-                    onMouseOver={(e) => e.currentTarget.style.background = '#f6f6f7'}
+                    onMouseOver={(e) => e.currentTarget.style.background = '#e8e8e8'}
                     onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
                   >
                     <Text as="span" variant="bodySm">{product.title}</Text>
@@ -833,79 +904,168 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
               </BlockStack>
             </Box>
           )}
+          {newScheduleProductId && (
+            <Box padding="200" background="bg-surface-success" borderRadius="200">
+              <InlineStack gap="200" blockAlign="center">
+                <Icon source={ProductIcon} tone="success" />
+                <Text as="span" variant="bodySm" fontWeight="semibold">{newScheduleProduct}</Text>
+                <Button size="slim" variant="plain" onClick={() => {
+                  setNewScheduleProductId('');
+                  setNewScheduleProduct('');
+                }}>Change</Button>
+              </InlineStack>
+            </Box>
+          )}
         </BlockStack>
         
-        <Select
-          label="Schedule Type"
-          options={[
-            { label: '🔄 Daily Reset - Reset inventory to fixed quantity each day', value: 'daily_reset' },
-            { label: '📅 Date Specific - Available only on specific dates', value: 'date_specific' },
-            { label: '📆 Recurring - Available on specific days of the week', value: 'recurring' },
-            { label: '🎯 Pre-order - Accept orders for future availability date', value: 'preorder' }
-          ]}
-          value={newScheduleType}
-          onChange={(v) => setNewScheduleType(v as ScheduleRule['scheduleType'])}
-        />
-        
-        {newScheduleType === 'daily_reset' && (
-          <BlockStack gap="300">
-            <TextField
-              label="Daily Quantity"
-              type="number"
-              value={newDailyQuantity}
-              onChange={setNewDailyQuantity}
-              helpText="Inventory will reset to this number each day"
-              autoComplete="off"
-            />
-            <TextField
-              label="Reset Time"
-              type="time"
-              value={newResetTime}
-              onChange={setNewResetTime}
-              helpText="When should inventory reset? (in your store's timezone)"
-              autoComplete="off"
-            />
+        {/* Step 2: Choose Schedule Type */}
+        {newScheduleProductId && (
+          <BlockStack gap="200">
+            <Text as="p" variant="bodyMd" fontWeight="semibold">2. Schedule Type</Text>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {[
+                { value: 'daily_reset', label: 'Daily Reset', desc: 'Set quantity each day' },
+                { value: 'recurring', label: 'Weekly Schedule', desc: 'Specific days only' },
+                { value: 'date_specific', label: 'Specific Dates', desc: 'One-time availability' },
+                { value: 'preorder', label: 'Pre-order', desc: 'Future availability' }
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setNewScheduleType(opt.value as ScheduleRule['scheduleType'])}
+                  style={{
+                    padding: '16px',
+                    border: newScheduleType === opt.value ? '2px solid #008060' : '1px solid #e1e1e1',
+                    borderRadius: '8px',
+                    background: newScheduleType === opt.value ? '#f0fdf4' : 'white',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                >
+                  <Text as="p" variant="bodySm" fontWeight="semibold">{opt.label}</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">{opt.desc}</Text>
+                </button>
+              ))}
+            </div>
           </BlockStack>
         )}
         
-        {newScheduleType === 'recurring' && (
-          <ChoiceList
-            title="Available Days"
-            allowMultiple
-            choices={[
-              { label: 'Monday', value: 'monday' },
-              { label: 'Tuesday', value: 'tuesday' },
-              { label: 'Wednesday', value: 'wednesday' },
-              { label: 'Thursday', value: 'thursday' },
-              { label: 'Friday', value: 'friday' },
-              { label: 'Saturday', value: 'saturday' },
-              { label: 'Sunday', value: 'sunday' },
-            ]}
-            selected={selectedDays}
-            onChange={setSelectedDays}
-          />
-        )}
-        
-        {newScheduleType === 'preorder' && (
-          <BlockStack gap="300">
+        {/* Step 3: Configure Details */}
+        {newScheduleProductId && (
+          <BlockStack gap="200">
+            <Text as="p" variant="bodyMd" fontWeight="semibold">3. Configure</Text>
+            
             <TextField
-              label="Availability Date"
-              type="date"
-              value={newPreorderDate}
-              onChange={setNewPreorderDate}
-              helpText="When will this product be available?"
+              label="Schedule Name"
+              value={newScheduleName}
+              onChange={setNewScheduleName}
+              placeholder="e.g., Daily Fresh Bread"
               autoComplete="off"
             />
-            <TextField
-              label="Pre-order Limit"
-              type="number"
-              value={newPreorderLimit}
-              onChange={setNewPreorderLimit}
-              helpText="Maximum pre-orders to accept"
-              autoComplete="off"
-            />
+            
+            {newScheduleType === 'daily_reset' && (
+              <InlineStack gap="300">
+                <div style={{ flex: 1 }}>
+                  <TextField
+                    label="Quantity"
+                    type="number"
+                    value={newDailyQuantity}
+                    onChange={setNewDailyQuantity}
+                    autoComplete="off"
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <TextField
+                    label="Reset Time"
+                    type="time"
+                    value={newResetTime}
+                    onChange={setNewResetTime}
+                    autoComplete="off"
+                  />
+                </div>
+              </InlineStack>
+            )}
+            
+            {newScheduleType === 'recurring' && (
+              <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                <BlockStack gap="200">
+                  <Text as="p" variant="bodySm" fontWeight="semibold">Available Days</Text>
+                  <InlineStack gap="200" wrap>
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => {
+                      const dayValue = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'][i];
+                      const isSelected = selectedDays.includes(dayValue);
+                      return (
+                        <button
+                          key={day}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedDays(selectedDays.filter(d => d !== dayValue));
+                            } else {
+                              setSelectedDays([...selectedDays, dayValue]);
+                            }
+                          }}
+                          style={{
+                            padding: '8px 16px',
+                            border: 'none',
+                            borderRadius: '6px',
+                            background: isSelected ? '#008060' : '#e1e1e1',
+                            color: isSelected ? 'white' : '#333',
+                            cursor: 'pointer',
+                            fontWeight: 500
+                          }}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </InlineStack>
+                  <TextField
+                    label="Daily Quantity on Active Days"
+                    type="number"
+                    value={newDailyQuantity}
+                    onChange={setNewDailyQuantity}
+                    autoComplete="off"
+                  />
+                </BlockStack>
+              </Box>
+            )}
+            
+            {newScheduleType === 'preorder' && (
+              <InlineStack gap="300">
+                <div style={{ flex: 1 }}>
+                  <TextField
+                    label="Available Date"
+                    type="date"
+                    value={newPreorderDate}
+                    onChange={setNewPreorderDate}
+                    autoComplete="off"
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <TextField
+                    label="Max Pre-orders"
+                    type="number"
+                    value={newPreorderLimit}
+                    onChange={setNewPreorderLimit}
+                    autoComplete="off"
+                  />
+                </div>
+              </InlineStack>
+            )}
+
+            {newScheduleType === 'date_specific' && (
+              <TextField
+                label="Available Date"
+                type="date"
+                value={newPreorderDate}
+                onChange={setNewPreorderDate}
+                helpText="Product will only be available on this date"
+                autoComplete="off"
+              />
+            )}
           </BlockStack>
         )}
+        
+        <Divider />
         
         <InlineStack align="end" gap="200">
           <Button onClick={() => setIsCreatingSchedule(false)}>Cancel</Button>
@@ -913,9 +1073,9 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
             variant="primary"
             onClick={handleCreateSchedule}
             loading={savingSchedule}
-            disabled={!newScheduleName || !newScheduleProduct}
+            disabled={!newScheduleName || !newScheduleProductId}
           >
-            Create Schedule
+            Create & Activate
           </Button>
         </InlineStack>
       </BlockStack>
@@ -924,76 +1084,61 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
 
   const renderSchedulingTab = () => (
     <BlockStack gap="400">
-      <InlineStack align="space-between" blockAlign="center">
-        <BlockStack gap="100">
-          <Text as="h3" variant="headingMd">Date-Based Inventory</Text>
-          <Text as="p" variant="bodySm" tone="subdued">
-            Perfect for perishables, events, and pre-orders
-          </Text>
-        </BlockStack>
-        <Button 
-          icon={PlusIcon} 
-          variant="primary"
-          onClick={() => setIsCreatingSchedule(true)}
-        >
-          Create Schedule
-        </Button>
-      </InlineStack>
+      {!isCreatingSchedule && (
+        <InlineStack align="space-between" blockAlign="center">
+          <BlockStack gap="100">
+            <Text as="h3" variant="headingMd">Inventory Schedules</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Automate inventory for perishables, events, and limited items
+            </Text>
+          </BlockStack>
+          <Button 
+            icon={PlusIcon} 
+            variant="primary"
+            onClick={() => setIsCreatingSchedule(true)}
+          >
+            New Schedule
+          </Button>
+        </InlineStack>
+      )}
       
       {isCreatingSchedule && renderCreateScheduleForm()}
       
       {!isCreatingSchedule && scheduleRules.length === 0 ? (
         <Card>
-          <Box padding="600">
+          <Box padding="500">
             <BlockStack gap="400" inlineAlign="center">
               <div style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '14px',
-                background: '#E3F4EE',
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                background: '#f0f0f0',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                color: '#008060'
+                justifyContent: 'center'
               }}>
                 <Icon source={CalendarIcon} />
               </div>
-              <Text as="h3" variant="headingMd" alignment="center">
-                Date-Based Inventory Management
-              </Text>
-              <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-                Automate inventory for perishable goods, event tickets, or limited daily offerings.
-              </Text>
+              <BlockStack gap="200" inlineAlign="center">
+                <Text as="h3" variant="headingMd" alignment="center">
+                  No Schedules Yet
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+                  Create schedules to automatically manage inventory based on time
+                </Text>
+              </BlockStack>
               
-              <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                <BlockStack gap="300">
-                  <Text as="p" variant="bodySm" fontWeight="semibold">What you can do:</Text>
-                  <BlockStack gap="200">
-                    <InlineStack gap="200" blockAlign="center">
-                      <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: '#E3F4EE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#008060' }}>
-                        <Icon source={RefreshIcon} />
-                      </div>
-                      <Text as="span" variant="bodySm"><strong>Daily Reset</strong> - "10 fresh loaves available each morning"</Text>
-                    </InlineStack>
-                    <InlineStack gap="200" blockAlign="center">
-                      <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: '#EBF0FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5C6AC4' }}>
-                        <Icon source={CalendarIcon} />
-                      </div>
-                      <Text as="span" variant="bodySm"><strong>Date Specific</strong> - "Only available on Dec 25th"</Text>
-                    </InlineStack>
-                    <InlineStack gap="200" blockAlign="center">
-                      <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: '#FFF8E6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#B98900' }}>
-                        <Icon source={ClockIcon} />
-                      </div>
-                      <Text as="span" variant="bodySm"><strong>Recurring</strong> - "Available Mon-Fri only"</Text>
-                    </InlineStack>
-                    <InlineStack gap="200" blockAlign="center">
-                      <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: '#FFF4F4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D82C0D' }}>
-                        <Icon source={ProductIcon} />
-                      </div>
-                      <Text as="span" variant="bodySm"><strong>Pre-order</strong> - "Reserve for Jan 15th pickup"</Text>
-                    </InlineStack>
-                  </BlockStack>
+              <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                <BlockStack gap="200">
+                  <Text as="p" variant="bodySm">
+                    <strong>Daily</strong> - Reset stock to a fixed amount each day
+                  </Text>
+                  <Text as="p" variant="bodySm">
+                    <strong>Weekly</strong> - Available only on specific days
+                  </Text>
+                  <Text as="p" variant="bodySm">
+                    <strong>Pre-order</strong> - Accept reservations for future dates
+                  </Text>
                 </BlockStack>
               </Box>
               
@@ -1001,13 +1146,13 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
                 variant="primary"
                 onClick={() => setIsCreatingSchedule(true)}
               >
-                Create Your First Schedule
+                Create Schedule
               </Button>
             </BlockStack>
           </Box>
         </Card>
       ) : !isCreatingSchedule && (
-        <BlockStack gap="300">
+        <BlockStack gap="200">
           {scheduleRules.map(renderScheduleCard)}
         </BlockStack>
       )}

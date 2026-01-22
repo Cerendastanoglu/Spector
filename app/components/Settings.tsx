@@ -239,7 +239,7 @@ export function Settings({
                     </div>
                     <BlockStack gap="050">
                       <Text as="p" variant="bodyMd" fontWeight="semibold">
-                        Bulk Product Management
+                        Bulk Edit
                       </Text>
                       <Text as="p" variant="bodySm" tone="subdued">
                         {hasActiveSubscription 

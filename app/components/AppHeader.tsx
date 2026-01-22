@@ -142,7 +142,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
               fontWeight: 'medium',
               fontFamily: 'inherit' // Easy to change font family later
             }}>
-              Product Management Suite
+              Bulk Edit Suite
             </span>
           </Text>
         </BlockStack>
@@ -174,7 +174,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
         </Button>
       </div>
       
-      {/* Product Management with Badge */}
+      {/* Bulk Edit with Badge */}
       <div style={{ display: 'flex', gap: '3px', alignItems: 'center', flexShrink: 0 }}>
         <div className={activeTab === "out-of-stock" ? "nav-button-active" : "nav-button-inactive"} style={{
           background: activeTab === "out-of-stock" 
@@ -191,7 +191,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
             variant="tertiary"
             size="slim"
           >
-            Products
+            Bulk Edit
           </Button>
         </div>
         
@@ -289,7 +289,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
         </Button>
       </div>
       
-      {/* Product Management with Badge */}
+      {/* Bulk Edit with Badge */}
       <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
         <div className={activeTab === "out-of-stock" ? "nav-button-active" : "nav-button-inactive"} style={{
           background: activeTab === "out-of-stock" 
@@ -306,7 +306,7 @@ export function AppHeader({ onTabChange, activeTab, outOfStockCount = 0, onPrelo
             variant="tertiary"
             size="medium"
           >
-            Product Management
+            Bulk Edit
           </Button>
         </div>
         

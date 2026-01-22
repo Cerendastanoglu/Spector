@@ -156,7 +156,7 @@ export default function Welcome() {
               <InlineStack align="start" blockAlign="center" gap="200">
                 <Badge tone="success">✓</Badge>
                 <Text as="p" variant="bodySm">
-                  <strong>Product Management</strong> - Manage unlimited products with bulk operations
+                  <strong>Bulk Edit</strong> - Manage unlimited products with bulk operations
                 </Text>
               </InlineStack>
               <InlineStack align="start" blockAlign="center" gap="200">

@@ -58,7 +58,7 @@ export function WelcomeModal({
       icon: StarIcon, // Keep for type compatibility
       iconClass: styles.logoWrapper,
       title: "Welcome to Spector",
-      subtitle: "Your intelligent product management companion",
+      subtitle: "Your intelligent bulk edit companion",
       isLogoSlide: true,
       content: (
         <BlockStack gap="400">
@@ -133,7 +133,7 @@ export function WelcomeModal({
     {
       icon: PackageIcon,
       iconClass: `${styles.iconWrapperStatic} ${styles.iconWrapperSlide2}`,
-      title: "Bulk Product Management",
+      title: "Bulk Edit",
       subtitle: "Edit hundreds of products in seconds, not hours",
       content: (
         <BlockStack gap="400">

@@ -47,7 +47,7 @@ export function ProductManagementSkeleton({ isVisible }: ProductManagementSkelet
           }}>
             <Spinner size="large" />
             <Text as="p" variant="bodyMd">
-              Loading Product Management...
+              Loading Bulk Edit...
             </Text>
             <Text as="p" variant="bodySm" tone="subdued">
               Loading advanced features and data
@@ -66,7 +66,7 @@ export function ProductManagementSkeleton({ isVisible }: ProductManagementSkelet
           <InlineStack align="space-between">
             <BlockStack gap="200">
               <Text as="h2" variant="headingLg">
-                Product Management Center
+                Bulk Edit Center
               </Text>
               <Text as="p" variant="bodySm" tone="subdued">
                 Advanced inventory control with smart filtering and bulk operations
@@ -130,7 +130,7 @@ export function ProductManagementSkeleton({ isVisible }: ProductManagementSkelet
                 onClick={handleLoadFullComponent}
                 loading={isLoadingFull}
               >
-                Access Full Product Management
+                Access Full Bulk Edit
               </Button>
             </BlockStack>
           </Card>
