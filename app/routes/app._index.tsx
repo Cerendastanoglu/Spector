@@ -8,9 +8,6 @@ import {
   Text,
   Card,
   BlockStack,
-  Collapsible,
-  Button,
-  InlineStack,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { AppHeader } from "../components/AppHeader";
@@ -190,7 +187,6 @@ export default function Index() {
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [isAppReady, setIsAppReady] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
-  const [trialBannerExpanded, setTrialBannerExpanded] = useState(false);
   const { preloadComponent } = useComponentPreloader();
   const welcomeFetcher = useFetcher();
 
@@ -367,45 +363,6 @@ export default function Index() {
             }
           }}
         />
-        
-        {/* Trial Banner - Only for live stores on trial (not dev stores) */}
-        {!settingsData?.hasActiveSubscription && !storeType?.isDevelopmentStore && (
-          <div style={{ 
-            background: '#FFF8E5', 
-            border: '1px solid #FFD79D', 
-            borderRadius: '8px', 
-            padding: '8px 12px'
-          }}>
-            <InlineStack align="space-between" blockAlign="center">
-              <InlineStack gap="200" blockAlign="center">
-                <Text as="span" variant="bodySm" fontWeight="semibold">
-                  ⏱️ 3-day free trial • 10 product limit
-                </Text>
-                <Button 
-                  variant="plain" 
-                  size="slim"
-                  onClick={() => setTrialBannerExpanded(!trialBannerExpanded)}
-                >
-                  {trialBannerExpanded ? 'Less' : 'More info'}
-                </Button>
-              </InlineStack>
-              <Button size="slim" onClick={() => handleTabChange('settings')}>
-                Subscribe
-              </Button>
-            </InlineStack>
-            <Collapsible
-              open={trialBannerExpanded}
-              id="trial-banner-details"
-              transition={{ duration: '150ms', timingFunction: 'ease-in-out' }}
-            >
-              <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #FFD79D' }}>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  During your trial, you can edit up to 10 products in bulk operations. Subscribe to unlock unlimited products, full inventory forecasting, and all premium features.
-                </Text>
-              </div>
-            </Collapsible>
-          </div>
-        )}
         
         <Layout>
           <Layout.Section>

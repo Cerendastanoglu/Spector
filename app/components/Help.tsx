@@ -17,6 +17,7 @@ export function Help({ isVisible: _isVisible, onNavigateToDashboard: _onNavigate
     dashboard: false,
     productManagement: false,
     forecasting: false,
+    automation: false,
     pricing: false,
     collections: false,
     tags: false,
@@ -996,6 +997,120 @@ export function Help({ isVisible: _isVisible, onNavigateToDashboard: _onNavigate
                   }}>
                     <Text as="p" variant="bodyMd">
                       <strong>Quick Action:</strong> See "7 days left" in red? Click the expand arrow → Check "Suggested Reorder Qty: 50 units" → Order exactly 50 units from your supplier. Done!
+                    </Text>
+                  </div>
+                </BlockStack>
+              </div>
+            </Collapsible>
+          </div>
+
+          {/* Automation Section */}
+          <div style={{ 
+            borderLeft: `4px solid ${brandColor}`, 
+            paddingLeft: '16px',
+            backgroundColor: 'transparent',
+            transition: 'background-color 0.2s ease',
+          }}>
+            <div
+              onClick={() => toggleSection('automation')}
+              style={{
+                cursor: 'pointer',
+                padding: '12px 0',
+              }}
+            >
+              <InlineStack gap="300" blockAlign="center">
+                <div style={{ minWidth: '20px', display: 'flex', alignItems: 'center' }}>
+                  {openSections.automation ? (
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                      <path d="M5 12.5L10 7.5L15 12.5" stroke={brandColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                      <path d="M5 7.5L10 12.5L15 7.5" stroke={brandColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+                <InlineStack gap="200" blockAlign="center" wrap={false}>
+                  <Text as="span" variant="headingMd" fontWeight="semibold">
+                    Automation
+                  </Text>
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    - Auto-organize products with rules
+                  </Text>
+                </InlineStack>
+              </InlineStack>
+            </div>
+            
+            <Collapsible
+              open={openSections.automation}
+              id="automation-collapsible"
+              transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
+            >
+              <div style={{ paddingTop: '16px', paddingBottom: '16px' }}>
+                <BlockStack gap="300">
+                  <Text as="p" variant="bodyMd">
+                    <strong style={{ color: brandColor }}>Automation</strong> lets you create rules that automatically organize your products. Set it once, and let Spector do the work!
+                  </Text>
+                  
+                  <BlockStack gap="200">
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">
+                      Two Types of Rules:
+                    </Text>
+                    
+                    <div style={{ paddingLeft: '12px' }}>
+                      <Text as="p" variant="bodyMd">
+                        <strong>1. Collection Rules</strong>
+                      </Text>
+                      <div style={{ marginBottom: '12px' }}>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Automatically add products to collections based on conditions:<br/>
+                          • Title contains "Summer" → Add to "Summer Collection"<br/>
+                          • Price greater than $100 → Add to "Premium Products"<br/>
+                          • Inventory less than 10 → Add to "Low Stock Alert"
+                        </Text>
+                      </div>
+
+                      <Text as="p" variant="bodyMd">
+                        <strong>2. Tag Rules</strong>
+                      </Text>
+                      <div style={{ marginBottom: '12px' }}>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Automatically tag products when they match your criteria:<br/>
+                          • Vendor equals "Nike" → Add tag "branded"<br/>
+                          • Product type contains "shirt" → Add tag "apparel"<br/>
+                          • Status equals "active" → Add tag "in-store"
+                        </Text>
+                      </div>
+                    </div>
+                  </BlockStack>
+
+                  <BlockStack gap="200">
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">
+                      How to Create a Rule:
+                    </Text>
+                    
+                    <div style={{ paddingLeft: '12px' }}>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        1. Go to "Automation" tab<br/>
+                        2. Choose "Collections" or "Tags" sub-tab<br/>
+                        3. Click "Create Rule"<br/>
+                        4. Name your rule (e.g., "Tag Sale Items")<br/>
+                        5. Set condition (e.g., Title contains "sale")<br/>
+                        6. Set action (e.g., Add tag "on-sale")<br/>
+                        7. Click "Preview Matches" to see which products match<br/>
+                        8. Click "Create Rule" to save and run
+                      </Text>
+                    </div>
+                  </BlockStack>
+
+                  <div style={{ 
+                    backgroundColor: '#fff7ed', 
+                    padding: '12px', 
+                    borderRadius: '8px',
+                    borderLeft: `3px solid ${brandColor}`,
+                  }}>
+                    <Text as="p" variant="bodyMd">
+                      <strong>Pro Tip:</strong> Rules run automatically! When you add new products that match your conditions, they'll be organized automatically.
                     </Text>
                   </div>
                 </BlockStack>

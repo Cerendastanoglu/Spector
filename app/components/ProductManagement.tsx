@@ -2450,6 +2450,25 @@ export function ProductManagement({
         }
       `}</style>
       <BlockStack gap="600">
+      {/* Trial Banner - Bulk Edit specific */}
+      {shouldApplyTrialRestrictions && (
+        <div style={{ 
+          background: '#FFF8E5', 
+          border: '1px solid #FFD79D', 
+          borderRadius: '8px', 
+          padding: '8px 12px'
+        }}>
+          <InlineStack align="space-between" blockAlign="center">
+            <Text as="span" variant="bodySm" fontWeight="semibold">
+              ⏱️ 3-day free trial • {trialProductLimit} product edit limit
+            </Text>
+            <Button size="slim" onClick={handleSubscribeFromModal}>
+              Subscribe
+            </Button>
+          </InlineStack>
+        </div>
+      )}
+
       {/* Error Display */}
       {error && (
         <Card background="bg-surface-critical">

@@ -101,6 +101,13 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
   const [previewError, setPreviewError] = useState<string | null>(null);
 
   const shouldApplyTrialRestrictions = isTrialMode && !isDevelopmentStore;
+  
+  // Trial limits: 1 rule per type
+  const TRIAL_RULE_LIMIT = 1;
+  const collectionRules = rules.filter(r => r.type === 'collection');
+  const tagRules = rules.filter(r => r.type === 'tag');
+  const hasReachedCollectionLimit = shouldApplyTrialRestrictions && collectionRules.length >= TRIAL_RULE_LIMIT;
+  const hasReachedTagLimit = shouldApplyTrialRestrictions && tagRules.length >= TRIAL_RULE_LIMIT;
 
   const conditionFieldOptions = [
     { label: 'Title', value: 'title' },
@@ -576,8 +583,6 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
   );
 
   const renderCollectionsTab = () => {
-    const collectionRules = rules.filter(r => r.type === 'collection');
-    
     return (
       <BlockStack gap="400">
         <InlineStack align="space-between" blockAlign="center">
@@ -585,17 +590,19 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
             <Text as="h3" variant="headingMd">Auto Collections</Text>
             <Text as="p" variant="bodySm" tone="subdued">
               Automatically add products to collections based on conditions
+              {hasReachedCollectionLimit && " (Trial limit: 1 rule)"}
             </Text>
           </BlockStack>
           <Button 
             icon={PlusIcon} 
             variant="primary"
+            disabled={hasReachedCollectionLimit}
             onClick={() => {
               setNewRuleType('collection');
               setIsCreating(true);
             }}
           >
-            Create Rule
+            {hasReachedCollectionLimit ? 'Limit Reached' : 'Create Rule'}
           </Button>
         </InlineStack>
         
@@ -643,8 +650,6 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
   };
 
   const renderTagsTab = () => {
-    const tagRules = rules.filter(r => r.type === 'tag');
-    
     return (
       <BlockStack gap="400">
         <InlineStack align="space-between" blockAlign="center">
@@ -652,17 +657,19 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
             <Text as="h3" variant="headingMd">Auto Tags</Text>
             <Text as="p" variant="bodySm" tone="subdued">
               Automatically apply or remove tags based on product attributes
+              {hasReachedTagLimit && " (Trial limit: 1 rule)"}
             </Text>
           </BlockStack>
           <Button 
             icon={PlusIcon} 
             variant="primary"
+            disabled={hasReachedTagLimit}
             onClick={() => {
               setNewRuleType('tag');
               setIsCreating(true);
             }}
           >
-            Create Rule
+            {hasReachedTagLimit ? 'Limit Reached' : 'Create Rule'}
           </Button>
         </InlineStack>
         
@@ -1173,13 +1180,23 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
         </Banner>
       )}
       
-      {/* Trial Mode Banner */}
+      {/* Trial Banner - Automation specific */}
       {shouldApplyTrialRestrictions && (
-        <Banner tone="warning">
-          <Text as="p" variant="bodySm">
-            Automation rules are limited during your trial. Subscribe to create unlimited rules.
-          </Text>
-        </Banner>
+        <div style={{ 
+          background: '#FFF8E5', 
+          border: '1px solid #FFD79D', 
+          borderRadius: '8px', 
+          padding: '8px 12px'
+        }}>
+          <InlineStack align="space-between" blockAlign="center">
+            <Text as="span" variant="bodySm" fontWeight="semibold">
+              ⏱️ 3-day free trial • 1 rule per type limit
+            </Text>
+            <Button size="slim" url="/app/settings">
+              Subscribe
+            </Button>
+          </InlineStack>
+        </div>
       )}
       
       {/* Header Card */}

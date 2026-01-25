@@ -682,6 +682,27 @@ export function ForecastingTab({
 
   return (
     <BlockStack gap="400">
+      {/* Trial Banner - Forecasting specific */}
+      {shouldApplyTrialRestrictions && (
+        <div style={{ 
+          background: '#FFF8E5', 
+          border: '1px solid #FFD79D', 
+          borderRadius: '8px', 
+          padding: '8px 12px'
+        }}>
+          <InlineStack align="space-between" blockAlign="center">
+            <Text as="span" variant="bodySm" fontWeight="semibold">
+              ⏱️ 3-day free trial • 1 product forecast visible
+            </Text>
+            {managedPricingUrl && (
+              <Button size="slim" url={managedPricingUrl}>
+                Subscribe
+              </Button>
+            )}
+          </InlineStack>
+        </div>
+      )}
+
       {/* Page Header with Tabs */}
       <Card>
         <BlockStack gap="400">
