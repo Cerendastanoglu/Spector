@@ -22,6 +22,7 @@ interface Subscription {
   currentPeriodEnd?: string;
   test: boolean;
   trialDays?: number;
+  createdAt?: string;
 }
 
 interface SettingsProps {
@@ -89,6 +90,42 @@ export function Settings({
     const symbol = currency === 'USD' ? '$' : currency || '';
     return `${symbol}${amount}`;
   };
+
+  // Calculate remaining trial time
+  const getTrialTimeRemaining = () => {
+    if (!subscription?.createdAt || !subscription?.trialDays) {
+      return null;
+    }
+    
+    try {
+      const trialStart = new Date(subscription.createdAt);
+      const trialEnd = new Date(trialStart.getTime() + subscription.trialDays * 24 * 60 * 60 * 1000);
+      const now = new Date();
+      const remainingMs = trialEnd.getTime() - now.getTime();
+      
+      if (remainingMs <= 0) {
+        return { expired: true, text: 'Trial Expired' };
+      }
+      
+      const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+      const days = Math.floor(hours / 24);
+      const remainingHours = hours % 24;
+      
+      if (days > 0) {
+        return { expired: false, text: `${days}d ${remainingHours}h left` };
+      } else if (hours > 0) {
+        const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+        return { expired: false, text: `${hours}h ${minutes}m left` };
+      } else {
+        const minutes = Math.floor(remainingMs / (1000 * 60));
+        return { expired: false, text: `${minutes}m left` };
+      }
+    } catch {
+      return null;
+    }
+  };
+
+  const trialTimeRemaining = getTrialTimeRemaining();
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
@@ -179,22 +216,18 @@ export function Settings({
                           <Icon source={CalendarIcon} />
                         </div>
                         <Text as="p" variant="bodyMd" tone="subdued">
-                          Trial Status
+                          Trial Time Remaining
                         </Text>
                       </InlineStack>
-                      <Text as="p" variant="bodyMd" fontWeight="semibold" tone="success">
-                        Active - Full Access
-                      </Text>
-                    </InlineStack>
-                  )}
-
-                  {/* Trial Days Remaining */}
-                  {subscription?.trialDays && subscription.trialDays > 0 && (
-                    <InlineStack align="space-between" blockAlign="center">
-                      <Text as="p" variant="bodyMd" tone="subdued">
-                        Trial Days Remaining
-                      </Text>
-                      <Badge tone="attention">{`${subscription.trialDays} days left`}</Badge>
+                      {trialTimeRemaining ? (
+                        <Badge tone={trialTimeRemaining.expired ? "critical" : "attention"}>
+                          ⏱️ {trialTimeRemaining.text}
+                        </Badge>
+                      ) : (
+                        <Text as="p" variant="bodyMd" fontWeight="semibold" tone="success">
+                          Active - Full Access
+                        </Text>
+                      )}
                     </InlineStack>
                   )}
 

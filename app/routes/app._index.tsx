@@ -104,6 +104,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         currentPeriodEnd: fullSubscription.currentPeriodEnd,
         test: fullSubscription.test,
         trialDays: fullSubscription.trialDays,
+        createdAt: fullSubscription.createdAt,
       } : null,
       hasActiveSubscription,
       isDevelopmentStore,
