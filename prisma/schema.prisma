@@ -165,3 +165,23 @@ model Subscription {
   @@index([status])
   @@index([trialEndsAt])
 }
+
+// Scheduled Product Actions
+model ScheduledAction {
+  id              String   @id @default(cuid())
+  shop            String   // Which Shopify store
+  productId       String   // Shopify product GID
+  productTitle    String   // Product title for display
+  actionType      String   // 'publish', 'unpublish', 'draft', 'archive'
+  scheduledFor    DateTime // When to execute the action
+  status          String   @default("pending") // 'pending', 'executing', 'completed', 'failed', 'cancelled'
+  executedAt      DateTime? // When the action was actually executed
+  error           String?  // Error message if failed
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([shop])
+  @@index([status])
+  @@index([scheduledFor])
+  @@index([productId])
+}

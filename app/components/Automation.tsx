@@ -23,7 +23,8 @@ import {
   ClockIcon,
   ProductIcon,
 } from "@shopify/polaris-icons";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { Scheduling } from "./Scheduling";
 
 interface AutomationRule {
   id: string;
@@ -68,8 +69,14 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
   const [activeSubTab, setActiveSubTab] = useState<'collections' | 'tags' | 'scheduling'>('collections');
   const [rules, setRules] = useState<AutomationRule[]>([]);
   
-  // Scheduling state
-  const [scheduleRules, setScheduleRules] = useState<ScheduleRule[]>([]);
+  // Products for scheduling
+  const [schedulingProducts, setSchedulingProducts] = useState<Array<{id: string; title: string; status: string}>>([]);
+  const [loadingSchedulingProducts, setLoadingSchedulingProducts] = useState(false);
+  
+  // Scheduling state (legacy - kept for potential future inventory scheduling)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [scheduleRules, _setScheduleRules] = useState<ScheduleRule[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isCreatingSchedule, setIsCreatingSchedule] = useState(false);
   const [newScheduleName, setNewScheduleName] = useState('');
   const [newScheduleType, setNewScheduleType] = useState<ScheduleRule['scheduleType']>('daily_reset');
@@ -101,6 +108,33 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
   const [previewError, setPreviewError] = useState<string | null>(null);
 
   const shouldApplyTrialRestrictions = isTrialMode && !isDevelopmentStore;
+
+  // Load products for scheduling when tab is activated
+  useEffect(() => {
+    if (activeSubTab === 'scheduling' && schedulingProducts.length === 0 && !loadingSchedulingProducts) {
+      loadSchedulingProducts();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSubTab]);
+
+  const loadSchedulingProducts = async () => {
+    setLoadingSchedulingProducts(true);
+    try {
+      const response = await fetch('/app/api/products');
+      const data = await response.json();
+      if (data.products) {
+        setSchedulingProducts(data.products.map((p: any) => ({
+          id: p.id,
+          title: p.title,
+          status: p.status || 'ACTIVE',
+        })));
+      }
+    } catch (error) {
+      console.error('Failed to load products for scheduling:', error);
+    } finally {
+      setLoadingSchedulingProducts(false);
+    }
+  };
   
   // Trial limits: 1 rule per type
   const TRIAL_RULE_LIMIT = 1;
@@ -281,6 +315,9 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
     setProductSearchResults([]);
   }, []);
 
+  // Scheduling is only available for development stores (beta feature)
+  const isSchedulingLocked = !isDevelopmentStore;
+
   const renderSubTabs = () => (
     <div style={{
       display: 'flex',
@@ -293,12 +330,12 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
       {[
         { id: 'collections', label: 'Collections', icon: CollectionIcon, locked: false },
         { id: 'tags', label: 'Tags', icon: HashtagIcon, locked: false },
-        { id: 'scheduling', label: 'Scheduling', icon: CalendarIcon, locked: true }
+        { id: 'scheduling', label: 'Scheduling', icon: CalendarIcon, locked: isSchedulingLocked, tooltip: isSchedulingLocked ? 'Coming soon - Currently in beta testing' : undefined }
       ].map(tab => (
         <button
           key={tab.id}
           onClick={() => !tab.locked && setActiveSubTab(tab.id as typeof activeSubTab)}
-          title={tab.locked ? "Coming soon" : undefined}
+          title={tab.locked ? (tab.tooltip || "Coming soon") : undefined}
           style={{
             flex: 1,
             display: 'flex',
@@ -315,12 +352,24 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
             fontSize: '13px',
             cursor: tab.locked ? 'not-allowed' : 'pointer',
             transition: 'all 0.2s ease',
-            opacity: tab.locked ? 0.6 : 1
+            opacity: tab.locked ? 0.6 : 1,
+            position: 'relative'
           }}
         >
           <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
             <Icon source={tab.icon} />
             <span>{tab.label}</span>
+            {tab.locked && (
+              <span style={{
+                fontSize: '9px',
+                background: '#5c5f62',
+                color: 'white',
+                padding: '1px 4px',
+                borderRadius: '4px',
+                marginLeft: '4px',
+                fontWeight: '500'
+              }}>BETA</span>
+            )}
           </span>
         </button>
       ))}
@@ -736,7 +785,7 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
       preorderLimit: parseInt(newPreorderLimit) || 50,
     };
     
-    setScheduleRules(prev => [...prev, newSchedule]);
+    _setScheduleRules((prev: ScheduleRule[]) => [...prev, newSchedule]);
     setIsCreatingSchedule(false);
     setNewScheduleName('');
     setNewScheduleProduct('');
@@ -746,13 +795,13 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
   }, [newScheduleName, newScheduleProduct, newScheduleProductId, newScheduleType, newDailyQuantity, newResetTime, selectedDays, newPreorderDate, newPreorderLimit]);
 
   const handleToggleSchedule = useCallback((scheduleId: string) => {
-    setScheduleRules(prev => prev.map(s => 
+    _setScheduleRules((prev: ScheduleRule[]) => prev.map((s: ScheduleRule) => 
       s.id === scheduleId ? { ...s, enabled: !s.enabled } : s
     ));
   }, []);
 
   const handleDeleteSchedule = useCallback((scheduleId: string) => {
-    setScheduleRules(prev => prev.filter(s => s.id !== scheduleId));
+    _setScheduleRules((prev: ScheduleRule[]) => prev.filter((s: ScheduleRule) => s.id !== scheduleId));
   }, []);
 
   const handleRunSchedule = useCallback(async (scheduleId: string) => {
@@ -779,6 +828,7 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
     setRunningSchedule(null);
   }, [scheduleRules]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const renderScheduleCard = (schedule: ScheduleRule) => {
     const typeLabels: Record<ScheduleRule['scheduleType'], string> = {
       'daily_reset': 'Daily',
@@ -859,6 +909,7 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
     );
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const renderCreateScheduleForm = () => (
     <Card>
       <BlockStack gap="400">
@@ -1092,80 +1143,10 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
   );
 
   const renderSchedulingTab = () => (
-    <BlockStack gap="400">
-      {!isCreatingSchedule && (
-        <InlineStack align="space-between" blockAlign="center">
-          <BlockStack gap="100">
-            <Text as="h3" variant="headingMd">Inventory Schedules</Text>
-            <Text as="p" variant="bodySm" tone="subdued">
-              Automate inventory for perishables, events, and limited items
-            </Text>
-          </BlockStack>
-          <Button 
-            icon={PlusIcon} 
-            variant="primary"
-            onClick={() => setIsCreatingSchedule(true)}
-          >
-            New Schedule
-          </Button>
-        </InlineStack>
-      )}
-      
-      {isCreatingSchedule && renderCreateScheduleForm()}
-      
-      {!isCreatingSchedule && scheduleRules.length === 0 ? (
-        <Card>
-          <Box padding="500">
-            <BlockStack gap="400" inlineAlign="center">
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: '#f0f0f0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Icon source={CalendarIcon} />
-              </div>
-              <BlockStack gap="200" inlineAlign="center">
-                <Text as="h3" variant="headingMd" alignment="center">
-                  No Schedules Yet
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-                  Create schedules to automatically manage inventory based on time
-                </Text>
-              </BlockStack>
-              
-              <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-                <BlockStack gap="200">
-                  <Text as="p" variant="bodySm">
-                    <strong>Daily</strong> - Reset stock to a fixed amount each day
-                  </Text>
-                  <Text as="p" variant="bodySm">
-                    <strong>Weekly</strong> - Available only on specific days
-                  </Text>
-                  <Text as="p" variant="bodySm">
-                    <strong>Pre-order</strong> - Accept reservations for future dates
-                  </Text>
-                </BlockStack>
-              </Box>
-              
-              <Button 
-                variant="primary"
-                onClick={() => setIsCreatingSchedule(true)}
-              >
-                Create Schedule
-              </Button>
-            </BlockStack>
-          </Box>
-        </Card>
-      ) : !isCreatingSchedule && (
-        <BlockStack gap="200">
-          {scheduleRules.map(renderScheduleCard)}
-        </BlockStack>
-      )}
-    </BlockStack>
+    <Scheduling 
+      products={schedulingProducts} 
+      isTrialMode={shouldApplyTrialRestrictions}
+    />
   );
 
   return (

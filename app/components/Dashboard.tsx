@@ -469,57 +469,30 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
     return formatCurrency(amount);
   };
 
-
-
-
-
-  // Skeleton loading component for key metrics
-  const renderMetricsSkeleton = () => (
-    <Card>
-      <InlineStack gap="600" align="space-between" wrap={false}>
-        {[1, 2, 3, 4].map((i) => (
-          <InlineStack key={i} gap="300" blockAlign="center">
-            <Box 
-              background="bg-surface-secondary" 
-              padding="200" 
-              borderRadius="100"
-            >
-              <div style={{ width: '20px', height: '20px' }} />
-            </Box>
-            <BlockStack gap="050">
-              <div style={{ width: '80px', height: '12px', backgroundColor: 'var(--p-color-bg-surface-secondary)', borderRadius: '4px' }} />
-              <div style={{ width: '60px', height: '20px', backgroundColor: 'var(--p-color-bg-surface-secondary)', borderRadius: '4px' }} />
-              <div style={{ width: '100px', height: '10px', backgroundColor: 'var(--p-color-bg-surface-secondary)', borderRadius: '4px' }} />
-            </BlockStack>
-          </InlineStack>
-        ))}
-      </InlineStack>
-    </Card>
-  );
-
-  // Skeleton loading component for product table
+  // LCP-optimized product table skeleton - shows real text structure
   const renderProductTableSkeleton = () => (
     <Card>
       <BlockStack gap="300">
         <BlockStack gap="200">
-          <div style={{ width: '200px', height: '20px', backgroundColor: 'var(--p-color-bg-surface-secondary)', borderRadius: '4px' }} />
-          <div style={{ width: '300px', height: '14px', backgroundColor: 'var(--p-color-bg-surface-secondary)', borderRadius: '4px' }} />
+          <Text as="h3" variant="headingMd" fontWeight="semibold">Top Products</Text>
+          <Text as="p" variant="bodySm" tone="subdued">Loading your best performers...</Text>
         </BlockStack>
         <Box background="bg-surface-secondary" padding="400" borderRadius="200">
           <BlockStack gap="300">
             {[1, 2, 3, 4, 5].map((i) => (
               <InlineStack key={i} gap="400" align="space-between">
                 <InlineStack gap="300">
-                  <div style={{ width: '40px', height: '40px', backgroundColor: 'var(--p-color-bg-surface)', borderRadius: '4px' }} />
+                  <Box background="bg-surface" padding="200" borderRadius="100">
+                    <div style={{ width: '24px', height: '24px' }} />
+                  </Box>
                   <BlockStack gap="100">
-                    <div style={{ width: '150px', height: '14px', backgroundColor: 'var(--p-color-bg-surface)', borderRadius: '4px' }} />
-                    <div style={{ width: '100px', height: '12px', backgroundColor: 'var(--p-color-bg-surface)', borderRadius: '4px' }} />
+                    <Text as="p" variant="bodyMd" tone="subdued">Product {i}</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">Loading...</Text>
                   </BlockStack>
                 </InlineStack>
                 <InlineStack gap="200">
-                  <div style={{ width: '60px', height: '14px', backgroundColor: 'var(--p-color-bg-surface)', borderRadius: '4px' }} />
-                  <div style={{ width: '80px', height: '14px', backgroundColor: 'var(--p-color-bg-surface)', borderRadius: '4px' }} />
-                  <div style={{ width: '50px', height: '20px', backgroundColor: 'var(--p-color-bg-surface)', borderRadius: '4px' }} />
+                  <Text as="p" variant="bodySm" tone="subdued">—</Text>
+                  <Badge>—</Badge>
                 </InlineStack>
               </InlineStack>
             ))}
@@ -593,16 +566,20 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
       );
     }
 
+    // Helper to show value or loading placeholder
+    const showValue = (value: string | number, suffix = '') => {
+      if (isLoading && !productAnalyticsData) {
+        return <span style={{ opacity: 0.5 }}>—</span>;
+      }
+      return <>{value}{suffix}</>;
+    };
+
     return (
     <BlockStack gap="400">
-      {/* Key Metrics - Always show structure, with loading states or data */}
-      {isLoading && !productAnalyticsData ? (
-        // Show skeleton during initial load
-        renderMetricsSkeleton()
-      ) : (
-        <Card>
-          <div className="metrics-grid">
-            <InlineStack gap="300" wrap={true} blockAlign="start">
+      {/* Key Metrics - Always show UI structure immediately, numbers load progressively */}
+      <Card>
+        <div className="metrics-grid">
+          <InlineStack gap="300" wrap={true} blockAlign="start">
             <div className="metric-card-wrapper">
               <InlineStack gap="200" blockAlign="center">
                 <Box 
@@ -615,17 +592,11 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                 <BlockStack gap="050">
                   <Text as="p" variant="bodySm" tone="subdued">Total Products</Text>
                   <Text as="span" variant="headingLg" fontWeight="bold">
-                    {productAnalyticsData?.totalProducts || 0}
+                    {showValue(productAnalyticsData?.totalProducts ?? 0)}
                   </Text>
                   <Text as="p" variant="bodyXs" tone="subdued">
-                    {productAnalyticsData?.activeProducts || 0} active
+                    {isLoading && !productAnalyticsData ? 'Loading...' : `${productAnalyticsData?.activeProducts || 0} active`}
                   </Text>
-                  {isLoading && (
-                    <InlineStack gap="100" blockAlign="center">
-                      <Spinner size="small" />
-                      <Text as="p" variant="bodyXs" tone="subdued">Updating...</Text>
-                    </InlineStack>
-                  )}
                 </BlockStack>
               </InlineStack>
             </div>
@@ -642,7 +613,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                 <BlockStack gap="050">
                   <Text as="p" variant="bodySm" tone="subdued">Catalog Value</Text>
                   <Text as="span" variant="headingLg" fontWeight="bold">
-                    {formatCompactCurrency(productAnalyticsData?.totalCatalogValue || 0)}
+                    {showValue(formatCompactCurrency(productAnalyticsData?.totalCatalogValue || 0))}
                   </Text>
                   <Text as="p" variant="bodyXs" tone="subdued">
                     Total inventory
@@ -663,7 +634,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                 <BlockStack gap="050">
                   <Text as="p" variant="bodySm" tone="subdued">Average Price</Text>
                   <Text as="span" variant="headingLg" fontWeight="bold">
-                    {formatCompactCurrency(productAnalyticsData?.avgProductPrice || 0)}
+                    {showValue(formatCompactCurrency(productAnalyticsData?.avgProductPrice || 0))}
                   </Text>
                   <Text as="p" variant="bodyXs" tone="subdued">
                     Per product
@@ -684,7 +655,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                 <BlockStack gap="050">
                   <Text as="p" variant="bodySm" tone="subdued">Catalog Health</Text>
                   <Text as="span" variant="headingLg" fontWeight="bold">
-                    {(productAnalyticsData?.catalogHealth || 0).toFixed(1)}%
+                    {showValue((productAnalyticsData?.catalogHealth ?? 0).toFixed(1), '%')}
                   </Text>
                   <Text as="p" variant="bodyXs" tone="subdued">
                     Stock score
@@ -693,22 +664,20 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
               </InlineStack>
             </div>
           </InlineStack>
-          </div>
-        </Card>
-      )}
+        </div>
+      </Card>
 
       {/* Analytics Deep Dive - Full Width Horizontal Layout */}
       <BlockStack gap="400">
-        {/* Stock Status - Full Width Horizontal */}
+        {/* Stock Status - Full Width Horizontal - Always show UI structure */}
         <Card>
           <BlockStack gap="400">
             <Text as="h3" variant="headingMd" fontWeight="semibold">
               Stock Status Overview
             </Text>
             
-            {productAnalyticsData?.inventoryDistribution ? (
-              <div className="stock-cards-grid">
-                <InlineStack gap="300" wrap={true} blockAlign="start">
+            <div className="stock-cards-grid">
+              <InlineStack gap="300" wrap={true} blockAlign="start">
                 <div className="stock-card-wrapper">
                   <Box 
                     padding="300" 
@@ -732,7 +701,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                         </BlockStack>
                       </InlineStack>
                       <Text as="p" variant="heading2xl" fontWeight="bold" tone="success">
-                        {productAnalyticsData.inventoryDistribution.wellStocked}
+                        {showValue(productAnalyticsData?.inventoryDistribution?.wellStocked ?? 0)}
                       </Text>
                     </InlineStack>
                   </Box>
@@ -761,24 +730,24 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                         </BlockStack>
                       </InlineStack>
                       <Text as="p" variant="heading2xl" fontWeight="bold">
-                        {productAnalyticsData.inventoryDistribution.lowStock}
+                        {showValue(productAnalyticsData?.inventoryDistribution?.lowStock ?? 0)}
                       </Text>
                     </InlineStack>
                   </Box>
                 </div>
                 
-                {/* Out of Stock Card - Clickable */}
+                {/* Out of Stock Card - Clickable when data loaded */}
                 <div 
                   className="stock-card-wrapper"
-                  onClick={() => productAnalyticsData.inventoryDistribution.outOfStock > 0 && setIsOosAccordionOpen(!isOosAccordionOpen)}
+                  onClick={() => productAnalyticsData?.inventoryDistribution?.outOfStock && productAnalyticsData.inventoryDistribution.outOfStock > 0 && setIsOosAccordionOpen(!isOosAccordionOpen)}
                   style={{ 
-                    cursor: productAnalyticsData.inventoryDistribution.outOfStock > 0 ? 'pointer' : 'default',
+                    cursor: productAnalyticsData?.inventoryDistribution?.outOfStock && productAnalyticsData.inventoryDistribution.outOfStock > 0 ? 'pointer' : 'default',
                     transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                    animation: productAnalyticsData.inventoryDistribution.outOfStock > 0 && !isOosAccordionOpen ? 'subtle-pulse 2s ease-in-out infinite' : 'none',
+                    animation: productAnalyticsData?.inventoryDistribution?.outOfStock && productAnalyticsData.inventoryDistribution.outOfStock > 0 && !isOosAccordionOpen ? 'subtle-pulse 2s ease-in-out infinite' : 'none',
                     borderRadius: '8px',
                   }}
                   onMouseEnter={(e) => {
-                    if (productAnalyticsData.inventoryDistribution.outOfStock > 0) {
+                    if (productAnalyticsData?.inventoryDistribution?.outOfStock && productAnalyticsData.inventoryDistribution.outOfStock > 0) {
                       e.currentTarget.style.transform = 'translateY(-2px)';
                       e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
                     }
@@ -817,17 +786,19 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                         <BlockStack gap="050">
                           <Text as="p" variant="bodyMd" fontWeight="semibold">Out of Stock</Text>
                           <Text as="p" variant="bodyXs" tone="subdued">
-                            {productAnalyticsData.inventoryDistribution.outOfStock > 0 
-                              ? (isOosAccordionOpen ? 'Click to collapse' : 'Active products only →') 
-                              : 'All stocked ✓'}
+                            {isLoading && !productAnalyticsData 
+                              ? 'Loading...'
+                              : productAnalyticsData?.inventoryDistribution?.outOfStock && productAnalyticsData.inventoryDistribution.outOfStock > 0 
+                                ? (isOosAccordionOpen ? 'Click to collapse' : 'Active products only →') 
+                                : 'All stocked ✓'}
                           </Text>
                         </BlockStack>
                       </InlineStack>
                       <InlineStack gap="200" blockAlign="center">
                         <Text as="p" variant="heading2xl" fontWeight="bold" tone="critical">
-                          {productAnalyticsData.inventoryDistribution.outOfStock}
+                          {showValue(productAnalyticsData?.inventoryDistribution?.outOfStock ?? 0)}
                         </Text>
-                        {productAnalyticsData.inventoryDistribution.outOfStock > 0 && (
+                        {productAnalyticsData?.inventoryDistribution?.outOfStock && productAnalyticsData.inventoryDistribution.outOfStock > 0 && (
                           <Icon 
                             source={isOosAccordionOpen ? ChevronUpIcon : ChevronDownIcon} 
                             tone="subdued" 
@@ -838,18 +809,10 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                   </Box>
                 </div>
               </InlineStack>
-              </div>
-            ) : (
-              <Box padding="600" background="bg-surface-secondary" borderRadius="300">
-                <BlockStack align="center" gap="300">
-                  <Spinner size="small" />
-                  <Text as="p" variant="bodyMd" tone="subdued">Loading stock data...</Text>
-                </BlockStack>
-              </Box>
-            )}
+            </div>
 
             {/* Out of Stock Products Accordion */}
-            {productAnalyticsData?.inventoryDistribution?.outOfStock > 0 && (
+            {productAnalyticsData?.inventoryDistribution?.outOfStock && productAnalyticsData.inventoryDistribution.outOfStock > 0 && (
               <Collapsible
                 open={isOosAccordionOpen}
                 id="oos-accordion"

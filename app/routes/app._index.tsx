@@ -314,41 +314,11 @@ export default function Index() {
     }
   };
 
-  // Show skeleton while hydrating to improve LCP (don't return null!)
+  // Render immediately for best LCP - no hydration skeleton needed
+  // The Dashboard component handles its own loading states
   if (!isHydrated) {
-    return (
-      <Page>
-        <BlockStack gap="500">
-          {/* Skeleton header */}
-          <Card>
-            <BlockStack gap="300">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ width: '200px', height: '24px', backgroundColor: 'var(--p-color-bg-surface-secondary)', borderRadius: '4px' }} />
-                <div style={{ width: '100px', height: '32px', backgroundColor: 'var(--p-color-bg-surface-secondary)', borderRadius: '4px' }} />
-              </div>
-            </BlockStack>
-          </Card>
-          {/* Skeleton content */}
-          <Card>
-            <BlockStack gap="400">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ width: '180px', height: '28px', backgroundColor: 'var(--p-color-bg-surface-secondary)', borderRadius: '4px' }} />
-                <div style={{ width: '100px', height: '32px', backgroundColor: 'var(--p-color-bg-surface-secondary)', borderRadius: '4px' }} />
-              </div>
-              <div style={{ height: '1px', backgroundColor: 'var(--p-color-border)' }} />
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} style={{ flex: '1 1 200px', padding: '16px', background: 'var(--p-color-bg-surface-secondary)', borderRadius: '8px' }}>
-                    <div style={{ width: '80px', height: '12px', backgroundColor: 'var(--p-color-bg-surface)', borderRadius: '4px', marginBottom: '8px' }} />
-                    <div style={{ width: '60px', height: '24px', backgroundColor: 'var(--p-color-bg-surface)', borderRadius: '4px' }} />
-                  </div>
-                ))}
-              </div>
-            </BlockStack>
-          </Card>
-        </BlockStack>
-      </Page>
-    );
+    // Return null during SSR - let the real Dashboard render on hydration
+    return null;
   }
 
   return (
