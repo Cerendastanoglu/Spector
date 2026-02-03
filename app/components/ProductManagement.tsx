@@ -111,7 +111,7 @@ interface ProductManagementProps {
   initialCategory?: InventoryCategory;
   shopDomain?: string;
   initialProducts?: Product[] | null; // Add support for server-side loaded products
-  subscriptionStatus?: 'trialing' | 'active' | 'cancelled' | 'expired' | 'none';
+  subscriptionStatus?: 'free' | 'active' | 'cancelled' | 'expired' | 'none';
   hasActiveSubscription?: boolean;
   isDevelopmentStore?: boolean; // Whether this is a development/partner store
 }
@@ -2435,7 +2435,7 @@ export function ProductManagement({
         }
       `}</style>
       <BlockStack gap="600">
-      {/* Trial Banner - Bulk Edit specific */}
+      {/* Free Plan Banner - Bulk Edit specific */}
       {shouldApplyTrialRestrictions && (
         <div style={{ 
           background: '#FFF8E5', 
@@ -2445,10 +2445,10 @@ export function ProductManagement({
         }}>
           <InlineStack align="space-between" blockAlign="center">
             <Text as="span" variant="bodySm" fontWeight="semibold">
-              ⏱️ 3-day free trial • {trialProductLimit} product edit limit
+              📦 Free Plan • {trialProductLimit} product edit limit
             </Text>
             <Button size="slim" onClick={handleSubscribeFromModal}>
-              Subscribe
+              Upgrade
             </Button>
           </InlineStack>
         </div>

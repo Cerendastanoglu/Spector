@@ -314,11 +314,11 @@ export function Scheduling({ products: initialProducts = [], isTrialMode = false
 
   return (
     <BlockStack gap="400">
-      {/* Trial Banner */}
+      {/* Free Plan Banner */}
       {isTrialMode && (
         <Banner tone="warning">
           <Text as="p" variant="bodySm">
-            ⏱️ 3-day free trial • {TRIAL_SCHEDULE_LIMIT - scheduled.length} scheduled actions remaining
+            📅 Free Plan • {TRIAL_SCHEDULE_LIMIT - scheduled.length} scheduled actions remaining
           </Text>
         </Banner>
       )}

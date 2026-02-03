@@ -139,11 +139,11 @@ model Subscription {
   shop                  String   @unique // One subscription per shop
   shopifyChargeId       String?  @unique // Shopify's recurring charge ID
   plan                  String   @default("basic") // Plan name: "basic"
-  status                String   @default("trialing") // 'trialing', 'active', 'cancelled', 'expired', 'frozen'
+  status                String   @default("free") // 'free', 'active', 'cancelled', 'expired', 'frozen'
   
-  // Trial Management
+  // Legacy Trial Fields (kept for backwards compatibility)
   trialStartedAt        DateTime @default(now())
-  trialEndsAt           DateTime // 3 days from install
+  trialEndsAt           DateTime // Legacy field - not used for time-based restrictions
   isTrialUsed           Boolean  @default(false)
   
   // Billing Dates

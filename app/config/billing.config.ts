@@ -1,8 +1,8 @@
 /**
  * Billing Configuration for Spector App
  * 
- * Single plan: Basic at $10.99/month
- * 3-day free trial for all new installations
+ * Single plan: Basic at $9.99/month
+ * Free plan with limited features for all users until they subscribe
  */
 
 export const BILLING_CONFIG = {
@@ -12,10 +12,11 @@ export const BILLING_CONFIG = {
   MONTHLY_PRICE: 9.99,
   CURRENCY: 'USD',
   
-  // Trial Configuration
-  TRIAL_DAYS: 3,
-  TRIAL_HOURS: 3 * 24, // 72 hours
-  TRIAL_PRODUCT_LIMIT: 10, // Max products that can be edited in trial mode
+  // Free Plan Limits (applied when no active subscription)
+  TRIAL_DAYS: 0, // No time-based trial - using feature limits instead
+  TRIAL_HOURS: 0,
+  FREE_PLAN_PRODUCT_LIMIT: 10, // Max products that can be edited on free plan
+  TRIAL_PRODUCT_LIMIT: 10, // Alias for backwards compatibility
   
   // Billing Interval
   BILLING_INTERVAL: 'EVERY_30_DAYS' as const,
@@ -35,55 +36,27 @@ export const BILLING_CONFIG = {
     price: 9.99,
     currencyCode: 'USD',
     interval: 'EVERY_30_DAYS',
-    trialDays: 3,
+    trialDays: 0, // No time-based trial
     test: process.env.NODE_ENV !== 'production', // Test mode in dev
   },
 } as const;
 
 // Subscription Status Types
 export type SubscriptionStatus = 
-  | 'trialing'    // In 3-day free trial
+  | 'free'        // Free plan (limited features)
   | 'active'      // Paid and active
   | 'cancelled'   // User cancelled
-  | 'expired'     // Trial or subscription expired
+  | 'expired'     // Subscription expired
   | 'frozen';     // Frozen by Shopify (payment failed)
 
-// Helper function to check if subscription allows access
-export function hasActiveSubscription(status: SubscriptionStatus, trialEndsAt: Date): boolean {
-  const now = new Date();
-  
-  if (status === 'active') {
-    return true;
-  }
-  
-  if (status === 'trialing' && now < trialEndsAt) {
-    return true;
-  }
-  
-  return false;
+// Helper function to check if subscription allows full access (no limits)
+export function hasActiveSubscription(status: SubscriptionStatus): boolean {
+  return status === 'active';
 }
 
-// Helper to calculate trial end date
-export function calculateTrialEndDate(startDate: Date = new Date()): Date {
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + BILLING_CONFIG.TRIAL_DAYS);
-  return endDate;
-}
-
-// Helper to get days remaining in trial
-export function getDaysRemainingInTrial(trialEndsAt: Date): number {
-  const now = new Date();
-  const diffTime = trialEndsAt.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return Math.max(0, diffDays);
-}
-
-// Helper to get hours remaining in trial
-export function getHoursRemainingInTrial(trialEndsAt: Date): number {
-  const now = new Date();
-  const diffTime = trialEndsAt.getTime() - now.getTime();
-  const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
-  return Math.max(0, diffHours);
+// Helper function to check if user is on free plan (has limits)
+export function isFreePlan(status: SubscriptionStatus): boolean {
+  return status === 'free' || status === 'cancelled' || status === 'expired';
 }
 
 // Format price for display
@@ -92,4 +65,13 @@ export function formatPrice(price: number = BILLING_CONFIG.MONTHLY_PRICE, curren
     style: 'currency',
     currency: currency,
   }).format(price);
+}
+
+// Get free plan limits
+export function getFreePlanLimits() {
+  return {
+    productEditLimit: BILLING_CONFIG.FREE_PLAN_PRODUCT_LIMIT,
+    forecastLimit: 1,
+    automationRulesPerType: 1,
+  };
 }

@@ -253,7 +253,7 @@ export default function Index() {
             isVisible={true} 
             shopDomain={shop?.primaryDomain?.host || shop?.myshopifyDomain} 
             initialProducts={initialProducts}
-            subscriptionStatus={settingsData.hasActiveSubscription ? 'active' : (subscription.status === 'ACTIVE' ? 'active' : 'trialing')}
+            subscriptionStatus={settingsData.hasActiveSubscription ? 'active' : (subscription.status === 'ACTIVE' ? 'active' : 'free')}
             hasActiveSubscription={settingsData.hasActiveSubscription}
             isDevelopmentStore={storeType?.isDevelopmentStore || false}
           />

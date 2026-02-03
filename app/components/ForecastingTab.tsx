@@ -985,7 +985,7 @@ export function ForecastingTab({
 
   return (
     <BlockStack gap="400">
-      {/* Trial Banner - Forecasting specific */}
+      {/* Free Plan Banner - Forecasting specific */}
       {shouldApplyTrialRestrictions && (
         <div style={{ 
           background: '#FFF8E5', 
@@ -995,11 +995,11 @@ export function ForecastingTab({
         }}>
           <InlineStack align="space-between" blockAlign="center">
             <Text as="span" variant="bodySm" fontWeight="semibold">
-              ⏱️ 3-day free trial • 1 product forecast visible
+              📊 Free Plan • 1 product forecast visible
             </Text>
             {managedPricingUrl && (
               <Button size="slim" url={managedPricingUrl}>
-                Subscribe
+                Upgrade
               </Button>
             )}
           </InlineStack>

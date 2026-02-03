@@ -1161,7 +1161,7 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
         </Banner>
       )}
       
-      {/* Trial Banner - Automation specific */}
+      {/* Free Plan Banner - Automation specific */}
       {shouldApplyTrialRestrictions && (
         <div style={{ 
           background: '#FFF8E5', 
@@ -1171,10 +1171,10 @@ export function Automation({ shopDomain: _shopDomain, isTrialMode = false, isDev
         }}>
           <InlineStack align="space-between" blockAlign="center">
             <Text as="span" variant="bodySm" fontWeight="semibold">
-              ⏱️ 3-day free trial • 1 rule per type limit
+              🤖 Free Plan • 1 rule per type limit
             </Text>
             <Button size="slim" url="/app/settings">
-              Subscribe
+              Upgrade
             </Button>
           </InlineStack>
         </div>
