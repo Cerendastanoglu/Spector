@@ -198,7 +198,7 @@ export function Settings({
                       variant={hasActiveSubscription ? "secondary" : "primary"}
                       onClick={handleManageSubscription}
                     >
-                      {hasActiveSubscription ? 'Manage Subscription' : 'Upgrade Now'}}
+                      {hasActiveSubscription ? 'Manage Subscription' : 'Upgrade Now'}
                     </Button>
                   </InlineStack>
                 </BlockStack>
