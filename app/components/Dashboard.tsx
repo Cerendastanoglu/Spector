@@ -798,7 +798,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
                         <Text as="p" variant="heading2xl" fontWeight="bold" tone="critical">
                           {showValue(productAnalyticsData?.inventoryDistribution?.outOfStock ?? 0)}
                         </Text>
-                        {productAnalyticsData?.inventoryDistribution?.outOfStock && productAnalyticsData.inventoryDistribution.outOfStock > 0 && (
+                        {(productAnalyticsData?.inventoryDistribution?.outOfStock ?? 0) > 0 && (
                           <Icon 
                             source={isOosAccordionOpen ? ChevronUpIcon : ChevronDownIcon} 
                             tone="subdued" 
@@ -812,7 +812,7 @@ export function Dashboard({ isVisible, outOfStockCount: _outOfStockCount, onNavi
             </div>
 
             {/* Out of Stock Products Accordion */}
-            {productAnalyticsData?.inventoryDistribution?.outOfStock && productAnalyticsData.inventoryDistribution.outOfStock > 0 && (
+            {(productAnalyticsData?.inventoryDistribution?.outOfStock ?? 0) > 0 && (
               <Collapsible
                 open={isOosAccordionOpen}
                 id="oos-accordion"
